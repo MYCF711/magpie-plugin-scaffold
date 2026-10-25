@@ -7,7 +7,6 @@
   "exports": "./index.mjs",
   "files": [
     "index.mjs",
-    "src",
     "README.md",
     "HOOKS.md",
     "LICENSE",
