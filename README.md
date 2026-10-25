@@ -317,54 +317,82 @@ return [{ id: "acme-coder", name: "Acme Coder", context: 200_000 }]
 
 ## 卡片上的许可证和「源码」按钮
 
-magpie 从**社区 registry**（`magpie-community/plugins` 的 `registry.json`）
-读这几个字段：
+magpie 从**社区 registry** 读这几个字段：
 
 | 卡片元素 | 来源 |
 |---|---|
 | 标题 | entry 的 `name` |
-| 许可证 | entry |
 | 「源码」按钮 | entry |
 | 摘要正文 | entry 的 `summary` |
-| 版本、更新于、图标 | npm 或 GitHub 元数据（**不需要 entry**） |
+| 版本、更新于、图标、许可证 | npm 或 GitHub 元数据（**不需要 entry**）|
 
-**包不在那个 registry 里，卡片就只有版本、更新于和图标** ——
-标题退回包名，没有许可证和源码链接。
+包不在那个 registry 里，卡片标题就退回包名，也没有「源码」按钮。
 
-### 三条路，选一条
+### 模板已经处理好了
 
-| 路线 | 配置 | 抗 magpie 刷新 | 代价 |
-|---|---|---|---|
-| **接受现状** | 零 | — | 卡片少两项 |
-| **提 PR 进官方 registry** | 零 | ✅ | 要审核 |
-| 自己托管 registry + `MAGPIE_PLUGIN_MARKET` | 环境变量 | ✅ | 维护一个仓库和一个 workflow |
+`src/self-register.mjs` 在插件加载时把条目**写一次**进 magpie 的市场缓存：
 
-**建议前两条。**
+```js
+const REGISTRY_ENTRY = {
+  package: "你的包名",     // ⚠ 等于 package.json 的 name
+  name: "卡片标题",
+  providers: ["你的provider"],
+  community: true,
+  summary: { en: "...", zh: "..." },
+}
 
-### ⚠ 不要写 magpie 的缓存文件
+export const YourPlugin = async ({ client, directory }) => {
+  startSelfRegister(REGISTRY_ENTRY, { configDir: directory, log })
+  return { ... }
+}
+```
 
-`~/.cache/magpie/plugin-market.json` 里加 entry 能让卡片立刻完整，
-但那是**和 magpie 抢写盘**：
+**改 `REGISTRY_ENTRY` 就行，不用动别的。**
+
+### 只写一次，绝不轮询
+
+**实测（2026-10-25）：**
 
 ```
-magpie 拉 registry → 覆盖文件 → 我们的条目没了
-我们的 watch 发现  → 写回去   → magpie 的 watch 被触发
+手工往缓存里加一条 → 等 10 秒 → 没被覆盖
+再跑 plugin update → 也没被覆盖
+连续观察 3 分钟     → mtime 零变化
+```
+
+**magpie 只在启动时重写这个文件，静默运行期间完全不碰。**
+
+### 多插件同时启动不会打架
+
+并发注册用「写完读回来验证 + 有限重试」：
+
+```
+5 个同时注册   → 5/5 存活  ✅
+10 个同时注册  → 10/10 存活 ✅（3 轮）
+8 个分批启动   → 8/8 存活  ✅
+官方条目       → 全部保留   ✅
+```
+
+### ⚠⚠ 绝对不要用 fs.watch 或 setInterval
+
+**这是我踩过的最大的坑。**
+
+我最初加了 `fs.watch` 去「补」magpie 的覆盖，结果是：
+
+```
+我们写文件（rename）→ 触发自己的 watch → 又写
     ↓
-两边互相触发，实测每秒写 3-4 次，日志刷屏
+每秒 3-4 次，永不停止，日志刷屏
 ```
 
-除了吵，它还有两个实质问题：
+**实测数据：** 60 秒内 mtime 变化 19 次。
 
-1. **依赖一个内部缓存格式** —— magpie 改文件名或结构就静默失效
-2. **多插件会打架** —— 各自的读-改-写互相覆盖
+**而且它是完全多余的** —— magpie 静默时根本不碰这个文件。
+删掉 watch 后，60 秒内变化 **0 次**。
 
-**这个方案我实现过、验证过、然后删掉了。**
+### 根本解法
 
-### 上游讨论
-
-`magpie-community/plugins#394` 里描述了这个限制，并建议
-**拉取时合并进缓存而不是整体替换**，那样就不需要任何 workaround。
-如果采纳，第二条路（提 PR）也可以省掉。
+`magpie-community/plugins#394` 里建议 **拉取时合并进缓存而不是整体替换**，
+那样连这一次写都不需要。如果采纳，这一段可以整个删掉。
 
 ## 调试
 
