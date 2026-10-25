@@ -166,7 +166,10 @@ auth.checkin(getAuth, provider) {
 
   windows?: [{
     name: string,
-    used: number,                   // 百分比 0-100，超额时 >100
+    used: number,                   // ⚠ 必填。百分比 0-100，超额时 >100
+                                    // 它是**路由排序输入**，不是只给进度条用的：
+                                    // 缺了 magpie 归一成 0 = 「满额」，会把一个
+                                    // 耗尽的账号顶到路由队首（见第十一节）
     resetsAt?: string | number,
     resetSecs?: number,
     display?: string,               // "370 / 1000 credits"
@@ -551,6 +554,119 @@ windows: [{
 
 **`aside: true` 的窗口用光不会停账号**（比如赠送积分），
 magpie 会把它显示成「附加额度」。
+
+### ⚠⚠ `used` 是必填，而且它决定路由，不只是画条
+
+这是本节最要紧的一条，踩过的人付出了很实的代价。
+
+magpie 归一化时是这么取的（宿主源码原文）：
+
+```js
+used: Math.max(0, num(w?.used)),   // past 100 when overspent
+```
+
+**`num(undefined)` 是 0** —— 于是「插件没上报 `used`」和「插件上报了 0%」
+在宿主眼里完全一样。而这个值还被拿去排序账号：
+
+```js
+const group = (w) => w.used >= 98 ? "spent" : w.used >= 90 ? "low" : "fine"
+```
+
+`spent` 的账号在智能路由里的解释是 *"all but used up, it answers only when
+nothing else can"* —— **排到最后**。
+
+所以漏一个 `used` 会同时造成两件坏事：
+
+| 后果 | 机制 |
+|---|---|
+| 卡片显示「剩余 100%」 | 设置里「显示剩余」时 `100 - used`，`used=0` ⇒ 100% |
+| **耗尽的账号被排到队首** | `used=0` ⇒ `fine` ⇒ 排在真在用的账号前面 |
+
+实测（2026-10-26，本机三天路由日志）：一个余额 0 的账号因为插件没上报
+`used`，在其所在路由组被选中 **256 次里占 255 次**，11 次请求被上游以
+「余额不足」拒掉。补上 `used` 后同一个账号从 **3/13 → 13/13**，并被 magpie
+按窗口休息到下一个结算日，之后再没被选中。
+
+**每条窗口都必须给一个有限的数字**，包括这些边角情形：
+
+```js
+// 号被蹬空（两池皆 0）：合成一条 used:100 的窗口，让它沉底。
+// 千万不要「什么都不画」—— 不画 = 没有参与路由的窗口 = 它继续排前面。
+{ name: "今日额度", used: 100, display: "已耗尽" }
+
+// 上限拿不到（厂商不下发 total）：别编一个 limit，但也别漏 used。
+// 标 aside，让它只展示、不参与路由打分。
+{ name: "今日额度", used: 0, aside: true, display: "1,234 剩余（上限未知）" }
+
+// 没有上限、没有周期的池（永久积分/赠送额度）：aside，used 给 0。
+// ⚠ 不要用 total = 剩余 伪造总量，那等于谎报占比。
+{ name: "永久积分", used: 0, aside: true, display: "5,500" }
+```
+
+**判据：`windows` 里每一条都要有 `used`，且是 `Number.isFinite` 为真的数字。**
+写完自己过一遍这四种情形：正常、耗尽、上限未知、只有永久池。
+（`magpie-loomy-auth` 的 `tests/semantics.test.mjs` 就是这么锁的，可以参照。）
+
+---
+
+## 十一之二、`free`：让模型进「免费优先」那一档
+
+模型条目上的 `free` 是布尔值，喂给 magpie 的 **Free first** 路由模式
+（界面上叫「Free first」，路由 id 是 `free`）。契约原文：
+
+> **Free first** — "Requests go to what costs nothing first: the models their
+> vendor serves **at no cost to this subscription's allowance or credits**, in
+> their listed order, and only when those can't answer to one that spends them."
+
+路由解释也能印证：
+
+```js
+case "free":
+  if (f.free) return t("Free first: {model} costs nothing on {who}, so it's tried before any that spends the allowance.")
+  return t("Free first: every one that costs nothing is spent or resting, so {model} on {who}, which spends the allowance, is next.")
+```
+
+### ⚠ 判据是「花不花这份订阅的额度」，不是「倍率是否为 0」
+
+这是最容易错的一处。实测（2026-10-26，本机 `plugin-providers.json`）：
+
+```
+rate === 0 的条目        51 条
+  其中 free === true      13 条
+  其中 free === false     38 条   ← 「套餐内不按次计费」，仍消耗套餐额度
+```
+
+那 38 条里包括 qoder 的 `ultimate` / `dfmodel` 等 —— 它们不按次计价，
+但照样吃套餐配额，**不是免费**。若按 `rate === 0` 一刀切，会把一整批
+套餐模型误标成免费，Free first 就会一直派到它们身上。
+
+```js
+// ❌ 错：把「不按次计费」当免费
+free: m.rate === 0
+
+// ❌ 也错：有倍率就一定是收费 —— `x0.0` 是 0 倍，等于不扣分
+if (m.rate) { model.rate = m.rate; model.free = false }
+
+// ✅ 对：只认厂商自己的声明
+function isFreeModel(displayName, rate) {
+  if (/免费/.test(String(displayName ?? ""))) return true      // 展示名写明「限时免费」
+  return typeof rate === "string" && /^x0(\.0+)?$/i.test(rate.trim())  // 倍率 x0.0
+}
+```
+
+**每个厂商的判据不同**，但都应当**来自厂商自己的说法**（展示名文本、
+模型条目里的价格字段、或厂商文档），而不是从别的字段反推。
+
+### 自查
+
+```js
+// 拿你的模型表跑一遍，确认该免费的确实是 true，不该的是 false
+for (const [id, m] of Object.entries(models)) console.log(id, m.free, m.rate)
+```
+
+⚠ `free` 只影响 `free` 这个路由模式；`pace` / `usage` / `weight` 等不看它。
+但它标错的后果很实：本该免费被优先派发的模型拿不到优先，或者反过来
+把收费模型当免费一直用。
 
 ---
 
