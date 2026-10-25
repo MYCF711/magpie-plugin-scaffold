@@ -591,20 +591,16 @@ agent       @magpie-community/agent-<name>
 
 推到 main 的版本号变更会自动发布。
 
-**方式三：registry.json**
+**方式三：registry.json —— 不必费心**
 
-在 [magpie-community/plugins](https://github.com/magpie-community/plugins)
-的 `registry.json` 加一条：
+社区的 [registry.json](https://github.com/magpie-community/plugins) 是上游的
+**推荐位**（商业化入口），进不进、什么时候进不由 PR 决定。**不要指望它**：
 
-```json
-{
-  "package": "opencode-acme-auth",
-  "name": "Acme",
-  "icon": "https://acme.example/icon.svg",
-  "providers": ["acme"],
-  "summary": { "en": "Your Acme Coding Plan.", "zh": "使用你的 Acme Coding Plan。" }
-}
-```
+- 对自用/自发布的插件来说，前两条（npm + GitHub topic）已经够用；
+- 把精力花在这上面，回报接近零。
+
+真要自己维护一份自注册条目（让卡片显示对的标题与图标），`src/self-register.mjs`
+就是干这个的 —— 它写的是本地市场缓存，不依赖任何上游审核。
 
 ---
 
