@@ -570,6 +570,20 @@ agent       @magpie-community/agent-<name>
 
 ---
 
+## 鸣谢
+
+模板里的钩子契约来自 **[yetone/magpie](https://github.com/yetone/magpie)**（MIT）。
+
+| 来源 | 用在了哪 |
+|---|---|
+| `internal/plugin/` 的 Go 实现 | 九个钩子的调用时机、返回值形状、错误语义 |
+| 二进制里嵌的契约注释（约 200 KB / 21 章） | `HOOKS.md` 的正文，以及官方文档漏掉的 `auth.checkin` |
+| `internal/plugin/market.go` 的 `market()` | 为什么市场缓存会被整体替换、为什么自注册写一次就够 |
+
+**`extract-contract.py`** 是提取那份嵌入契约的脚本，可以重新跑一遍核对。
+
+上游是 MIT，本模板也是 MIT。
+
 ## 许可
 
 MIT
