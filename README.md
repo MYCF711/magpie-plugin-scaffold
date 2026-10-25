@@ -379,13 +379,63 @@ plugin-market.json 存在 → 读出来，去掉同名的旧条目，加进去�
 | 图标 | ✅（npm/GitHub 元数据）| ✅ |
 | 版本、更新于 | ✅ | ✅ |
 
+### 为什么不用「设只读」
+
+`chmod 444` 确实能挡住 magpie 覆盖（实测：只读 + `plugin add` → 文件没变）。
+**但它也挡住了插件自己**：
+
+```
+EPERM: operation not permitted, rename '....tmp-16884' -> 'plugin-market.json'
+```
+
+因为原子写回（写 tmp → rename）也要写权限。而且锁上之后
+**官方 registry 永远不更新** —— 新出现的社区插件你永远看不到。
+
+`fs.watch` 不跟 magpie 对抗，而是紧跟其后补回来：
+
+```
+magpie 覆盖（41 条官方）
+    ↓ 300ms 内
+插件补回（42 条，含我们的）
+```
+
+官方更新照常，插件自己也能写。
+
+### 实测记录
+
+**触发拉取的条件（`plugin list` 不拉）：**
+
+| 操作 | 拉 registry |
+|---|---|
+| `magpie plugin list` | ❌ |
+| `magpie plugin add` | ✅ |
+| `magpie plugin update` | ✅ |
+| magpie 启动 | ✅ |
+
+**watch 补回（真实环境）：**
+
+```
+手动从缓存移除 officeace-auth（模拟 magpie 覆盖）
+等待 12 秒
+→ 条目数 42，含 officeace-auth: YES    ✅
+```
+
+**单元测试（沙箱）：**
+
+```
+① 加载时           共 4 条, 含 mine=✅
+模拟 magpie 覆盖...
+③ watch 触发后     共 4 条, 含 mine=✅   ← 自动补回
+```
+
 ### 已知限制
 
-- **会被覆盖**，所以每次插件加载都重打。magpie 运行期间被覆盖后，
-  要等下次重载插件才恢复（或重启 magpie）。
+- **会有短暂空窗期**：magpie 覆盖到 watch 补回之间约 300ms。
 - 改的是用户机器上的缓存文件。不影响其它插件。
 - 如果 magpie 未来改了缓存文件名或结构，`registerSelf` 会静默失败，
   卡片退回原来的样子 —— **不会让插件坏掉**。
+- watch 在某些只读文件系统或容器里可能挂不上；
+  `setInterval` 每 10 分钟的兜底仍然有效。
 
 ### 已验证
 
