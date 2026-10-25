@@ -689,7 +689,7 @@ for (const [id, m] of Object.entries(models)) console.log(id, m.free, m.rate)
 | prompts 流程 | 顺序提问 + when/condition/validate |
 | 故障转移 | 限流/5xx 自动换账号或模型 |
 | 自动更新 | `@magpie-community/*` 启动后和每小时 |
-| 市场发现 | registry.json + GitHub topic |
+| 市场发现 | GitHub topic `magpie-plugin`（registry.json 是上游推荐位，提 PR 不必费心）|
 
 **插件只写六个钩子，其余全交给 magpie。**
 
