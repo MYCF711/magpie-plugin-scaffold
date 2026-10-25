@@ -43,6 +43,26 @@
 //
 // ═══════════════════════════════════════════════════════════════════════
 
+import { startSelfRegister } from "./src/self-register.mjs"
+
+// ── 自注册条目 ──────────────────────────────────────────────────────────
+//
+// 这个对象会被写进 magpie 的市场缓存（plugin-market.json），
+// 让插件卡片显示许可证、「源码」按钮和正确的标题。
+//
+// ⚠ 改成你自己的：package 必须和 package.json 的 name 一致。
+//
+const REGISTRY_ENTRY = {
+  package: "magpie-plugin-template",
+  name: "My Provider",
+  providers: ["xxx"],
+  community: true,
+  summary: {
+    en: "What it signs in to, in one sentence.",
+    zh: "一句话说清签入什么服务。",
+  },
+}
+
 // ── 配置 ──────────────────────────────────────────────────────────────
 
 const PROVIDER = "xxx" // ⚠ 改成厂商 id，如 "acme"
@@ -92,7 +112,24 @@ function staticModels() {
 
 // ── 插件入口 ──────────────────────────────────────────────────────────
 
-export const XxxAuthPlugin = async ({ client }, options) => ({
+export const XxxAuthPlugin = async ({ client, directory }, options) => {
+  // ★ 自注册：把本插件写进 magpie 的市场缓存
+  //
+  // 卡片上的「源码」按钮、许可证、标题都来自 plugin-market.json，
+  // 而 magpie 每 6 小时用官方 registry 整体替换它。
+  // 这里在加载时和 5 秒后各打一次补丁（幂等）——
+  // 不这么做的话，包不在官方 registry 里就永远显示不全。
+  startSelfRegister(REGISTRY_ENTRY, {
+    configDir: directory,
+    log: (msg) => {
+      try {
+        client?.app?.log?.({ service: "template", level: "info", message: msg })
+      } catch {}
+    },
+  })
+
+  return {
+
   // ═══ ① 声明 provider ══════════════════════════════════════════════
   config: async (cfg) => {
     cfg.provider ??= {}
@@ -452,7 +489,8 @@ export const XxxAuthPlugin = async ({ client }, options) => ({
     if (id !== PROVIDER || !input?.sessionID) return
     output.headers["x-xxx-session"] = String(input.sessionID).slice(0, 128)
   },
-})
+  }
+}
 
 // ── 以下是 TODO，按具体厂商实现 ─────────────────────────────────────
 
