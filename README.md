@@ -4,6 +4,31 @@
 
 > 克隆这个仓库，改三处配置，实现五个 TODO，就是一个标准 magpie 插件。
 
+---
+
+## ⚠ 动手前先读这两份
+
+**1. [README-TEMPLATE.md](./README-TEMPLATE.md) —— 写插件介绍页的模板，照抄。**
+用户只看 README 决定装不装：开头给数字、功能一句一条、不踩别人、安装放最后、
+技术细节全进 `docs/internals.md`。**参考源是必填段** —— 用了别人的协议结论或实现思路，
+列出来（MIT 要求，也让读者知道依据）。
+
+**2. [HOOKS.md](./HOOKS.md) —— 钩子契约。**
+从 magpie 二进制里提取的 21 章，比官方文档全（官方漏了 `auth.checkin`）。
+其中一条最容易错：**`usage` 的 `used` 是必填**，它不只画进度条，还是路由排序输入 ——
+漏了会被当成 0% = 满额，空号反而排到队首。
+
+写完代码，这几件事**每件都踩过**：
+
+| 事 | 判据 |
+|---|---|
+| `LICENSE` 必须是标准 MIT 正文 | 归属说明插在正文里，GitHub 返回 `NOASSERTION`，插件卡片就没有许可那一格 |
+| 包名先 `npm view <名> version` | 撞名 = magpie 的「更新」会装成别人的包 |
+| `keywords` 含 `opencode` + `plugin`/`auth`/`provider` | 否则 npm 搜索找不到 |
+| 改代码要 bump `version` 再打包 | 同版本重打，bun 命中缓存（`no changes`），装了个寂寞 |
+
+细节见 [README-TEMPLATE.md](./README-TEMPLATE.md) 的「仓库里还该有什么」一节。
+
 ## 目录
 
 - [写 README](./README-TEMPLATE.md) —— **插件介绍页的模板，照抄这份**
