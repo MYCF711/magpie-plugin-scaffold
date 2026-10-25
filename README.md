@@ -315,150 +315,56 @@ return [{ id: "acme-coder", name: "Acme Coder", context: 200_000 }]
 
 ---
 
-## 自注册到市场（让卡片显示完整）
+## 卡片上的许可证和「源码」按钮
 
-**问题：** 包不在官方 registry 里 → 卡片只有版本和更新时间，
-**没有许可证、没有「源码」按钮，标题退回包名**。
+magpie 从**社区 registry**（`magpie-community/plugins` 的 `registry.json`）
+读这几个字段：
 
-原因是这些字段来自 `~/.cache/magpie/plugin-market.json`，
-而 magpie 每 6 小时用官方 `registry.json` **整体替换**它。
-
-**实测时序（这台机器）：**
-
-```
-magpie 启动      18:49:47
-手动打补丁       18:52:59
-缓存被覆盖       18:53:00   ← 1 秒后
-```
-
-**所以一次性补丁没用，必须每次加载都重打。**
-
-### 模板已经做好了
-
-`src/self-register.mjs` + `index.mjs` 里的 `REGISTRY_ENTRY`：
-
-```js
-const REGISTRY_ENTRY = {
-  package: "magpie-plugin-template",   // ⚠ 必须等于 package.json 的 name
-  name: "My Provider",                 // 卡片标题
-  providers: ["xxx"],
-  community: true,
-  summary: {
-    en: "What it signs in to, in one sentence.",
-    zh: "一句话说清签入什么服务。",
-  },
-}
-```
-
-插件函数里已经接好：
-
-```js
-export const XxxAuthPlugin = async ({ client, directory }) => {
-  startSelfRegister(REGISTRY_ENTRY, { configDir: directory, log })
-  return { ... }
-}
-```
-
-**运行时机：** 插件加载时一次，5 秒后一次（等 magpie 的拉取完成）。两次都幂等。
-
-**行为：**
-
-```
-plugin-market.json 存在 → 读出来，去掉同名的旧条目，加进去，原子写回
-                不存在 → 先拉官方 registry，再加
-             拉不到官方 → 静默跳过，不影响插件启动
-```
-
-### 效果
-
-| 卡片元素 | 打补丁前 | 打补丁后 |
-|---|---|---|
-| 标题 | 包名 | `name` 字段 |
-| 许可证 | ❌ | ✅ |
-| 「源码」按钮 | ❌ | ✅ |
-| 图标 | ✅（npm/GitHub 元数据）| ✅ |
-| 版本、更新于 | ✅ | ✅ |
-
-### 为什么不用「设只读」
-
-`chmod 444` 确实能挡住 magpie 覆盖（实测：只读 + `plugin add` → 文件没变）。
-**但它也挡住了插件自己**：
-
-```
-EPERM: operation not permitted, rename '....tmp-16884' -> 'plugin-market.json'
-```
-
-因为原子写回（写 tmp → rename）也要写权限。而且锁上之后
-**官方 registry 永远不更新** —— 新出现的社区插件你永远看不到。
-
-`fs.watch` 不跟 magpie 对抗，而是紧跟其后补回来：
-
-```
-magpie 覆盖（41 条官方）
-    ↓ 300ms 内
-插件补回（42 条，含我们的）
-```
-
-官方更新照常，插件自己也能写。
-
-### 实测记录
-
-**触发拉取的条件（`plugin list` 不拉）：**
-
-| 操作 | 拉 registry |
+| 卡片元素 | 来源 |
 |---|---|
-| `magpie plugin list` | ❌ |
-| `magpie plugin add` | ✅ |
-| `magpie plugin update` | ✅ |
-| magpie 启动 | ✅ |
+| 标题 | entry 的 `name` |
+| 许可证 | entry |
+| 「源码」按钮 | entry |
+| 摘要正文 | entry 的 `summary` |
+| 版本、更新于、图标 | npm 或 GitHub 元数据（**不需要 entry**） |
 
-**watch 补回（真实环境）：**
+**包不在那个 registry 里，卡片就只有版本、更新于和图标** ——
+标题退回包名，没有许可证和源码链接。
 
-```
-手动从缓存移除 officeace-auth（模拟 magpie 覆盖）
-等待 12 秒
-→ 条目数 42，含 officeace-auth: YES    ✅
-```
+### 三条路，选一条
 
-**单元测试（沙箱）：**
+| 路线 | 配置 | 抗 magpie 刷新 | 代价 |
+|---|---|---|---|
+| **接受现状** | 零 | — | 卡片少两项 |
+| **提 PR 进官方 registry** | 零 | ✅ | 要审核 |
+| 自己托管 registry + `MAGPIE_PLUGIN_MARKET` | 环境变量 | ✅ | 维护一个仓库和一个 workflow |
 
-```
-① 加载时           共 4 条, 含 mine=✅
-模拟 magpie 覆盖...
-③ watch 触发后     共 4 条, 含 mine=✅   ← 自动补回
-```
+**建议前两条。**
 
-### 另一条路：把 entry 提进官方 registry
+### ⚠ 不要写 magpie 的缓存文件
 
-自注册是零配置的，但它每次都要重新打。如果你想让卡片**永久**完整，
-把条目提进 [magpie-community/plugins](https://github.com/magpie-community/plugins)
-的 `registry.json`（见下面「怎么发布 → 方式三」）。
-
-**⚠ 不要走「自己托管一份 registry + `MAGPIE_PLUGIN_MARKET`」那条路。**
-我试过：能work，但要用户设环境变量，还要维护一个仓库和一个 workflow。
-**它做的和自注册是同一件事，只是更麻烦。** 相关讨论见
-[magpie-community/plugins#394](https://github.com/magpie-community/plugins/issues/394)。
-
-### 已知限制
-
-- **会有短暂空窗期**：magpie 覆盖到 watch 补回之间约 500ms。
-- 改的是用户机器上的缓存文件。不影响其它插件。
-- 如果 magpie 未来改了缓存文件名或结构，`registerSelf` 会静默失败，
-  卡片退回原来的样子 —— **不会让插件坏掉**。
-- watch 在某些只读文件系统或容器里可能挂不上；
-  `setInterval` 每 10 分钟的兜底仍然有效。
-
-### 已验证
+`~/.cache/magpie/plugin-market.json` 里加 entry 能让卡片立刻完整，
+但那是**和 magpie 抢写盘**：
 
 ```
-单元测试（沙箱）：
-  cacheDirOf 推导      ✅
-  首次注册             ✅ 2 条（保留原有条目）
-  重复注册后条数        1 ✅ 幂等
-
-真实环境：
-  已注册 officeace-auth（更新，共 39 条）   ✅
+magpie 拉 registry → 覆盖文件 → 我们的条目没了
+我们的 watch 发现  → 写回去   → magpie 的 watch 被触发
+    ↓
+两边互相触发，实测每秒写 3-4 次，日志刷屏
 ```
+
+除了吵，它还有两个实质问题：
+
+1. **依赖一个内部缓存格式** —— magpie 改文件名或结构就静默失效
+2. **多插件会打架** —— 各自的读-改-写互相覆盖
+
+**这个方案我实现过、验证过、然后删掉了。**
+
+### 上游讨论
+
+`magpie-community/plugins#394` 里描述了这个限制，并建议
+**拉取时合并进缓存而不是整体替换**，那样就不需要任何 workaround。
+如果采纳，第二条路（提 PR）也可以省掉。
 
 ## 调试
 
