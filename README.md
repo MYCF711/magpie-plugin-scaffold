@@ -428,9 +428,20 @@ magpie 覆盖（41 条官方）
 ③ watch 触发后     共 4 条, 含 mine=✅   ← 自动补回
 ```
 
+### 另一条路：把 entry 提进官方 registry
+
+自注册是零配置的，但它每次都要重新打。如果你想让卡片**永久**完整，
+把条目提进 [magpie-community/plugins](https://github.com/magpie-community/plugins)
+的 `registry.json`（见下面「怎么发布 → 方式三」）。
+
+**⚠ 不要走「自己托管一份 registry + `MAGPIE_PLUGIN_MARKET`」那条路。**
+我试过：能work，但要用户设环境变量，还要维护一个仓库和一个 workflow。
+**它做的和自注册是同一件事，只是更麻烦。** 相关讨论见
+[magpie-community/plugins#394](https://github.com/magpie-community/plugins/issues/394)。
+
 ### 已知限制
 
-- **会有短暂空窗期**：magpie 覆盖到 watch 补回之间约 300ms。
+- **会有短暂空窗期**：magpie 覆盖到 watch 补回之间约 500ms。
 - 改的是用户机器上的缓存文件。不影响其它插件。
 - 如果 magpie 未来改了缓存文件名或结构，`registerSelf` 会静默失败，
   卡片退回原来的样子 —— **不会让插件坏掉**。
