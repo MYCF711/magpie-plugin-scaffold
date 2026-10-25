@@ -1,0 +1,41 @@
+{
+  "name": "magpie-plugin-template",
+  "version": "0.1.0",
+  "description": "A magpie / OpenCode provider plugin template: all nine hooks implemented — config, sign-in, token renewal, request takeover, usage, daily check-in, per-account models and chat headers. Clone it and implement five functions to make your own provider.",
+  "type": "module",
+  "main": "./index.mjs",
+  "exports": "./index.mjs",
+  "files": [
+    "index.mjs",
+    "README.md",
+    "HOOKS.md",
+    "LICENSE",
+    "extract-contract.py"
+  ],
+  "keywords": [
+    "magpie",
+    "magpie-plugin",
+    "opencode",
+    "opencode-plugin",
+    "opencode-auth",
+    "provider",
+    "template",
+    "boilerplate",
+    "checkin"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MYCF711/magpie-plugin-template.git"
+  },
+  "bugs": {
+    "url": "https://github.com/MYCF711/magpie-plugin-template/issues"
+  },
+  "homepage": "https://github.com/MYCF711/magpie-plugin-template#readme",
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "magpie": {
+    "maxConcurrency": 4
+  }
+}

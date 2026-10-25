@@ -1,0 +1,622 @@
+# magpie 插件钩子清单（权威版）
+
+来源：`magpie-windows-amd64.exe` 内嵌的插件契约源码
+（偏移 ~56929980，904 行，39 KB，用 `extract-contract.py` 提取）
+
+**这份契约比 `usemagpie.ai/docs/plugins` 更全** —— 官方文档漏了 `auth.checkin`。
+
+---
+
+## 一、六个钩子（不是五个）
+
+```js
+export const XxxAuthPlugin = async ({ client }, options) => ({
+  // ① 声明 provider 和静态模型表
+  config(cfg) {
+    cfg.provider ??= {}
+    cfg.provider["xxx"] ??= {
+      name: "Xxx",
+      npm: "@ai-sdk/openai-compatible",
+      api: BASE,
+      models: staticModels(),      // ⚠ 未登录时也必须有，否则显示 "0 models"
+    }
+  },
+
+  auth: {
+    provider: "xxx",
+    icon: "https://...",           // 或 data:image/...
+    maxConcurrency: 4,
+    refreshLead: 5 * 60_000,       // token 到期前多久续期
+
+    // ② 登录方式
+    methods: [{
+      type: "oauth",               // 或 "api"
+      label: "Sign in with Xxx",
+      placeholder: "...",          // api 类型时是输入框提示
+      prompts: [],                 // 可选：登录前的问题
+      async authorize() {
+        return {
+          url,                     // magpie 打开
+          instructions,            // 显示给用户
+          method: "auto",          // "auto" | "code"
+          opened: false,           // true = 插件自己已经开了页面
+          async callback() {
+            return { type: "success", refresh, access, expires, accountId }
+          },
+        }
+      },
+    }],
+
+    // ③ 续期
+    async refresh(auth, provider) {
+      return { access, refresh, expires }   // 合并到旧账号上
+    },
+
+    // ④ 请求接管
+    async loader(getAuth, provider) {
+      return { baseURL, apiKey, headers, fetch }
+    },
+
+    // ⑤ 额度
+    async usage(getAuth, provider) {
+      return { plan, user, until, renew, balance, error, windows, resets, signIn }
+    },
+
+    // ⑥ 签到（文档漏了这个）
+    async checkin(getAuth, provider) {
+      return { outcome, credit, streak, message }
+    },
+  },
+
+  // ⑦ 每账号的模型目录
+  provider: {
+    id: "xxx",
+    async models(provider, { auth }) { ... },
+  },
+
+  // ⑧ 每个请求加头
+  "chat.headers": async (input, output) => {
+    output.headers["x-xxx-session"] = input.sessionID
+  },
+})
+```
+
+---
+
+## 二、`auth.checkin` 完整契约
+
+```js
+auth.checkin(getAuth, provider) {
+  outcome: "claimed"      // 刚签到成功
+         | "done"         // 今天已经签过了
+         | "ineligible"   // 这个账号不能参加
+         | "inactive"     // 没有签到活动
+         | "captcha"      // 厂商要验证码 —— 让用户去官方 App 手动签，永不解
+         | "failed",      // 失败
+  credit?: number,        // 给了多少积分
+  streak?: number,        // 连续多少天
+  message?: string,       // 显示给用户的话
+}
+```
+
+### 调用规则（原文）
+
+> magpie asks **once a Beijing day per account** while the user has it on,
+> and **again later that day after a failure**; a hook that throws is a failure.
+> Run in the account's scope, a token it renews is saved to that account.
+
+| 规则 | 说明 |
+|---|---|
+| 时间口径 | **北京时间**（不是 UTC，不是太平洋时间）|
+| 频率 | 每账号每天一次 |
+| 重试 | 当天失败后还会再调 |
+| 抛异常 | 等同 `failed` |
+| 作用域 | 在账号的 scope 里，它刷新的 token 会存到该账号 |
+
+### 状态文件
+
+```
+~/.config/magpie/plugin-checkin.json        （通用）
+~/.config/magpie/workbuddy-checkin.json     （CodeBuddy 专用，magpie 内置）
+```
+
+格式：
+```json
+{
+  "codearts|codearts": {
+    "day": "2026-10-25",
+    "at": "2026-10-25T17:16:46+08:00",
+    "outcome": "done",
+    "msg": "今天已领取"
+  },
+  "qoder-cn|qoder-cn": {
+    "day": "2026-10-25",
+    "outcome": "claimed",
+    "credit": 100,
+    "claimed": "2026-10-25T17:16:43+08:00"
+  }
+}
+```
+
+---
+
+## 三、`auth.usage` 完整字段
+
+```js
+{
+  plan?: string,                    // "Pro"
+  user?: string,                    // 厂商那边这个账号的名字
+  until?: string | number,          // 套餐到期
+  renew?: "auto" | "off",
+  balance?: string,                 // "$12.40"
+  error?: string,                   // 替代 windows 显示
+
+  resets?: {
+    count: number,
+    until?: string | number,
+    byWindow?: boolean,
+    fiveHour?: number,
+    weekly?: number,
+    team?: boolean,                 // 团队套餐的，不是个人
+    each?: [{                       // 每个还能用的重置
+      until?: string | number,      // 无 = 永不过期
+      window?: "fiveHour" | "weekly",
+    }],
+  },
+
+  windows?: [{
+    name: string,
+    used: number,                   // 百分比 0-100，超额时 >100
+    resetsAt?: string | number,
+    resetSecs?: number,
+    display?: string,               // "370 / 1000 credits"
+    amount?: number,
+    limit?: number,
+    unit?: string,                  // "credits"
+    span?: number,                  // 窗口时长（秒）
+    model?: string,                 // 只统计 id 含该词的模型
+    models?: string[],              // 精确的 id 列表
+    notModels?: string[],           // 除这些之外
+    aside?: boolean,                // true: 用光不影响账号
+    runsOutAt?: string | number,    // 剩余额度什么时候失效
+    runsOut?: number,               // 失效时损失多少
+  }],
+
+  signIn?: "expired" | "kept" | "renewed",
+}
+```
+
+**时间可以是 ISO 字符串、秒、毫秒。**
+
+---
+
+## 四、登录的陷阱
+
+### 陷阱 1：`authorize()` 里不能等用户
+
+```js
+// ❌ 死锁
+async authorize() {
+  const token = await waitForUserToLogin()   // 这里等 = magpie 双向死锁
+  return { type: "success", access: token }
+}
+
+// ✅
+async authorize() {
+  const flow = startLoginFlow()
+  return {
+    url: flow.url,
+    method: "auto",
+    callback: async () => {                   // 真正等登录的是这里
+      const token = await flow.result
+      return { type: "success", access: token }
+    },
+  }
+}
+```
+
+### 陷阱 2：`inputs` 只在有 `prompts` 时传入
+
+> the inputs go only to a method that asks something... an object with none
+> is how its CLI calls, and a plugin told so asks its questions on the terminal
+
+```js
+// 没有 prompts → 收到 undefined
+// 有 prompts   → 收到 { region: "cn", team: "t-xxx" }
+```
+
+### 陷阱 3：`opened: true` 防止开两次页面
+
+```js
+// Grok Build 的 `grok login` 在 macOS/Windows 上自己开了页面
+// magpie 再开一次 → 用户看到两个一样的窗口
+return { url, opened: true }
+```
+
+### 陷阱 4：`single: true` 只允许一个账号
+
+```js
+auth: {
+  single: true,     // 再登录会替换而不是新增
+}
+```
+
+---
+
+## 五、`auth.refresh` 的语义
+
+```js
+async refresh(auth, provider) {
+  // 返回值 **合并** 到旧账号上（与 client.auth.set 的整体替换不同）
+  return { access, refresh: newRefresh ?? auth.refresh, expires }
+}
+```
+
+### 运行时机
+
+- OAuth 账号的 `expires` 距现在 < `refreshLead` 时
+- 在 loader / provider.models / auth.usage / 请求 **之前**
+
+### 串行化
+
+> Requests that find the token due wait for one renewal, so a vendor that
+> spends a refresh token once never sees it twice. They wait up to 15 seconds.
+
+**一次性 refresh_token 的厂商（如 CodeBuddy）不会被并发用两次。**
+
+### 失败处理
+
+| 情况 | magpie 行为 |
+|---|---|
+| `throw Object.assign(e, { signIn: "expired" })` | 标记账号，不再重试直到重新登录 |
+| 其它错误 | 30 秒后重试 |
+| 返回 `undefined` | 保持原样，不续期 |
+
+### 不续期的情况
+
+> An account with `expires` 0 or none is never renewed.
+
+**`expires` 为 0 或不存在的账号永不续期。**
+
+---
+
+## 六、`loader` 返回的四个字段
+
+```js
+{
+  baseURL,    // 请求去哪（优先于模型的 api 和 provider 的 api）
+  apiKey,     // 按 npm 包自动加头：见下表
+  headers,    // 每个请求都加
+  fetch,      // 真正的请求函数
+}
+```
+
+### apiKey 的发送方式（magpie 自动处理）
+
+```js
+// 契约源码原文
+function sdkHeaders(npm, key) {
+  if (!key) return {}
+  if (npm === "@ai-sdk/anthropic" || npm === "@ai-sdk/google-vertex/anthropic")
+    return { "x-api-key": key }
+  if (npm === "@ai-sdk/google")
+    return { "x-goog-api-key": key }
+  return { authorization: `Bearer ${key}` }
+}
+```
+
+### 请求头的设置顺序（后者覆盖前者）
+
+```
+1. sdkHeaders(apiKey)
+2. loader.headers
+3. gateway 的请求头
+4. chat.headers 钩子加的
+```
+
+### `fetch(input, init)` 收到什么
+
+- `input`：完整 URL
+- `init.method`：通常 POST
+- `init.body`：该 API 形状的 JSON 字符串（非 UTF-8 时是 bytes）
+- `init.signal`：agent 放弃时 abort
+
+**必须返回 Response。** 状态码、头、body 原样透传。
+
+**改写流式 body 时要去掉 `content-length` 和 `content-encoding`。**
+
+---
+
+## 七、失败处理的层次
+
+| 情况 | 做法 | magpie 的行为 |
+|---|---|---|
+| 模型不存在 | 返回 **404** + 错误 JSON | 只搁置**这个模型** |
+| 登录被拒 | 401 或 `signIn: "expired"` | 标记**这个账号** |
+| 这个 401 是别的事 | 响应头 `X-Magpie-Sign-In: kept` | 不标记 |
+| 已续期 | 响应头 `X-Magpie-Sign-In: renewed` | 清除标记 |
+| 限流 / 5xx | 原样透传 | 自动换账号或模型 |
+| 插件内部错误 | 抛异常 | 请求失败，故障转移继续 |
+
+**尽量用该 API 自己的错误形状回答**，agent 才能显示供应商的原始消息。
+
+---
+
+## 八、账号标识（决定卡片显示什么）
+
+### 三级回退（契约源码 `whoOf`）
+
+```js
+function whoOf(a) {
+  return a?.accountId ?? a?.metadata?.email ?? a?.email ?? ""
+}
+```
+
+**登录成功时返回的字段决定卡片显示：**
+
+```js
+return {
+  type: "success",
+  refresh, access, expires,
+  accountId: "user@example.com",   // ← 首选
+  uid: "0d1606bf-...",             // ← 区分同名账号
+}
+```
+
+| 字段 | 作用 |
+|---|---|
+| `accountId` | 卡片显示的账号名 |
+| `metadata.email` | 次选 |
+| `email` | 再次选 |
+| `uid` | 厂商自己的 id，区分同名账号（issue #413）|
+
+### 没有 accountId 时
+
+```js
+// hintOf tells an account with no id from another: the end of its key.
+function hintOf(a) {
+  return a?.type === "api" && typeof a.key === "string" && a.key.length >= 12
+    ? a.key.slice(-4) : ""
+}
+```
+
+**API key 类型没有 accountId → 卡片显示 key 的最后 4 位。**
+
+### 同名账号自动合并（`settle`）
+
+```js
+// settle keeps a sign-in just saved at key once: one to an account already
+// signed in (the same account id and, where both have one, the same uid,
+// else the same secret) replaces that one's and goes.
+```
+
+判定顺序：
+1. `accountId` 相同 **且** `uid` 相同（两边都有 uid 时）→ 替换旧账号
+2. 都没有 accountId，但 secret 相同 → 替换
+3. 否则 → 新增账号
+
+**所以重复登录同一账号不会产生重复条目。**
+
+### 账号在存储里的 key
+
+```js
+// accountsOf are the keys provider's accounts are kept under, the one under
+// its own id first.
+function accountsOf(all, provider) {
+  return Object.keys(all)
+    .filter((k) => k === provider || k.startsWith(provider + "#"))
+    .sort(...)
+}
+```
+
+```
+第一个账号  →  provider
+第二个账号  →  provider#a1b2c3
+第三个账号  →  provider#d4e5f6
+```
+
+---
+
+## 九、图标与并发（两级回退）
+
+### 图标（契约源码 `iconOf`）
+
+```js
+function iconOf(a) {
+  const ok = (v) => {
+    const s = typeof v === "string" ? v.trim() : ""
+    // data URI 超过 1MB 不携带
+    return s.length <= 3 << 19 && /^(https:\/\/|data:image\/)/i.test(s) ? s : ""
+  }
+  // ① auth 钩子的 icon 优先
+  const own = ok(a.auth.icon)
+  if (own || !a.target) return own
+  // ② 否则读 package.json 的 magpie.icon
+  return ok(readJSON(path.join(dir, "package.json"))?.magpie?.icon)
+}
+```
+
+**优先级：`auth.icon` > `package.json` 的 `magpie.icon`**
+
+**约束：**
+- 必须是 `https://` 或 `data:image/` 开头
+- 大小 ≤ 1 MB（`3 << 19` = 1,572,864 字节）
+- SVG、PNG 都行
+
+### 并发（契约源码 `concurrencyOf`）
+
+```js
+function concurrencyOf(a) {
+  const ok = (v) => (Number.isInteger(v) && v > 0 ? Math.min(v, 1000) : 0)
+  const own = ok(a.auth.maxConcurrency)
+  if (own || !a.target) return own
+  return ok(readJSON(path.join(dir, "package.json"))?.magpie?.maxConcurrency)
+}
+```
+
+**优先级：`auth.maxConcurrency` > `package.json` 的 `magpie.maxConcurrency`**
+
+**范围：1-1000 的整数。** 用户自己设的会覆盖它。
+
+---
+
+## 十、卡片介绍页（不是钩子）
+
+**magpie 用 npm 包的 README 渲染插件卡片的介绍正文。**
+
+官方文档原文：
+> **README.** A plugin's page in magpie shows its npm README. Say what it signs in to,
+> how, where the sign-in is kept, and which models it has.
+
+**所以 README 要写清楚四件事：**
+1. 签入什么服务
+2. 怎么登录
+3. 登录态存在哪
+4. 有哪些模型
+
+### 卡片上其它元素（全部自动）
+
+| 元素 | 来源 |
+|---|---|
+| 版本号 | `package.json` 的 `version` |
+| 许可证 | `package.json` 的 `license` |
+| 「npm ↗」链接 | `package.json` 的 `name` |
+| 「源码 ↗」链接 | `package.json` 的 `repository` |
+| 更新时间 | npm 的发布记录 |
+| 下载量 | npm 统计 |
+| 「已登录」绿勾 | 有 auth 记录 |
+| 「非官方插件」警告 | GitHub topic 安装的会自动标 |
+
+### provider 信息的完整组装（契约源码）
+
+```js
+{
+  spec: a.spec,
+  name: p.name,
+  npm: p.npm ?? "",
+  api: p.api ?? "",
+  methods: methods(a.auth),
+  single: a.auth.single === true,
+  icon: iconOf(a),
+  usage: typeof a.auth.usage === "function",      // ← 有无 usage 钩子
+  checkin: typeof a.auth.checkin === "function",  // ← 有无 checkin 钩子
+  options: optionsOf(a.auth),
+  decide: p.decide === true,
+  searches: p.searches === true,
+  maxConcurrency: concurrencyOf(a),
+  signedIn: keys.length > 0,
+  authType: first?.type ?? "",
+  accountId: whoOf(first),
+  fellBack: keys.length > 0 && !!p.fellBack,
+  listError: ...,
+  accounts: keys.map((k, i) => ({
+    key: k,
+    type: stored[k]?.type ?? "",
+    accountId: whoOf(stored[k]),
+    hint: hintOf(stored[k]),
+    models: ...,
+    fellBack: ...,
+    listError: ...,
+  })),
+  models: [...],
+}
+```
+
+**`usage: typeof a.auth.usage === "function"` —— magpie 直接探测你有没有这个钩子。**
+
+---
+
+## 十一、`usage` 字段怎么变成你看到的进度条
+
+```js
+windows: [{
+  name: "积分",                          // 进度条上方的标签
+  used: 62.7,                            // 已用百分比（0-100，超额 >100）
+  display: "2,131.63 / 3,400 积分",       // 数字显示
+  amount: 2131.63,                       // 已用
+  limit: 3400,                           // 总量
+  unit: "积分",                          // 单位
+  resetsAt: "2026-11-23T00:00:00Z",      // 重置时间
+  aside: false,                          // 用光是否停账号
+}]
+```
+
+渲染结果：
+
+```
+积分  ████████░░░░  2,131.63 / 3,400 积分 · 剩余 62.7%
+```
+
+**如果只给 `used` 不给 `display`/`amount`/`limit`，就只有一个光秃秃的进度条。**
+
+**`aside: true` 的窗口用光不会停账号**（比如赠送积分），
+magpie 会把它显示成「附加额度」。
+
+---
+
+## 十二、magpie 已经做好的事（插件不用重做）
+
+| 能力 | magpie 的实现 |
+|---|---|
+| 签到调度 | 北京时间每账号每天一次 + 失败重试 |
+| 签到记账 | `plugin-checkin.json` |
+| 签到 UI | 「今日已签到 +100 · 连续 21 天」 |
+| 额度趋势 | `credits-daily.json` |
+| token 续期 | `refreshLead` + 串行化 + 合并保存 |
+| 登录作用域 | `inScope(provider, key, ...)` |
+| 代理 | `via.run(proxy, ...)`，登录和请求都走 |
+| SDK 请求头 | `sdkHeaders(npm, key)` |
+| 请求头顺序 | sdkHeaders → loader → gateway → chat.headers |
+| 流式转发 | 分帧 + 背压 + base64 |
+| 登录态标记 | `X-Magpie-Sign-In` 解析 |
+| 多账号分配 | `signInKey` → `provider` 或 `provider#xxxxxx` |
+| prompts 流程 | 顺序提问 + when/condition/validate |
+| 故障转移 | 限流/5xx 自动换账号或模型 |
+| 自动更新 | `@magpie-community/*` 启动后和每小时 |
+| 市场发现 | registry.json + GitHub topic |
+
+**插件只写六个钩子，其余全交给 magpie。**
+
+---
+
+## 十三、写插件前的检查清单
+
+1. `~/.config/magpie/` 下有没有相关状态文件（`plugin-checkin.json` 等）
+2. `magpie plugin list` 有没有同类 provider
+3. magpie 界面「观测 → 用量」有没有现成展示
+4. `magpie-community/plugins` 的 README 表格（25 个插件）
+5. 提取二进制里的契约源码（`extract-contract.py`）
+
+**只有确认 magpie 没有、社区也没有，才值得自己写。**
+
+---
+
+## 十四、部署（tgz 的坑）
+
+⚠ **`magpie plugin add xxx.tgz` 有 bug** —— 它把 tgz 当 JS 文件 `import()`，
+报 `exports no OpenCode plugin function`。
+
+**正确步骤**：
+
+```bash
+# 1. 解压
+DST=~/.config/magpie/plugins/node_modules/<包名>
+mkdir -p "$DST"
+tar -xzf <包名>.tgz -C "$DST" --strip-components=1
+
+# 2. plugins.json 的 plugins 数组加
+{"spec": "<包名>"}
+
+# 3. plugins/package.json 的 dependencies 加
+"<包名>": "file:./node_modules/<包名>"
+
+# 4. 安装
+magpie-bun install
+```
+
+**删除时四处都要清**：
+1. `plugins.json`
+2. `plugins/package.json`
+3. `plugins/node_modules/<包名>/`
+4. `plugin-auth.json`（账号）
+5. `plugin-providers.json`（缓存）
