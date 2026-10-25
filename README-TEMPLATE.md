@@ -139,6 +139,66 @@ MIT。
 
 ---
 
+## 仓库里还该有什么
+
+README 只是门面。这几样缺一个，装机的人就会卡：
+
+| 文件 | 作用 | 注意 |
+|---|---|---|
+| `docs/internals.md` | 实现细节、协议取证、反向验证、本地安装法 | README 里所有「为什么」都挪到这 |
+| `NOTICE.md` | 完整版权声明：衍生自哪些项目、各是哪一段 | README 的「参考源」指向它 |
+| `LICENSE` | **必须是与官方模板逐字一致的正文** | 见下 |
+
+### ⚠ LICENSE 写错，GitHub 就认不出，卡片会缺许可那一格
+
+magpie 从**仓库**读 license，不是从 npm。把归属说明插在版权行和许可正文之间，
+GitHub 的分类器会放弃解析：
+
+```
+MYCF711/magpie-officeace  → NOASSERTION   ← 卡片没有许可那一格
+MYCF711/magpie-plugin-template → MIT
+```
+
+**做法**：MIT 正文一字不动占满整个 `LICENSE`，归属说明放 `NOTICE.md`。自查：
+
+```bash
+# 1. 取 GitHub 认的那份 MIT 正文
+curl -s https://raw.githubusercontent.com/github/choosealicense.com/gh-pages/_licenses/mit.txt \
+  | sed -n '/^Permission is hereby granted/,/SOFTWARE\.$/p' > /tmp/canon.txt
+
+# 2. 从自己的 LICENSE 里切出同一段
+sed -n '/^Permission is hereby granted/,/SOFTWARE\.$/p' LICENSE > /tmp/ours.txt
+
+# 3. 逐字比对，无输出才合格
+diff /tmp/canon.txt /tmp/ours.txt
+```
+
+改完 push，GitHub 一分钟内重新识别。
+
+### ⚠ 包名先查 npm，撞名会装成别人的包
+
+magpie 的「有新版本」按**包名**查 npm，跟仓库属主无关。撞名 = 界面提示别人的新版，
+点「更新」把别人的包装进来：
+
+```bash
+npm view <包名> version     # 有输出 = 被占了，换个名
+```
+
+改名的三处必须同步（缺一个就静默错位）：
+`package.json` 的 `name`、`index.mjs` 里 `REGISTRY_ENTRY.package`（**一字不差**）、
+magpie 侧 `plugins.json` 的 spec 与 `plugins/package.json` 的依赖键。
+
+### keywords 决定能不能被搜到
+
+magpie 搜索走 npm 的 `/-/v1/search`。`keywords` 要含 `opencode` + `plugin`/`auth`/`provider`
+之一，否则搜不到。实测 `<厂商名>` 这种词最有效。
+
+```json
+"keywords": ["magpie", "magpie-plugin", "opencode", "opencode-plugin", "opencode-auth", "<厂商>"]
+```
+
+---
+
 ## 反例对照
 
 同一件事，两种写法：
