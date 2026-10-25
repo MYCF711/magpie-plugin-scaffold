@@ -315,6 +315,90 @@ return [{ id: "acme-coder", name: "Acme Coder", context: 200_000 }]
 
 ---
 
+## 自注册到市场（让卡片显示完整）
+
+**问题：** 包不在官方 registry 里 → 卡片只有版本和更新时间，
+**没有许可证、没有「源码」按钮，标题退回包名**。
+
+原因是这些字段来自 `~/.cache/magpie/plugin-market.json`，
+而 magpie 每 6 小时用官方 `registry.json` **整体替换**它。
+
+**实测时序（这台机器）：**
+
+```
+magpie 启动      18:49:47
+手动打补丁       18:52:59
+缓存被覆盖       18:53:00   ← 1 秒后
+```
+
+**所以一次性补丁没用，必须每次加载都重打。**
+
+### 模板已经做好了
+
+`src/self-register.mjs` + `index.mjs` 里的 `REGISTRY_ENTRY`：
+
+```js
+const REGISTRY_ENTRY = {
+  package: "magpie-plugin-template",   // ⚠ 必须等于 package.json 的 name
+  name: "My Provider",                 // 卡片标题
+  providers: ["xxx"],
+  community: true,
+  summary: {
+    en: "What it signs in to, in one sentence.",
+    zh: "一句话说清签入什么服务。",
+  },
+}
+```
+
+插件函数里已经接好：
+
+```js
+export const XxxAuthPlugin = async ({ client, directory }) => {
+  startSelfRegister(REGISTRY_ENTRY, { configDir: directory, log })
+  return { ... }
+}
+```
+
+**运行时机：** 插件加载时一次，5 秒后一次（等 magpie 的拉取完成）。两次都幂等。
+
+**行为：**
+
+```
+plugin-market.json 存在 → 读出来，去掉同名的旧条目，加进去，原子写回
+                不存在 → 先拉官方 registry，再加
+             拉不到官方 → 静默跳过，不影响插件启动
+```
+
+### 效果
+
+| 卡片元素 | 打补丁前 | 打补丁后 |
+|---|---|---|
+| 标题 | 包名 | `name` 字段 |
+| 许可证 | ❌ | ✅ |
+| 「源码」按钮 | ❌ | ✅ |
+| 图标 | ✅（npm/GitHub 元数据）| ✅ |
+| 版本、更新于 | ✅ | ✅ |
+
+### 已知限制
+
+- **会被覆盖**，所以每次插件加载都重打。magpie 运行期间被覆盖后，
+  要等下次重载插件才恢复（或重启 magpie）。
+- 改的是用户机器上的缓存文件。不影响其它插件。
+- 如果 magpie 未来改了缓存文件名或结构，`registerSelf` 会静默失败，
+  卡片退回原来的样子 —— **不会让插件坏掉**。
+
+### 已验证
+
+```
+单元测试（沙箱）：
+  cacheDirOf 推导      ✅
+  首次注册             ✅ 2 条（保留原有条目）
+  重复注册后条数        1 ✅ 幂等
+
+真实环境：
+  已注册 officeace-auth（更新，共 39 条）   ✅
+```
+
 ## 调试
 
 **永远在沙箱里试，不要碰你自己的 magpie。**
