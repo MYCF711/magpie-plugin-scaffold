@@ -422,6 +422,64 @@ m plugin logout acme
 
 ---
 
+## 上下文窗口要实测，别凭印象填
+
+`provider.models` 里每个模型的 `limit.context` 会被 magpie 转给 agent（DSH 等），
+**决定它什么时候压缩对话**。
+
+### 填错的两种后果
+
+```
+填小了  → agent 在 12.8 万就压缩，模型明明能收 100 万，浪费 8 倍容量
+        → 更要紧：路由组按「组内最大」算窗口，一个填小的成员拉低整组
+填大了  → agent 以为还有余量，超了上游才报错
+        → 用户看到「内容太长了」，以为是 bug
+```
+
+### 最容易犯的错：把「最大输出」当成「上下文」
+
+DeepSeek 系常见组合：
+
+```
+最大输出 128,000     ← 每次回复的上限
+上下文   1,000,000   ← 能塞进多少历史
+```
+
+**两个数字长得很像，填反了差 8 倍。** 我们就填反过：
+
+```js
+// 错的
+limit: { context: 128_000, output: 8192 }
+// 对的（实测后）
+limit: { context: 1_000_000, output: 128_000 }
+```
+
+### 实测办法
+
+```js
+// 造一份约 N token 的文本发过去，看 usage.prompt_tokens 和是否 200
+for (const n of [200_000, 500_000, 800_000, 1_000_000, 1_100_000]) {
+  const body = JSON.stringify({
+    model: "your/model",
+    messages: [{ role: "user", content: "填充文本".repeat(...) + " OK" }],
+    max_tokens: 20, stream: false,
+  })
+  const r = await fetch(gatewayUrl, { method: "POST", headers, body })
+  const d = await r.json()
+  console.log(n, d.choices ? "OK " + d.usage.prompt_tokens : "ERR " + d.error.message)
+}
+```
+
+**找到第一次失败的位置，取稍低一点的圆整值**（如 258,556 → 256K）。
+
+### 另一个坑：路由组的窗口
+
+magpie 的路由组可以按「组内最大」或「固定值」决定窗口。**如果组用「最大」，
+而你在某个成员卡片里手动改小，组的值不会变——但这个成员的对外值变了，
+agent 看到窗口变化会重新组装上下文，可能一次发出两倍的历史。**
+
+**建议：组用「自定义」，固定成组内成员共同的一个值。**
+
 ## 常见坑
 
 ### 1. `magpie plugin add xxx.tgz` 有 bug
