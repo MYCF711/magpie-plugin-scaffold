@@ -87,6 +87,20 @@ npm publish
 **这一步是给人看的，不是给 magpie 看的**（原因见下面的 ⚠）——
 但不做，用户就没有一个地方能一眼看出「这个版本改了什么」。
 
+#### 有 workflow 的话：推个 tag 就完事
+
+本模板带了 [`.github/workflows/release.yml`](./.github/workflows/release.yml)：
+推一个 `v*` tag，它就用仓库自己的 token 把 `CHANGELOG.md` 里该版本那几条抽出来建成
+Release。**正文只有一处来源**，不会和 CHANGELOG 打架。
+
+```bash
+git tag v0.1.8 && git push origin v0.1.8
+```
+
+⚠ 这个 workflow 只建 Release —— 它**不碰 npm，也不替你 push 分支**。
+
+#### 没有 workflow 的话：手工发
+
 打开 `https://github.com/<owner>/<repo>/releases/new`：
 
 | 字段 | 填什么 |

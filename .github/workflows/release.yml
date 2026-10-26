@@ -1,0 +1,66 @@
+name: release
+
+# 推一个 v* tag，就把 CHANGELOG.md 里该版本那几条抽出来，建成 GitHub Release。
+#
+# 为什么要有这个：Release 的正文就是「更新内容，一条条列出来」——
+# 手工复制迟早会漏，而正文与 CHANGELOG 分家就会互相打架。
+# 机制见 UPDATING.md；这里只做一件事：CHANGELOG 是唯一来源，Release 是它的投影。
+#
+# ⚠ 这个 workflow 不参与 magpie 的更新检测（那是 push 默认分支 + npm publish 的事）。
+#   Release 是给人看的。
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 从 CHANGELOG.md 抽出这个版本的条目
+        run: |
+          set -euo pipefail
+          ver="${GITHUB_REF_NAME#v}"
+
+          if [ ! -f CHANGELOG.md ]; then
+            echo "没有 CHANGELOG.md —— Release 正文留空" >&2
+            printf '见仓库根目录的 CHANGELOG.md。\n' > notes.md
+            exit 0
+          fi
+
+          # 取 "## <ver>" 那一节，到下一个 "## " 之前；去掉空行
+          awk -v ver="$ver" '
+            /^## / {
+              if (f) exit
+              if (substr($0, 4, length(ver)) == ver) { f = 1; next }
+            }
+            f { print }
+          ' CHANGELOG.md | sed '/^[[:space:]]*$/d' > notes.md
+
+          if [ ! -s notes.md ]; then
+            echo "CHANGELOG.md 里没有 $ver 这一节" >&2
+            printf '见仓库根目录的 CHANGELOG.md。\n' > notes.md
+          fi
+
+          echo "--- Release 正文 ---"
+          cat notes.md
+
+      - name: 建 Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # 已存在就跳过，别让重推 tag 报错
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME 已存在，跳过"
+            exit 0
+          fi
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file notes.md
