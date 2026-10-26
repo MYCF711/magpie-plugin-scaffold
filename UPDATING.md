@@ -227,6 +227,10 @@ magpie plugin add github:owner/repo
 ⚠ **magpie 的卡片只渲染 README**，不渲染别的文件。所以更新内容本身放 CHANGELOG，
 README 里只留路标 —— 别把 changelog 抄一遍进 README，那是两份会打架的记录。
 
+⚠ **Release 正文里的相对链接点不开。** `[CHANGELOG.md](./CHANGELOG.md)` 在 Release
+页面上会相对 `/releases/...` 去解析 —— 正文里要么写全 URL，要么只写文件名。
+（CHANGELOG 自己内部留相对链接没问题，那是仓库里的文件。）
+
 ---
 
 ## 五、发版前检查清单
