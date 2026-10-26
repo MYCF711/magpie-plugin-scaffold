@@ -69,10 +69,13 @@ jobs:
         run: |
           set -euo pipefail
           # 重推同一个 tag 时刷新，而不是报错 —— CHANGELOG 改了，Release 就跟着改
+          # ⚠ --draft=false 是必需的：tag 被删过的话，GitHub 会把 Release 转成草稿，
+          #   而 `gh release view` 看得见草稿 —— 于是走 edit 分支，草稿就一直是草稿。
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             gh release edit "$GITHUB_REF_NAME" \
               --title "$GITHUB_REF_NAME" \
-              --notes-file notes.md
+              --notes-file notes.md \
+              --draft=false
           else
             gh release create "$GITHUB_REF_NAME" \
               --title "$GITHUB_REF_NAME" \
