@@ -227,6 +227,49 @@ magpie 反查键名当标题      gitName():  for name, s := range pj.Dependenci
 ⚠ **换 `name` 就是换包**：npm 上是一个新包，已装用户要重装一次。
 所以**新建插件时就把 `name` 定成想要的显示名**，别等发出去再改。
 
+#### git 源想要大写标题、npm 又要能发？发布时临时换 `name`
+
+两个来源读的是**同一个** `package.json`：
+
+| 谁读 | 读哪份 | 决定了什么 |
+|---|---|---|
+| bun（`plugin add github:…`）| 仓库里的 `package.json` | 依赖键 → **卡片标题** |
+| `npm publish` | **同一份** | npm 上的**包名** |
+
+一个文件喂两个地方，所以想「git 装显示 `OfficeAce`，npm 上仍是小写包名」，
+只能在**发布那一下**换掉 `name`：
+
+```js
+// publish-npm.mjs —— 用 `npm run publish:npm` 跑
+import fs from "node:fs"
+import { execSync } from "node:child_process"
+
+const file = "package.json"
+const orig = fs.readFileSync(file, "utf8")
+const pkg = JSON.parse(orig)
+
+pkg.name = "officeace-auth"                    // npm 上的包名：小写、不变
+fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + "\n")
+try {
+  execSync("npm publish", { stdio: "inherit" })
+} finally {
+  fs.writeFileSync(file, orig)                 // 无论成败都改回来
+}
+```
+
+```jsonc
+// package.json
+"name": "OfficeAce",                           // git 源看到的显示名
+"scripts": { "publish:npm": "node publish-npm.mjs" }
+```
+
+⚠ 从此**不要裸跑 `npm publish`** —— 那会拿 `OfficeAce` 去发，而 registry 拒绝含大写的
+**新**包名（不会静默变小写）。一律用 `npm run publish:npm`。
+
+⚠ 两个来源的包名从此不同：npm 装的依赖键是 `officeace-auth`（标题就是包名），
+git 装上的是 `OfficeAce`。**这正是「分开」的含义**，不是 bug。
+好处是 npm 那边的包名没变 —— 已装用户照旧收到更新，不用重装。
+
 #### 已经发出去了、又不想换包名
 
 那只能在用户那边手改依赖键（三处同步），并且**每次 `add` / `update` 后都要改回来** ——
