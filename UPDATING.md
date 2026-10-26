@@ -99,6 +99,11 @@ git tag v0.1.8 && git push origin v0.1.8
 
 ⚠ 这个 workflow 只建 Release —— 它**不碰 npm，也不替你 push 分支**。
 
+⚠⚠ **别用「删 tag 再重推」来刷新正文。** GitHub 会在 tag 被删除时**连带删掉它的
+Release**（实测：删 tag → `releases/tags/<tag>` 立刻 404）。想刷新已发版本的正文，
+去 **Actions 页面手动跑一次 `release`**（workflow 带 `workflow_dispatch`，填 tag 即可），
+或者干脆改 `CHANGELOG.md` 发下一个版本。
+
 #### 没有 workflow 的话：手工发
 
 打开 `https://github.com/<owner>/<repo>/releases/new`：
