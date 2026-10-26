@@ -557,9 +557,30 @@ plugin github:owner/repo didn't load:
 | 标题 | 上面说的 `plugin.Name()` |
 | 标题下一行 | 安装 spec（`github:owner/repo` 或包名） |
 | 「版本」 | 已装包自己的 `package.json` 的 `version` |
+| 「版本」后面那串 | **只有 git 源有**：已装那份代码的 **commit 短 sha**（`plugin.ShortCommit`）|
 | 「更新于」 | npm registry 的发布时间，或 git commit 的时间 |
 | 「npm ↗ / 源码 ↗」按钮 | npm 安装显示 npm，git 安装显示源码（`package.json` 的 `repository` 决定链接） |
 | 介绍正文 | **README.md 的内容**（见第十章） |
+
+**为什么 git 源要补一个 commit。** 那边「版本」不是可靠的标识 —— 同一个 `0.1.14`
+可以对应任意多个 commit（改了代码、不发 npm，包内 `version` 就不会动）。所以 magpie
+把短 sha 跟在版本号后面，那一串才是「你装的到底是哪份代码」：
+
+```
+Loomy  0.1.14 c2aacc2      ← 版本号 + 本机装的那次 commit
+```
+
+短 sha 取自本机 `plugins/bun.lock` 里该依赖锁住的 `#<sha>`，不是远端的、也不是最新的。
+
+同一套符号解释了两件事：
+
+| 现象 | 机制 |
+|---|---|
+| 改了代码、推上去，version 没变，界面也提示有新版本 | git 源比的是 **commit**（`GitBehind` / `SameCommit`），不是 version —— 文案 `已安装 {have}，{repo} 已到 {head}`、`{head} 是 {repo} 的最新提交` |
+| 同一版本号，两串却不一样 | 两个仓库各自的 commit 不同；光看 version 分不清 |
+
+⚠ **npm 源没有这个兜底** —— 那边比的只有 `version`，所以改了代码**必须 bump**，
+否则用户看不到任何更新提示（见 [UPDATING.md](./UPDATING.md)）。
 
 ⚠ **已安装卡片的元数据是有限的**：只显示版本、更新于、按钮和 README 摘要。
 **publisher、周下载量、license、stars 只在「发现」面板的卡片上显示**，不在已安装列表里
