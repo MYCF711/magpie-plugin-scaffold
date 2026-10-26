@@ -51,16 +51,18 @@ jobs:
           echo "--- Release 正文 ---"
           cat notes.md
 
-      - name: 建 Release
+      - name: 建 Release（已存在则刷新正文）
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          # 已存在就跳过，别让重推 tag 报错
+          # 重推同一个 tag 时刷新，而不是报错 —— CHANGELOG 改了，Release 就跟着改
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            echo "Release $GITHUB_REF_NAME 已存在，跳过"
-            exit 0
+            gh release edit "$GITHUB_REF_NAME" \
+              --title "$GITHUB_REF_NAME" \
+              --notes-file notes.md
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              --title "$GITHUB_REF_NAME" \
+              --notes-file notes.md
           fi
-          gh release create "$GITHUB_REF_NAME" \
-            --title "$GITHUB_REF_NAME" \
-            --notes-file notes.md
