@@ -23,6 +23,11 @@
 | 参考源 | 用了谁的代码 / 抄了谁的协议结论 | 表格，几行 |
 | 许可 | 一行 | 1 行 |
 
+> 另外，README **末尾（许可上方）加一行**：
+> `> 更新记录：[CHANGELOG.md](./CHANGELOG.md)`
+> 卡片正文就是 README —— 这是用户唯一看得见的路标。
+> 更新内容本身写在 `CHANGELOG.md`，发版流程见 [UPDATING.md](./UPDATING.md)。
+
 ## 硬规则
 
 1. **开头给数字，不给铺垫。** 用户扫一眼就知道值不值得装。
@@ -130,6 +135,8 @@ magpie plugin list
 
 ---
 
+> 更新记录：[`CHANGELOG.md`](./CHANGELOG.md)
+
 ## 许可
 
 MIT。
@@ -146,6 +153,7 @@ README 只是门面。这几样缺一个，装机的人就会卡：
 | 文件 | 作用 | 注意 |
 |---|---|---|
 | `docs/internals.md` | 实现细节、协议取证、反向验证、本地安装法 | README 里所有「为什么」都挪到这 |
+| `CHANGELOG.md` | 每个版本一节，**一条一行**说用户能感知的变化 | README 末尾指一行过来；发版流程见 [UPDATING.md](./UPDATING.md) |
 | `NOTICE.md` | 完整版权声明：衍生自哪些项目、各是哪一段 | README 的「参考源」指向它 |
 | `LICENSE` | **必须是与官方模板逐字一致的正文** | 见下 |
 
