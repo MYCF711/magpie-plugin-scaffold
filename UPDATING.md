@@ -81,6 +81,8 @@ npm publish
 ```
 
 ⚠ 同版本号重复 publish 会被拒；改了代码必须 bump（见第 1 步）。
+⚠ **包内 `name` 与 npm 包名不同的话**（就是「git 源想要大写标题、npm 又要能发」那种），
+裸跑会被 registry 拒 —— 那种插件走 `npm run publish:npm`。
 
 ### 第 6 步 · 在 GitHub 上发 Release
 
@@ -381,7 +383,7 @@ README 里只留路标 —— 别把 changelog 抄一遍进 README，那是两�
 □ version 已经 bump（npm 源检测就看它）
 □ npm pack --dry-run 清单对（README / CHANGELOG / docs 都在）
 □ 推到默认分支了（git 源检测看的是它的 HEAD）
-□ npm publish 成功
+□ npm publish 成功（显示名与包名不同的插件：`npm run publish:npm`）
 □ GitHub Release 发了：tag `v<version>`，说明里一条条列了这次的更新
 □ npm view <包名> version 已是新版本
 □ 线上 tarball 抓下来看过（不只是版本号）

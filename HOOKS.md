@@ -545,8 +545,9 @@ plugin github:owner/repo didn't load:
 改仓库名只会让所有已安装用户的 spec 失效。
 
 ⚠ **`magpie plugin add` 会覆盖你手改的键名。** 每次 `add` / `update` 都由 bun 重新写
-`package.json`，键名回到包自己的 `package.json` 里那个 `name`。要永久改名，要么改包内的
-`package.json` 的 `name`（会影响 npm 发布名），要么接受每次更新后重改。
+`package.json`，键名回到包自己的 `package.json` 里那个 `name`。所以**正路是改包内的
+`name`** —— 改完装出来就是那个名字，再也不用管（实测见 [UPDATING.md](./UPDATING.md)）；
+不想改 `name` 才退回去手改，接受每次更新后重改。
 
 ⚠ **npm 安装无法改名。** 标题就是包名，只能通过改包名（重新发布）实现。
 
