@@ -99,10 +99,19 @@ git tag v0.1.8 && git push origin v0.1.8
 
 ⚠ 这个 workflow 只建 Release —— 它**不碰 npm，也不替你 push 分支**。
 
-⚠⚠ **别用「删 tag 再重推」来刷新正文。** GitHub 会在 tag 被删除时**连带删掉它的
-Release**（实测：删 tag → `releases/tags/<tag>` 立刻 404）。想刷新已发版本的正文，
-去 **Actions 页面手动跑一次 `release`**（workflow 带 `workflow_dispatch`，填 tag 即可），
-或者干脆改 `CHANGELOG.md` 发下一个版本。
+⚠⚠ **别用「删 tag 再重推」来刷新正文。** 删 tag 并不会删掉 Release —— GitHub 把它
+**转成草稿（`draft: true`）**。草稿在网页和匿名 API 上都看不见（`releases/tags/<tag>` 直接
+404），只有带 token 的 `releases` 列表能看到它；表现得很像「Release 没了」，其实还在。
+想刷新已发版本的正文，去 **Actions 页面手动跑一次 `release`**（workflow 带
+`workflow_dispatch`，填 tag 即可），或者干脆改 `CHANGELOG.md` 发下一个版本。
+
+⚠ 如果 Release 已经躺在草稿态（上面那个坑），发出去：
+
+```bash
+gh release edit v0.1.8 --draft=false
+```
+
+本模板的 workflow 已经在 edit 分支带上 `--draft=false`，不会再把草稿留在草稿态。
 
 #### 没有 workflow 的话：手工发
 
@@ -188,6 +197,54 @@ magpie plugin add github:owner/repo
 ⚠ **别自己去跑 `~/.cache/magpie/bun/*/magpie-bun.exe`** —— magpie 调 bun 时会
 自备 CA 环境，裸跑会报 `UNABLE_TO_GET_ISSUER_CERT_LOCALLY`（而且 exit code 是 0，
 看不出来）。一律走 `magpie plugin ...`。
+
+### 装完（更新完）把卡片标题改成供应商名
+
+**约定：这个插件在 magpie 里显示的是供应商名，不是包名。**
+
+git 装完，`~/.config/magpie/plugins/package.json` 的依赖键就是包名 ——
+卡片标题跟着变成 `officeace-auth` / `magpie-plugin-loomy-auth`。把它改成供应商名：
+
+```jsonc
+// ~/.config/magpie/plugins/package.json
+"dependencies": {
+  "OfficeAce": "github:MYCF711/magpie-officeace",   // 不是 "officeace-auth"
+  "Loomy":     "github:MYCF711/magpie-loomy-auth"   // 不是 "magpie-plugin-loomy-auth"
+}
+```
+
+**为什么是依赖键**：magpie 没有 `displayName`，git 安装的卡片标题由
+`plugin.Name()` → `gitName()` 反查 dependencies 的**键名**得来（源码见
+[HOOKS.md](./HOOKS.md) 的「九之二、插件名」）。这个键同时是 `node_modules` 下的目录名。
+
+改一处不够，**三处必须同步**：
+
+| # | 位置 | 改什么 |
+|---|---|---|
+| 1 | `plugins/package.json` | `dependencies` 的键 |
+| 2 | `plugins/bun.lock` | 两处键：`workspaces.dependencies` 与 `packages` |
+| 3 | `plugins/node_modules/` | 目录 `旧名` → `新名` |
+
+```bash
+cd ~/.config/magpie/plugins
+# 1、2 用编辑器的批量替换；3 用 mv —— 然后重启 magpie
+mv node_modules/officeace-auth node_modules/OfficeAce
+```
+
+⚠ 漏掉第 3 步会报：`no such plugin: ...\plugins\node_modules\OfficeAce`。
+⚠ `bun.lock` 的 `packages` 段里**键是别名、值的第一段仍是真包名** —— 只改键：
+
+```
+"OfficeAce": ["officeace-auth@github:MYCF711/magpie-officeace#<sha>", ...]
+   ↑ 改成这个            ↑ 这个不动
+```
+
+⚠ **`magpie plugin add` / `update` 会把它改回包名** —— 包名是包自己 `package.json`
+里的 `name`。所以**每次装完/更新完都检查一眼**。要永久生效只有两条路：改包内的
+`name`（会改 npm 发布名），或者接受每次重改。
+
+> 为什么值得每次改：卡片标题是用户唯一看到的名字。`officeace-auth` 是包名，
+> `OfficeAce` 才是他装的那个服务。
 
 ---
 
