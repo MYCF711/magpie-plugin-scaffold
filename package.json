@@ -1,6 +1,6 @@
 {
   "name": "magpie-plugin-template",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "A magpie / OpenCode provider plugin template: all nine hooks implemented — config, sign-in, token renewal, request takeover, usage, daily check-in, per-account models and chat headers. Clone it and implement five functions to make your own provider.",
   "type": "module",
   "main": "./index.mjs",
@@ -9,10 +9,12 @@
     "index.mjs",
     "src",
     "README.md",
+    "README-TEMPLATE.md",
     "HOOKS.md",
+    "UPDATING.md",
+    "CHANGELOG.md",
     "LICENSE",
-    "extract-contract.py",
-    "README-TEMPLATE.md"
+    "extract-contract.py"
   ],
   "keywords": [
     "magpie",

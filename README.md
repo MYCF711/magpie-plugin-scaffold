@@ -32,6 +32,7 @@
 ## 目录
 
 - [写 README](./README-TEMPLATE.md) —— **插件介绍页的模板，照抄这份**
+- [更新途径](./UPDATING.md) —— **发下一个版本、用户拿更新，照这份走**
 - [最小交付面](#最小交付面) —— 这个模板的设计原则
 - [magpie 是什么](#magpie-是什么)
 - [九项清单](#九项清单)
@@ -568,6 +569,41 @@ python extract-contract.py /path/to/magpie
 
 ⚠ Windows 上**没有 `strings` 命令**（Git for Windows 不带），必须用 Python。
 
+### 7. 插件在卡片上叫什么，改不了（除非动三处）
+
+**magpie 没有 `displayName`。** 卡片标题由 `plugin.Name()` 决定：
+
+| 安装方式 | 标题 |
+|---|---|
+| 路径 `./my-plugin` | 那个路径 |
+| npm `my-package` | 包名 |
+| git `github:owner/repo` | **`plugins/package.json` 里 dependencies 的键名** |
+
+git 安装时，`gitName()` 反查的**键名同时是 `node_modules` 下的目录名**，所以改名要三处同步：
+
+```bash
+cd ~/.config/magpie/plugins
+# 1. package.json 的 dependencies 键
+# 2. bun.lock 的两个同名键（workspaces.dependencies 和 packages）
+# 3. node_modules/<旧名> → node_modules/<新名>
+```
+
+漏掉第 3 步会报 `no such plugin: ...\node_modules\<新名>`。
+
+⚠ **`magpie plugin add` / `update` 会把键名改回包自己的 `name`。** 手改不是永久的。
+要永久改名只能改包内 `package.json` 的 `name`（会影响 npm 发布名）。
+
+完整说明见 [HOOKS.md](./HOOKS.md) 的「九之二、插件名」。
+
+### 8. 已安装卡片只显示版本和 README
+
+publisher、周下载量、license、stars **只在「发现」面板显示**，已安装列表没有这些字段
+（`internal/gui/plugins.go` 的 `pluginEntryJSON` 不传出它们）。
+
+想让某条信息出现在已安装卡片上，**写进 README** —— 卡片正文就是 README 的内容。
+
+另外：`weekly` 为 0 时下载量整个元素不渲染（`if (l.npm?.weekly)`），新发布的包看不到它。
+
 ---
 
 ## 怎么发布
@@ -627,6 +663,17 @@ agent       @magpie-community/agent-<name>
 
 真要自己维护一份自注册条目（让卡片显示对的标题与图标），`src/self-register.mjs`
 就是干这个的 —— 它写的是本地市场缓存，不依赖任何上游审核。
+
+### 之后每一次更新
+
+上面讲的是**第一次**发出去。后面每发一个版本，照
+[UPDATING.md](./UPDATING.md) 走 —— 那份只讲「之后」：
+
+- magpie 怎么发现新版本（npm 源比 `version`、git 源比默认分支 HEAD 的 commit，
+  **两条路都不看 GitHub Release / tag**）
+- 发版六步：写 CHANGELOG → bump → push 默认分支 → `npm publish` →
+  GitHub Release（tag + 更新内容一条条列）→ 验证
+- 用户侧怎么拿到更新（npm 源自动、git 源要手动；`rm` + `add` 会把卡片显示名重置成包名）
 
 ---
 
