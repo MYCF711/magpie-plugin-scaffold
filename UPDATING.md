@@ -198,12 +198,39 @@ magpie plugin add github:owner/repo
 自备 CA 环境，裸跑会报 `UNABLE_TO_GET_ISSUER_CERT_LOCALLY`（而且 exit code 是 0，
 看不出来）。一律走 `magpie plugin ...`。
 
-### 装完（更新完）把卡片标题改成供应商名
+### 卡片标题：在仓库里改 `name`，不要指望用户手改
 
-**约定：这个插件在 magpie 里显示的是供应商名，不是包名。**
+**卡片标题 = 包自己的 `package.json` 的 `name`。** 链路（源码
+`internal/plugin/store.go`）：
 
-git 装完，`~/.config/magpie/plugins/package.json` 的依赖键就是包名 ——
-卡片标题跟着变成 `officeace-auth` / `magpie-plugin-loomy-auth`。把它改成供应商名：
+```
+bun 按包内 name 写依赖键   plugins/package.json:  "<name>": "github:owner/repo"
+        ↓
+magpie 反查键名当标题      gitName():  for name, s := range pj.Dependencies { if s == spec { return name } }
+        ↓
+                          Name():     IsGit(spec) → gitName(spec)，取不到才回退成 spec 原文
+```
+
+实测：`bun add` 一个 `name: "OfficeAce"` 的包，依赖键就写成 `"OfficeAce"`。
+
+⇒ **要永久生效，改仓库里 `package.json` 的 `name`。** 更新多少次都不会变，用户一根手指都不用动。
+**这才是正路** —— 手改用户那边的键只是权宜。
+
+⚠ 限制：**npm 不允许新包名含大写**（npm 官方校验库逐字：
+`name can no longer contain capital letters`，`validForNewPackages: false`）。所以：
+
+| 卡片标题想要 | `name` 写成 | 能发 npm 吗 |
+|---|---|---|
+| `officeace` | `"officeace"` | ✅ |
+| `OfficeAce` | `"OfficeAce"` | ❌ —— 只能走 git 源，不发 npm |
+
+⚠ **换 `name` 就是换包**：npm 上是一个新包，已装用户要重装一次。
+所以**新建插件时就把 `name` 定成想要的显示名**，别等发出去再改。
+
+#### 已经发出去了、又不想换包名
+
+那只能在用户那边手改依赖键（三处同步），并且**每次 `add` / `update` 后都要改回来** ——
+bun 会按包内 `name` 重写它。
 
 ```jsonc
 // ~/.config/magpie/plugins/package.json
@@ -239,11 +266,7 @@ mv node_modules/officeace-auth node_modules/OfficeAce
    ↑ 改成这个            ↑ 这个不动
 ```
 
-⚠ **`magpie plugin add` / `update` 会把它改回包名** —— 包名是包自己 `package.json`
-里的 `name`。所以**每次装完/更新完都检查一眼**。要永久生效只有两条路：改包内的
-`name`（会改 npm 发布名），或者接受每次重改。
-
-> 为什么值得每次改：卡片标题是用户唯一看到的名字。`officeace-auth` 是包名，
+> 为什么值得争这个标题：卡片标题是用户唯一看到的名字。`officeace-auth` 是包名，
 > `OfficeAce` 才是他装的那个服务。
 
 ---

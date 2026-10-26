@@ -570,7 +570,25 @@ plugin github:owner/repo didn't load:
 Loomy  0.1.14 c2aacc2      ← 版本号 + 本机装的那次 commit
 ```
 
-短 sha 取自本机 `plugins/bun.lock` 里该依赖锁住的 `#<sha>`，不是远端的、也不是最新的。
+短 sha **从哪读**（`internal/plugin/gitrev.go` 的 `GitCommit()`，按顺序）：
+
+1. `node_modules/<目录名>/.bun-tag` —— bun 写的，形如 `MYCF711-magpie-loomy-auth-c2aacc2`，取最后一段
+2. 否则读 `plugins/bun.lock` 的 `"<名>": ["<名>@…#<sha>"…]`
+
+⚠ 第 2 条的正则**要求键名与值首段同名**。改过别名的依赖
+（`"OfficeAce": ["officeace-auth@…#…"]`）在那里**匹配不上** —— 所以现役路径其实是
+`.bun-tag`；那个文件没了，这串也就没了。
+
+**它不是「有更新时才有」。** `internal/gui/plugins.go` 里只有一个条件：
+
+```go
+if plugin.IsGit(e.Spec) {
+    j.Commit, j.Head = plugin.ShortCommit(plugin.GitCommit(e.Spec)), plugin.ShortCommit(plugin.GitHeadCached(e.Spec))
+}
+```
+
+git 源**总是**填 `Commit`（已装）和 `Head`（远端最新），npm 源两个都不填。
+⇒ **那串只在 git 源出现，而且在插件侧去不掉** —— 想让版本位置干净，只有改用 npm 源。
 
 同一套符号解释了两件事：
 
