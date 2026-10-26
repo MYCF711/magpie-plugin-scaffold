@@ -10,6 +10,7 @@
 - [README](./README.md) —— 目录与「怎么发布」指向 UPDATING.md
 - [README-TEMPLATE](./README-TEMPLATE.md) —— 文件清单加 `CHANGELOG.md`，骨架末尾加一行更新记录路标
 - [HOOKS](./HOOKS.md) —— 新增「九之二、插件名」：卡片标题来自 `plugins/package.json` 的依赖键名（附 `plugin.Name()` 源码、改名三步、以及 `add` / `update` 会覆盖手改键名这条陷阱）
+- **新增 [.github/workflows/release.yml](./.github/workflows/release.yml)** —— 推 `v*` tag 就用仓库自己的 token 把本文件里该版本的条目建成 GitHub Release（正文与 CHANGELOG 同源）
 - `package.json` —— `files` 带上 `UPDATING.md` 与 `CHANGELOG.md`
 
 ## 0.1.2 及更早
