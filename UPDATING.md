@@ -263,6 +263,17 @@ try {
 "scripts": { "publish:npm": "node publish-npm.mjs" }
 ```
 
+**实测**（2026-10-26，officeace 与 loomy 各一次）：把 `name` 改成 `OfficeAce` 之后，
+`magpie plugin rm OfficeAce` + `plugin add github:MYCF711/magpie-officeace`，
+**全程不碰任何文件** —— 装出来的依赖键就是
+
+```jsonc
+"OfficeAce": "github:MYCF711/magpie-officeace"
+```
+
+`bun.lock` 里也跟着变成 `"OfficeAce": ["OfficeAce@github:…#<sha>", …]`（值首段 = 包名）。
+⇒ 从此 `add` / `update` 都写这个键，**再也不用手改**，卡片标题稳定是供应商名。
+
 ⚠ 从此**不要裸跑 `npm publish`** —— 那会拿 `OfficeAce` 去发，而 registry 拒绝含大写的
 **新**包名（不会静默变小写）。一律用 `npm run publish:npm`。
 
@@ -302,12 +313,14 @@ mv node_modules/officeace-auth node_modules/OfficeAce
 ```
 
 ⚠ 漏掉第 3 步会报：`no such plugin: ...\plugins\node_modules\OfficeAce`。
-⚠ `bun.lock` 的 `packages` 段里**键是别名、值的第一段仍是真包名** —— 只改键：
+⚠ `bun.lock` 的 `packages` 段里**键是依赖键、值的第一段是包自己的 `name`** —— 只改键：
 
 ```
 "OfficeAce": ["officeace-auth@github:MYCF711/magpie-officeace#<sha>", ...]
-   ↑ 改成这个            ↑ 这个不动
+   ↑ 改成这个            ↑ 这个不动（它是 npm 包名 / 包内 name）
 ```
+
+（把包内 `name` 改成 `OfficeAce` 之后两者会一致，就不存在这个问题了 —— 见上一节。）
 
 > 为什么值得争这个标题：卡片标题是用户唯一看到的名字。`officeace-auth` 是包名，
 > `OfficeAce` 才是他装的那个服务。
