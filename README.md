@@ -616,6 +616,10 @@ npm publish
 
 用户就能 `magpie plugin add opencode-acme-auth` 了。
 
+⚠ 若**卡片标题与 npm 包名不一样**（包内 `name` 是 `OfficeAce`，npm 上是 `officeace-auth`），
+别裸跑 —— 那会拿 `OfficeAce` 去发，registry 拒绝含大写的新包名。那种插件用发布脚本，
+见 [UPDATING.md](./UPDATING.md) 的「git 源想要大写标题、npm 又要能发」。
+
 ### 收录进 magpie 的市场
 
 **方式一：GitHub topic（最快）**
@@ -671,7 +675,8 @@ agent       @magpie-community/agent-<name>
 
 - magpie 怎么发现新版本（npm 源比 `version`、git 源比默认分支 HEAD 的 commit，
   **两条路都不看 GitHub Release / tag**）
-- 发版六步：写 CHANGELOG → bump → push 默认分支 → `npm publish` →
+- 发版六步：写 CHANGELOG → bump → push 默认分支 → `npm publish`（显示名与包名不同的
+  插件用 `npm run publish:npm`）→
   GitHub Release（tag + 更新内容一条条列）→ 验证
 - 用户侧怎么拿到更新（npm 源自动、git 源要手动；`rm` + `add` 会把卡片显示名重置成包名）
 
