@@ -14,7 +14,7 @@ on:
     tags:
       - "v*"
   # 想刷新已发版本的 Release 正文，就在 Actions 页面手动跑一次 ——
-  # 别用「删 tag 再重推」：GitHub 删 tag 时会连带删掉它的 Release。
+  # 别用「删 tag 再重推」：GitHub 删 tag 时会把它的 Release 转成草稿（网页上就看不见了）。
   workflow_dispatch:
     inputs:
       tag:
