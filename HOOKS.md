@@ -463,6 +463,111 @@ function concurrencyOf(a) {
 
 ---
 
+## 九之二、插件名（卡片标题显示什么）
+
+### 结论先说：插件名**没有** `displayName`
+
+magpie 不读 `package.json` 的 `name`、也不读任何自定义显示字段来当卡片标题。标题来自
+`plugin.Name()`（`internal/plugin/store.go`）：
+
+```go
+func Name(spec string) string {
+	if IsPath(spec) { return spec }                    // 路径安装 → 路径
+	if IsGit(spec) {                                   // git 安装
+		if n := gitName(spec); n != "" { return n }    //   → dependencies 的键名
+		return spec                                    //   → spec 原文
+	}
+	at := strings.LastIndex(spec, "@")                 // npm 安装 → 去掉 @version
+	if at > 0 { return spec[:at] }
+	return spec
+}
+```
+
+| 安装方式 | 卡片标题 |
+|---|---|
+| `magpie plugin add ./my-plugin` | 那个路径 |
+| `magpie plugin add github:owner/repo` | **`plugins/package.json` 里 dependencies 的键名** |
+| `magpie plugin add my-npm-package` | 包名（去掉 `@version`） |
+
+### git 安装：名字 = dependencies 的键名
+
+`gitName()` 的实现就是反查：
+
+```go
+for name, s := range pj.Dependencies {
+	if s == spec { return name }   // ← 键名就是显示名
+}
+```
+
+**键名同时是 `node_modules` 下的目录名**，所以改名必须三处同步，漏一处就加载失败。
+
+### 改名的完整步骤（实测）
+
+以 `github:owner/repo` 改叫 `Loomy` 为例：
+
+```
+~/.config/magpie/plugins/
+├── package.json     ┐
+├── bun.lock         ├─ 三处都要把旧键改成新名
+└── node_modules/    ┘
+    └── Loomy/       ← 目录名必须跟着改
+```
+
+```bash
+cd ~/.config/magpie/plugins
+
+# 1. package.json：把键改成想显示的名字
+#    "magpie-plugin-loomy-auth": "github:owner/repo"
+#    → "Loomy": "github:owner/repo"
+
+# 2. bun.lock：同样换键（两处：workspaces.dependencies 和 packages）
+#    "magpie-plugin-loomy-auth": "github:..."  → "Loomy": "github:..."
+#    "magpie-plugin-loomy-auth": [...]          → "Loomy": [...]
+
+# 3. node_modules 目录改名
+mv node_modules/magpie-plugin-loomy-auth node_modules/Loomy
+```
+
+然后重启 magpie。
+
+**只改 1、2 不改 3 会报：**
+
+```
+plugin github:owner/repo didn't load:
+  Error: no such plugin: ...\plugins\node_modules\Loomy
+```
+
+**已经装好之后改名，不需要重新下载。** 三处键名一致、目录存在即可。
+
+### 陷阱
+
+⚠ **不要试图靠改仓库名来改名。** 仓库名不影响显示（git 安装看的是 dependencies 键），
+改仓库名只会让所有已安装用户的 spec 失效。
+
+⚠ **`magpie plugin add` 会覆盖你手改的键名。** 每次 `add` / `update` 都由 bun 重新写
+`package.json`，键名回到包自己的 `package.json` 里那个 `name`。要永久改名，要么改包内的
+`package.json` 的 `name`（会影响 npm 发布名），要么接受每次更新后重改。
+
+⚠ **npm 安装无法改名。** 标题就是包名，只能通过改包名（重新发布）实现。
+
+### 卡片上的其他文字来自哪
+
+| 位置 | 来源 |
+|---|---|
+| 标题 | 上面说的 `plugin.Name()` |
+| 标题下一行 | 安装 spec（`github:owner/repo` 或包名） |
+| 「版本」 | 已装包自己的 `package.json` 的 `version` |
+| 「更新于」 | npm registry 的发布时间，或 git commit 的时间 |
+| 「npm ↗ / 源码 ↗」按钮 | npm 安装显示 npm，git 安装显示源码（`package.json` 的 `repository` 决定链接） |
+| 介绍正文 | **README.md 的内容**（见第十章） |
+
+⚠ **已安装卡片的元数据是有限的**：只显示版本、更新于、按钮和 README 摘要。
+**publisher、周下载量、license、stars 只在「发现」面板的卡片上显示**，不在已安装列表里
+（`internal/gui/plugins.go` 的 `pluginEntryJSON` 没有传给这些字段）。想让某条信息出现在
+已安装卡片上，**写进 README**。
+
+---
+
 ## 十、卡片介绍页（不是钩子）
 
 **magpie 用 npm 包的 README 渲染插件卡片的介绍正文。**
