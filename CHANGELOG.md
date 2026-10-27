@@ -3,6 +3,16 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.1.9 — 2026-10-27
+
+- **删掉 `src/self-register.mjs`** —— 插件不再往 `~/.cache/magpie/plugin-market.json` 写条目：那是 magpie 的文件，按包名 merge 会把 registry 条目盖掉（上游 review `magpie-community/plugins#399` 明确要求删）
+- **新增 `registry-entry.json`** —— 要提交给 `registry.json` 的条目形状摆在这里，改四个字段即可
+- [README](./README.md) —— 「卡片上的许可证和『源码』按钮」整节重写：载体是 registry 条目，不是本地缓存；「方式三」那段的「用自注册绕开审核」删掉
+- [scripts/check.mjs](./scripts/check.mjs) —— ⑩ 从「读 index.mjs 里的 `REGISTRY_ENTRY`」改成「读 `registry-entry.json`」，另加一条静态检查：入口与 `src/` 里不准出现 `plugin-market.json` / `startSelfRegister`
+- [README](./README.md)、[README-TEMPLATE](./README-TEMPLATE.md)、[UPDATING](./UPDATING.md)、[HOOKS](./HOOKS.md) —— 四处提到 `REGISTRY_ENTRY` 的地方跟着改
+
+> 起因：OfficeAce 那份 PR 的 review。结论是插件对 magpie 的目录**只有读的份** —— 想改卡片上看到的东西，只能改 registry 条目。
+
 ## 0.1.8 — 2026-10-27
 
 - [MULTI-PROVIDER](./MULTI-PROVIDER.md) —— 铁律 6 重写：卡片上那个「承载 X、Y」**不是 package.json 字段**，magpie ≥ 0.1.1744（`766356c`，issue #3902）从插件**注册的 provider 名**派生；草案里的 `magpie.carries` 从未随任何 magpie 发布。附「什么时候出现」与「名字带不带站点」的判据

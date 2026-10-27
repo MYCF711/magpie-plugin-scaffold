@@ -47,25 +47,6 @@
 //
 // ═══════════════════════════════════════════════════════════════════════
 
-import { startSelfRegister } from "./src/self-register.mjs"
-
-// ── 自注册条目 ──────────────────────────────────────────────────────────
-//
-// 写进 magpie 的市场缓存，让卡片显示「源码」按钮和正确的标题。
-//
-// ⚠ package 必须等于 package.json 的 name。
-//
-const REGISTRY_ENTRY = {
-  package: "magpie-plugin-scaffold",
-  name: "My Provider",
-  providers: ["xxx"],
-  community: true,
-  summary: {
-    en: "What it signs in to, in one sentence.",
-    zh: "一句话说清签入什么服务。",
-  },
-}
-
 // ── 配置 ──────────────────────────────────────────────────────────────
 
 const PROVIDER = "xxx" // ⚠ 改成厂商 id，如 "acme"
@@ -130,20 +111,13 @@ function staticModels() {
 
 // ── 插件入口 ──────────────────────────────────────────────────────────
 
-export const XxxAuthPlugin = async ({ client, directory }, options) => {
-  // 自注册：写一次就够
+export const XxxAuthPlugin = async (_ctx, _options) => {
+  // _ctx 是宿主给的上下文：{ client, directory, … }。
+  // 打日志用 _ctx?.client?.app?.log?.({ service, level, message })。
   //
-  // magpie 只在启动时重写市场缓存，静默运行期间完全不碰（实测 3 分钟零变化）。
-  // 所以不要用 fs.watch 或 setInterval 去补 —— 那会写文件触发自己的 watch，
-  // 形成每秒 3-4 次的死循环（我实测过）。
-  startSelfRegister(REGISTRY_ENTRY, {
-    configDir: directory,
-    log: (msg) => {
-      try {
-        client?.app?.log?.({ service: "template", level: "info", message: msg })
-      } catch {}
-    },
-  })
+  // ⚠ 不要往 magpie 的目录里写任何东西（包括它自己的 ~/.cache/magpie/*.json）：
+  //   那份文件属于 magpie。插件只读，不写。
+  //   卡片标题、「源码」按钮、市场文案的载体是 registry 条目，见 registry-entry.json。
 
   return {
 

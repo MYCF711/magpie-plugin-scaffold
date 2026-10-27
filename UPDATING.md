@@ -48,8 +48,8 @@ npm version patch --no-git-tag-version     # 0.1.7 → 0.1.8；minor/major 同�
 ```
 
 ⚠ 改了包名的话，三处必须同步（缺一个静默错位）：
-`package.json` 的 `name`、`index.mjs` 里 `REGISTRY_ENTRY.package`（**一字不差**）、
-`README` 里的安装命令。
+`package.json` 的 `name`、`registry-entry.json` 的 `package`（**一字不差**；已经上了 registry
+的话那边也要跟着改）、`README` 里的安装命令。
 
 ### 第 2 步 · 本地验证打包内容
 

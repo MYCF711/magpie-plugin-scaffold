@@ -224,17 +224,67 @@ for (const target of ["index.mjs", "src", "README.md", "docs", "tests", "tools",
   }
 }
 
-// ── ⑩ 自注册条目与包名一致 ───────────────────────────────────────────
+// ── ⑩ registry 条目与包名一致 ─────────────────────────────────────────
+//
+// 条目是提交给 magpie-community/plugins 的那份 JSON。它**不属于运行时** ——
+// 插件不许把条目写进 magpie 的市场缓存（plugins#399 的 review 明确要求）。
+//
+// ⚠ 要核对的是 **npm 上的包名**，不是 package.json 的 name：显示名带大写的插件
+// （OfficeAce、Loomy…）用 publish-npm.mjs 在发布时换名，registry 条目跟的是那个名字。
+// 所以有发布脚本就取它里面的 PUBLISH_AS / NPM_NAME，没有才退回 package.json 的 name。
 
-if (entryFile && existsSync(join(ROOT, String(entryFile))) && pkg?.name) {
-  const src = readFileSync(join(ROOT, String(entryFile)), "utf8")
-  const m = src.match(/package:\s*["']([^"']+)["']/)
-  if (m) {
-    ok(m[1] === pkg.name,
-       "自注册条目的 package 与 package.json 的 name 一致",
-       "不一致会让市场认错包（UPDATING.md「改名的三处必须同步」）",
-       `条目写 ${m[1]}，package.json 是 ${pkg.name}`)
+const publishScript = join(ROOT, "publish-npm.mjs")
+let npmName = pkg?.name
+if (existsSync(publishScript)) {
+  const src = readFileSync(publishScript, "utf8")
+  const m = src.match(/(?:PUBLISH_AS|NPM_NAME)\s*=\s*["']([^"']+)["']/)
+  if (m) npmName = m[1]
+}
+
+const entryJson = join(ROOT, "registry-entry.json")
+if (existsSync(entryJson) && pkg?.name) {
+  let entry = null
+  try {
+    entry = JSON.parse(readFileSync(entryJson, "utf8"))
+  } catch (e) {
+    ok(false, "registry-entry.json 是合法 JSON", String(e.message))
   }
+  if (entry) {
+    if (entry.package === "your-package-name") {
+      warn(false, "registry 条目还是模板占位名",
+           "模板自己留着占位名；派生出来的仓库要改成自己的包名",
+           "把 your-package-name / your-provider-id 换成真的")
+    } else {
+      ok(entry.package === npmName,
+         "registry 条目的 package 与 npm 包名一致",
+         "不一致会让市场认错包（UPDATING.md「改名的三处必须同步」）",
+         `条目写 ${entry.package}，npm 包名是 ${npmName}`)
+    }
+    ok(typeof entry.name === "string" && entry.name.length > 0,
+       "registry 条目有 name（市场里的显示名）")
+    ok(entry.summary && typeof entry.summary.zh === "string" && typeof entry.summary.en === "string",
+       "registry 条目有中英双语 summary")
+  }
+} else {
+  warn(false, "没有 registry-entry.json",
+       "想上 registry 才需要它；不上架也不影响使用",
+       "从模板根目录复制一份，改 package / name / providers / summary")
+}
+
+{
+  // 插件不该写 magpie 的缓存目录 —— 静态查一下入口与 src 里有没有市场缓存路径
+  const abs = []
+  if (entryFile && existsSync(join(ROOT, String(entryFile)))) abs.push(join(ROOT, String(entryFile)))
+  const srcDir = join(ROOT, "src")
+  if (existsSync(srcDir)) abs.push(...walk(srcDir))
+  const hits = abs
+    .filter((f) => f.endsWith(".mjs"))
+    .filter((f) => /plugin-market\.json|startSelfRegister/.test(readFileSync(f, "utf8")))
+    .map((f) => f.slice(ROOT.length + 1))
+  ok(hits.length === 0,
+     "不写 magpie 的市场缓存（plugin-market.json）",
+     "那份文件属于 magpie：按包名 merge 会把 registry 条目盖掉",
+     `命中的文件：${hits.join(", ")}`)
 }
 
 // ── 输出 ──────────────────────────────────────────────────────────────
