@@ -12,6 +12,8 @@
 用户只看 README 决定装不装：开头给数字、功能一句一条、不踩别人、安装放最后、
 技术细节全进 `docs/internals.md`。**参考源是必填段** —— 用了别人的协议结论或实现思路，
 列出来（MIT 要求，也让读者知道依据）。
+**模型段写发行商，不写数量** —— `DeepSeek / GLM / GPT` 这样列，表格只留各家最新 / 热门，
+全量交给 `magpie plugin list`；数量跟着平台上下架变，写死必然过期。
 
 **2. [HOOKS.md](./HOOKS.md) —— 钩子契约。**
 从 magpie 二进制里提取的 21 章，比官方文档全（官方漏了 `auth.checkin`）。
@@ -303,7 +305,7 @@ const MODELS = [["acme-coder", "Acme Coder", 200_000], ...]
 | `@ai-sdk/google` | Gemini | `/models/<id>:streamGenerateContent` |
 
 **③ `README.md`** —— 这个文件会显示在 magpie 的插件卡片上。
-写清四件事：签入什么服务、怎么登录、登录态存在哪、有哪些模型。
+写清四件事：签入什么服务、怎么登录、登录态存在哪、支持哪几家发行商。
 
 ---
 

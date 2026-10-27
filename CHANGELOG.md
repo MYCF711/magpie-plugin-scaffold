@@ -3,6 +3,13 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.1.7 — 2026-10-27
+
+- [README-TEMPLATE](./README-TEMPLATE.md) —— **模型段改版**：开头写发行商（`DeepSeek / GLM / GPT`），不写「支持 N 个模型」；表格只留各家最新 / 热门一两行，全量交给 `magpie plugin list`
+- [README-TEMPLATE](./README-TEMPLATE.md) —— 硬规则加第 8 条（发行商而非数量）；反例对照补「模型数量」与「整表贴满」两行；「完整实例」注明 loomy 的模型段是旧写法，以本模板为准
+- [README](./README.md) —— 「写 README」摘要同步这条规则；「README.md 写清四件事」把「有哪些模型」改成「支持哪几家发行商」
+- [HOOKS](./HOOKS.md) 第十节 —— 「README 写清四件事」第 4 条改成「支持哪几家发行商，各家只列最新 / 热门」，并写明别写「支持 N 个模型」的理由
+
 ## 0.1.6 — 2026-10-27
 
 - **分清三个名字**（这是个真混淆过的地方）：`package.json` 的 `name` → 插件卡片标题；
