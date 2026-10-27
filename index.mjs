@@ -163,7 +163,12 @@ export const XxxAuthPlugin = async ({ client, directory }, options) => {
     provider: PROVIDER,
 
     // ── 数据字段（不是钩子）────────────────────────────────────────
-    icon: "https://xxx.example/icon.svg", // 或 data:image/svg+xml;base64,...
+    // ⚠ 图标要写两份，缺一份就有地方显示灰方块：
+    //   这里 auth.icon        → 供应商列表那一行、用量概览的卡
+    //   package.json 的
+    //     magpie.icon        → 插件列表那一行、插件详情页左上角
+    //   两处内容一样，直接抄同一份 data URI。见 HOOKS.md「插件自己的图标」。
+    icon: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjggMTI4Ij48cmVjdCB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCIgcng9IjI4IiBmaWxsPSIjMWYyOTM3Ii8+PHRleHQgeD0iNjQiIHk9Ijg0IiBmb250LXNpemU9IjYwIiBmb250LWZhbWlseT0ic3lzdGVtLXVpLHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiM2MGE1ZmEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkE8L3RleHQ+PC9zdmc+",
     maxConcurrency: 4, // 1-1000
     refreshLead: REFRESH_LEAD_MS,
 

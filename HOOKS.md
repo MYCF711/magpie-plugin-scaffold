@@ -465,6 +465,102 @@ function concurrencyOf(a) {
 
 **范围：1-1000 的整数。** 用户自己设的会覆盖它。
 
+### 插件自己的图标：`magpie.icon` —— 和上面那个 `iconOf` 不是一回事
+
+上面讲的 `iconOf` 管的是**供应商卡片**。**插件卡片**（插件列表那一行、插件详情页左上角）
+走的是另一条路，源码 `internal/plugin/market.go`：
+
+```go
+// InstalledIcon is the picture the installed plugin spec's package.json
+// gives in magpie.icon, as ownIcon takes one: the plugin's own, for its
+// row, apart from those its providers give themselves in the auth hook (#1775).
+func InstalledIcon(spec string) string {
+	b, _ := os.ReadFile(filepath.Join(Target(spec), "package.json"))
+	var p struct {
+		Magpie struct {
+			Icon string `json:"icon"`
+		} `json:"magpie"`
+	}
+	// ...
+}
+```
+
+⚠ **`auth.icon` 到不了插件卡片。** 只写 `auth.icon` 的后果：
+
+| 位置 | 有图标吗 |
+|---|---|
+| 供应商列表那一行 | ✓ |
+| 用量概览的卡 | ✓ |
+| **插件列表那一行** | ✗ 灰方块（回退到默认图） |
+| **插件详情页左上角** | ✗ 灰方块 |
+
+⇒ **两个都要写。** 内容一样就抄两份：
+
+```json
+{
+  "name": "Magicrew",
+  "magpie": {
+    "icon": "data:image/png;base64,iVBORw0KGgo...",
+    "maxConcurrency": 4
+  }
+}
+```
+
+同一份 data URI 也放进 `auth.icon`，两处各一份。
+
+## 九之三、卡片上的徽章从哪来
+
+插件行上除了名字和版本，还会出现几类 chip。哪些插件能给自己挣到，哪些挣不到：
+
+| 徽章 | 数据源 | 插件能控制吗 |
+|---|---|---|
+| `已是最新` / `有新提交` / `v{x} out` | npm 版本、git HEAD，magpie 自己比 | 间接（发版即可） |
+| `已自动更新` | magpie 自己更新过 | — |
+| `供应商` / `Request hook` / `中间件` / `页面` | 插件导出里带了什么钩子 | ✓ 有钩子就有 |
+| **`承载 {names}`** | `provider.MovedOnto`，**内置订阅被迁移到这个插件**的清单 | ✗ **做不到** |
+
+### `承载` 为什么第三方插件做不出来
+
+`internal/gui/plugins.go`：
+
+```go
+j.Moved = provider.MovedOnto(e.Spec)
+```
+
+`internal/provider/migrate.go`：
+
+```go
+// MovedOnto are the built-ins moved onto the plugin named (its spec or package name).
+func MovedOnto(name string) []string {
+	var out []string
+	for _, e := range plugin.Load().Plugins {
+		if plugin.Name(e.Spec) != name && e.Spec != name { continue }
+		pkg := plugin.PackageName(e.Spec)
+		for _, id := range OnPlugins() {   // ← 只遍历「可迁移的内置订阅」
+			if m, _ := MigrationOf(id); m.Package == pkg && !slices.Contains(out, id) {
+				out = append(out, id)
+			}
+		}
+	}
+	return out
+}
+```
+
+`OnPlugins()` 只返回 `readMigrations()` 里 `State == MovePlugin` 的 id，而这些 id 来自
+`movers` —— **magpie 自己内置的订阅**。当前 19 个：
+
+```
+claude  codex  chatgpt-api  cursor  grok  copilot  zcode  workbuddy  workbuddy-ai
+commandcode-plan  qoder  qoder-cn  devin  zed  factory  mimo-app  kiro  gemini  antigravity
+```
+
+不在这个清单里的产品，哪怕插件写得一模一样，`MovedOnto` 也永远返回空，
+`Serves {names}` 那个 chip 永远不出现。**这不是配置问题，是宿主没把它当自家订阅。**
+
+> 想有那个徽章只有一条路：把产品加进 magpie 的内置订阅（改宿主、重编译）——
+> 不是改插件能解决的事。写 README 时别承诺它。
+
+
 ---
 
 ## 九之二、插件名（卡片标题显示什么）
