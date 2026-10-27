@@ -1,6 +1,6 @@
 {
   "name": "magpie-plugin-template",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "A magpie / OpenCode provider plugin template: all nine hooks implemented — config, sign-in, token renewal, request takeover, usage, daily check-in, per-account models and chat headers. Clone it and implement five functions to make your own provider.",
   "type": "module",
   "main": "./index.mjs",
@@ -41,6 +41,7 @@
     "node": "^22.19.0 || >=24.0.0"
   },
   "magpie": {
+    "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjggMTI4Ij48cmVjdCB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCIgcng9IjI4IiBmaWxsPSIjMWYyOTM3Ii8+PHRleHQgeD0iNjQiIHk9Ijg0IiBmb250LXNpemU9IjYwIiBmb250LWZhbWlseT0ic3lzdGVtLXVpLHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiM2MGE1ZmEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkE8L3RleHQ+PC9zdmc+",
     "maxConcurrency": 4
   }
 }
