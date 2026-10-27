@@ -166,6 +166,34 @@ if (SITE.needsOrgOnGateway && fresh.org) headers["organization-code"] = fresh.or
 
 见下节。
 
+### 6. 卡片要自己说「承载」哪些供应商
+
+magpie 插件卡片上那个蓝色「承载 X、Y」的徽章，默认**只有内置订阅迁到插件上**时才出现
+（`internal/provider/migrate.go` 的 `MovedOnto` 只遍历 `movers` 表）。你的包承载的供应商
+magpie 从来没内置过 —— 所以那一格空着，数据得你自己在 `package.json` 里给：
+
+```json
+"magpie": {
+  "icon": "https://acme.example/icon.svg",
+  "maxConcurrency": 4,
+  "carries": ["Acme", "Acme International (acme.example)"]
+}
+```
+
+| | |
+|---|---|
+| 形状 | 字符串数组，1–8 项，每项 ≤48 字；空白项被丢弃，超长被截断 |
+| 名字 | 跟卡片底部那行供应商名一致；站点域名放括号里，两站才分得开 |
+| 卡片显示 | `承载 Acme、Acme International (acme.example)` |
+
+**只有承载两个及以上供应商时才写**。一个供应商的包不需要这个字段，卡片上那行
+`foo (Foo, 12 models)` 已经说清了。
+
+⚠ 这个字段要 **magpie 侧支持**（`magpie.carries`，读进 `pluginEntryJSON.Carries`）。
+不支持它的 magpie 会**忽略**这个字段 —— 不报错、也不显示，所以加了没有副作用，
+但也别以为它在每个版本上都出现。判断方法：装一个带 `carries` 的 magpie 构建，
+看卡片上有没有那个徽章。
+
 ---
 
 ## 五、模型目录：别写死

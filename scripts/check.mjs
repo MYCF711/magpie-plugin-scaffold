@@ -116,6 +116,20 @@ if (pkg) {
     ok(Number.isInteger(mc) && mc >= 1 && mc <= 1000,
        "magpie.maxConcurrency 是 1-1000 的整数", "超出范围会被忽略")
   }
+
+  // 一个包承载多个供应商时，卡片上的「承载」徽章由这个字段给
+  // （不是必须的：一个供应商的包不写，卡片上那行本来就说得清）
+  const car = pkg.magpie?.carries
+  if (car !== undefined) {
+    if (ok(Array.isArray(car), "magpie.carries 是数组", "一个名字一项")) {
+      ok(car.length >= 1 && car.length <= 8,
+         "magpie.carries 是 1-8 项", "超出 8 项的部分不会被显示")
+      ok(car.every((s) => typeof s === "string" && s.trim() !== ""),
+         "magpie.carries 每项是非空字符串", "空白项会被丢弃")
+      ok(car.every((s) => typeof s !== "string" || [...s.trim()].length <= 48),
+         "magpie.carries 每项 ≤48 字", "超长会被截断")
+    }
+  }
 }
 
 // ── ⑥ LICENSE 逐字 MIT ────────────────────────────────────────────────
