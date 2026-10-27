@@ -166,6 +166,38 @@ if (SITE.needsOrgOnGateway && fresh.org) headers["organization-code"] = fresh.or
 
 见下节。
 
+### 6. 卡片上那个「承载」徽章：magpie 自己派生，你只管名字
+
+插件行上的「承载 X、Y」不是 `package.json` 给的字段。magpie ≥ **0.1.1744**
+（`766356c`，[issue #3902](https://github.com/yetone/magpie/issues/3902)）从插件**注册的
+provider** 派生：
+
+```go
+// internal/gui/plugins.go
+j.Serves = servesBeside(j.Moved, provs[e.Spec])   // → /api/plugins 的 "serves"
+```
+
+| | |
+|---|---|
+| 数据源 | 插件注册的 provider 名（`cfg.provider[id].name`），每个一次 |
+| 何时出现 | 有内置订阅迁到这个插件（`moved` 非空）**或** 注册了 ≥2 个 provider |
+| 单 provider | 不出现 —— 行的标题 `foo (Foo, 12 models)` 已经说了 |
+| 内置订阅 | 不重复列（页面按内置名画）；tooltip「… 正由此插件代替内置运行」只留给它 |
+| 插件要做什么 | **什么都不用做**。名字就是徽章内容 |
+
+⇒ 多站点包的徽章 = `承载 超级麦吉、MagiCrew`：两个站点、两个名字，一行说完。
+
+**名字的分寸**（和铁律 3 一起读）。徽章上只有名字，没有图标、也没有域名，所以：
+
+- 两个站的**品牌名不同**（超级麦吉 / MagiCrew）→ 就用官方名，别加域名；
+- 两个站的**共用一个品牌名**（Qoder 国际版 / Qoder CN）→ 名字里必须带站点，
+  magpie 自己的内置名就是这写法，`Qoder 国际版 (qoder.com)`、`Qoder CN`。
+
+⚠ 曾经草案里有个 `magpie.carries` 字段（#3902 的 option 1），**从未随任何 magpie 发布**：
+上游选了派生（option 2）。写了不报错，只是没人读 —— `scripts/check.mjs` 会提醒删掉。
+
+版本下限：徽章要求 **magpie ≥ 0.1.1744**；更旧的 magpie 只在内置订阅迁入时画它。
+
 ---
 
 ## 五、模型目录：别写死

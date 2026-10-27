@@ -41,7 +41,7 @@
 node scripts/check.mjs          # 或 bun scripts/check.mjs
 ```
 
-24 项规定逐条过，退出码非 0 就是不合规。它查的是**能查的那部分**：
+规定逐条过（脚本末尾自己报「通过 N · 警告 M · 失败 K」），退出码非 0 就是不合规。它查的是**能查的那部分**：
 
 | 组 | 查什么 |
 |---|---|
@@ -151,6 +151,7 @@ magpie 把每个插件加载进一个 Bun 进程（plugin host），通过 stdin
 | ⑨ | 登录返回的 `accountId` / `uid` | 卡片显示名 / 区分同名账号 |
 | | `auth.icon` 或 `magpie.icon` | 卡片图标 |
 | | `auth.maxConcurrency` 或 `magpie.maxConcurrency` | 并发数 |
+| | （没有字段）卡片上的「承载 X、Y」徽章 | magpie ≥ 0.1.1744 由插件**注册的 provider 名**派生；`magpie.carries` 从未发布过，别写。见 [MULTI-PROVIDER.md](MULTI-PROVIDER.md) 铁律 6 |
 
 ### 非钩子但必需
 

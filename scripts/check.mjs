@@ -116,6 +116,14 @@ if (pkg) {
     ok(Number.isInteger(mc) && mc >= 1 && mc <= 1000,
        "magpie.maxConcurrency 是 1-1000 的整数", "超出范围会被忽略")
   }
+
+  // 卡片上的「承载」徽章不是 package.json 给的：magpie ≥ 0.1.1744 从插件**注册的
+  // provider 名**派生（/api/plugins 的 serves），有内置订阅迁入或注册了 2 个以上
+  // provider 才画。曾经草案里的 magpie.carries 从未随 magpie 发布过，留着它没人读。
+  warn(pkg.magpie?.carries === undefined,
+       "没有已作废的 magpie.carries",
+       "徽章由注册的 provider 名派生（magpie ≥ 0.1.1744），这个字段宿主不读",
+       "删掉 magpie.carries；想让徽章读起来清楚，改的是供应商 name")
 }
 
 // ── ⑥ LICENSE 逐字 MIT ────────────────────────────────────────────────
