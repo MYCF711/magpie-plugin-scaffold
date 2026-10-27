@@ -32,8 +32,32 @@ export function defaultEntry(id, name, vision, opts = {}) {
 /** 倍率换算：上游给的是「点数」，magpie 要的是倍数。**这个系数必须实测核对**，别猜 */
 export const MULT_BASE = 2000
 
-/** 不算模型的 id：生图 / embedding / rerank —— 列出来用户选了就报错 */
-const NOT_CHAT = /embed|rerank|image|video|tts|whisper|sd(xl)?[-.]|flux/i
+/** 不像 chat 模型的 id：embedding / rerank / 语音 —— 列出来选中必报错 */
+const NOT_CHAT = /embed|rerank|tts|whisper/i
+
+/**
+ * 生图模型的 id 特征（与 magpie 的 `catalog.DrawsID` 对齐的主要几个词）。
+ * 注意 `gemini-*-image` 与 `gpt-5-image` **不在此列** —— 它们在 chat 里回图，是正经 chat 模型。
+ */
+const IMAGE_LIKE = /(^|[-_/])(image|imagen|imagine|dall-e|flux|seedream|cogview|sdxl|stable-diffusion|wanx|kolors|hidream|banana|sensenova-u1)/i
+
+/**
+ * **要不要把生图模型也列进 models？默认不列。**
+ *
+ * magpie 0.1.1707 起支持「插件提供图像模型」：id 命中 `catalog.DrawsID` 且
+ * `catalog.ImagesAPI`、且这个模型在 `@ai-sdk/openai-compatible` 上，就会被列进
+ * Settings 的「图像生成」选择器，请求走 `/v1/images/generations`。
+ *
+ * 但 `pluginCatalog` **不会**把它们从模型列表里摘掉 —— 列出来 = chat 列表里多一条
+ * 选不得的条目（用户选中 → 400）。所以这是个取舍，不是对错：
+ *
+ *   想供图 → 把它设成 `true`，并且在条目上把 `capabilities.output` 写成
+ *            `{ text: false, image: true }`、`capabilities.input` 照实写
+ *   只想干净 → 保持 `false`（默认）
+ *
+ * 三个判据、以及为什么 `gemini-*-image` 不算，见 HOOKS.md「十一之三」。
+ */
+const LIST_IMAGE_MODELS = false
 
 /**
  * 上游给的模型能不能被用户真正选中。
@@ -43,6 +67,7 @@ export function isUsable(m) {
   const id = String(m?.id ?? "")
   if (!id) return false
   if (NOT_CHAT.test(id)) return false
+  if (!LIST_IMAGE_MODELS && IMAGE_LIKE.test(id)) return false
   // VIP / 锁定：选中必报错，直接不列
   const tags = Array.isArray(m?.tags) ? m.tags : []
   if (tags.some((t) => /vip|lock|pay|premium/i.test(String(t?.value ?? t)))) return false

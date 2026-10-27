@@ -60,6 +60,13 @@
 | 17 | 接口抖一下，列表整个空掉；或某个模型缺价格，用户选了报错 | **部分成功有三态**，方向要各自选对：① 整个接口失败 → 退回上次快照（不要返回空表）② 接口成功但单条缺字段 → **不列**（不猜）③ 登录失效 → 抛 `signIn: "expired"` | [`src/models.mjs`](./src/models.mjs) 的 `buildModels` |
 | 18 | 越改越乱，`index.mjs` 涨到几百行，改一个钩子要读全篇 | 成熟形态是**`index.mjs` 只做九项钩子的装配，实现全在 `src/`**。实测四个真实插件的 `index.mjs` 是 80~715 行，而 `src/` 是 1.4k~3.7k 行 —— 而本模板现在是反过来的（index 535 行 / src 78 行） | 本文件「五、长大之后」 |
 
+还有两条是 **magpie 0.1.1763 重新提取契约后才发现**的（2026-10-28）：
+
+| # | 症状 | 判据 | 出处 |
+|---|---|---|---|
+| 19 | 某个能力「明明实现了却没生效」：模型不会联网、不能收图、没有思考档、折扣前的倍率不显示 | 模型 / provider 条目上有一批**不写就等于关掉**的字段：`searches`（模型级=这条自己会搜，provider 级=上游整体会搜）、`decides`（decision 模型，从 agent 列表隐藏）、`rateWas`（折扣前倍率）、`fast`、`serviceTiers`、`modalities`（图片 / 音频能力全靠它） | HOOKS 十一之三 |
+| 20 | 厂商有画图模型，插件里当垃圾过滤掉了；或者反过来，列进去之后用户在 chat 里选中报 400 | magpie **0.1.1707 起**支持插件供图（`DrawsID` + `ImagesAPI` + npm 是 `@ai-sdk/openai-compatible`）。但它**同时**留在 chat 模型列表里 —— 列不列是取舍，判据见 [`src/models.mjs`](./src/models.mjs) 的 `LIST_IMAGE_MODELS` | HOOKS 十一之三的「插件供图」 |
+
 ---
 
 ## 三、命令
@@ -131,14 +138,19 @@ python extract-contract.py [magpie 可执行文件]
 
 结论：**`index.mjs` 只做装配，实现全在 `src/`** —— 最成熟的那个（magicrew）index 只有 80 行。
 
-已经备好三块骨架（`api` / `models` / `chat` 四个插件里 4/4 都有）：
+已经备好四块骨架（前三块四个插件里 4/4 都有；`store` 只有 magicrew 独立成文件，
+另两个各自实现了等价逻辑）：
 
 | 文件 | 里面写什么 | 为什么单独拎出来 |
 |---|---|---|
 | [`src/api.mjs`](./src/api.mjs) | `headersFor` / `read` / `get` / `asModelError` / `asSignInExpired` | 错误语义只在一处定义 —— 401 与 404 混用会打死整个账号 |
 | [`src/models.mjs`](./src/models.mjs) | `isUsable` / `priceOf` / `buildModels` / `defaultEntry` | 三态降级 + `free` 三分支，错法都长得像「正常」 |
 | [`src/chat.mjs`](./src/chat.mjs) | `passThrough` / `withUsage` / `singleShotToSSE` / `normalizeUsage` | 流式三坑：读干流、漏 `include_usage`、`stream:false` 不被接受 |
+| [`src/store.mjs`](./src/store.mjs) | `fileOf` / `readJson` / `writeJson` + 快照 / 登录态 / 一次性标记三件套 | 只写 `~/.cache/magpie`、文件名带账号、原子写、可整目录删 |
 | [`tests/semantics.test.mjs`](./tests/semantics.test.mjs) | 16 条语义锁 | `check.mjs` 查不到的那部分，只有它能拦 |
+
+**拆分示例**：[`examples/split/`](./examples/split/) 把「index 只装配」这件事摆了一遍
+（三个钩子各占一个文件 + 一个 40 行的 index）。钩子只有三种形态，其余五个照同一规则搬。
 
 **什么时候该搬**（出现任一情形就搬，别等）：
 
