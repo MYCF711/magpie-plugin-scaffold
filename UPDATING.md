@@ -100,6 +100,31 @@ npm publish
 **这一步是给人看的，不是给 magpie 看的**（原因见下面的 ⚠）——
 但不做，用户就没有一个地方能一眼看出「这个版本改了什么」。
 
+**三条路，按省事程度挑一条：**
+
+| 路 | 怎么做 | 适合 |
+|---|---|---|
+| **`node scripts/release.mjs --yes`** | 模板自带。体检六项（版本 / CHANGELOG / 干净 / 分支 / 落后 / tag 被占）→ push → tag → 建 Release，第 7 步的四条验证也一并打印出来 | **默认走这条**。没有 token 也能建 tag，只是 Release 要手工补 |
+| 有 `release.yml` | 推 `v*` tag，workflow 用仓库自己的 token 把 CHANGELOG 对应那段抽出来建 Release | 想让 CI 长期接管（见下「什么时候该有 workflow」） |
+| 手工 | 网页 Draft a new release，正文把 CHANGELOG 那段粘过去 | 一次性仓库、没装 node |
+
+```bash
+node scripts/release.mjs              # 预演：只体检 + 打印计划，什么都不改
+node scripts/release.mjs --yes        # 真做：push + tag + Release
+node scripts/release.mjs --yes --npm  # 再加 npm publish（有 publish:npm 脚本就用它）
+```
+
+它**故意不帮你做**第 0~3 步（写 CHANGELOG / bump / pack 预演 / 提交）：
+那四步要人判断，而且体检会把它们当输入检查 —— 没写就过不了。
+
+#### 什么时候该有 workflow
+
+实测本机四个插件仓库：只有模板仓库自己有 `release.yml`，另外三个都没有，
+于是每次发版都得手工 `POST /releases`。判据很简单：
+
+- **发版频率 ≥ 每个月一次**，或者**不止一个人发版** → 加 `release.yml`
+- 只自己用、几个月才发一次 → 用 `release.mjs` 就够，少一个 CI 面少一处出错
+
 #### 有 workflow 的话：推个 tag 就完事
 
 本模板带了 [`.github/workflows/release.yml`](./.github/workflows/release.yml)：
@@ -369,6 +394,21 @@ mv node_modules/officeace-auth node_modules/OfficeAce
 | 新版本在最上面（倒序） | 正序追加 |
 | 破坏性变更单独标 `⚠ **破坏性**` | 埋在中间让人自己发现 |
 | 数字写清口径 | 换个版本就没人知道怎么复现的数 |
+
+### 一个小节收尾用 `> 起因：`
+
+这个仓库和四个真实插件里，事后最有用的一句话都是那行 `> 起因`：
+
+```markdown
+## 0.1.9 — 2026-10-27
+
+- 删掉 `src/self-register.mjs` —— ……
+
+> 起因：OfficeAce 那份 PR 的 review。结论是插件对 magpie 的目录**只有读的份**。
+```
+
+一条一行说的是**改了什么**；`> 起因` 说的是**为什么**。三个月后回来找「这条规矩
+是哪来的、能不能改」，只有后半句能回答。**用户感知不到它，所以它不进 Release 正文。**
 
 ### 放在哪
 

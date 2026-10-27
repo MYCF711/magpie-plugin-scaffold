@@ -52,6 +52,14 @@
 | 14 | 推了分支，magpie 还说没更新 | git 源比的是**默认分支** HEAD 的 commit；推别的分支不算。而 `plugin add` 不会更新已有的锁 | UPDATING 一 / 六 |
 | 15 | magpie 的 Discover 里搜不到自己的包 | `keywords` 要含 `opencode` + `plugin`/`auth`/`provider` + `magpie`；仓库要打 `magpie-plugin` topic | README 顶部四件 |
 
+再三条与代码结构有关的 —— 它们不报错，但会让插件在多账号 / 部分成功 / 长大后出问题：
+
+| # | 症状 | 判据 | 出处 |
+|---|---|---|---|
+| 16 | 加了第二个账号，第一个账号的数据变了 / 串号 | 一切按账号落盘的东西，文件名必须带账号（`<plugin>-<siteId>__<account>.json`）；**不要用模块级变量存 per-account 状态** —— 宿主是同一个进程跑所有账号 | [`src/hooks/models.mjs`](HOOKS.md) 的 `inScope` |
+| 17 | 接口抖一下，列表整个空掉；或某个模型缺价格，用户选了报错 | **部分成功有三态**，方向要各自选对：① 整个接口失败 → 退回上次快照（不要返回空表）② 接口成功但单条缺字段 → **不列**（不猜）③ 登录失效 → 抛 `signIn: "expired"` | [`src/models.mjs`](./src/models.mjs) 的 `buildModels` |
+| 18 | 越改越乱，`index.mjs` 涨到几百行，改一个钩子要读全篇 | 成熟形态是**`index.mjs` 只做九项钩子的装配，实现全在 `src/`**。实测四个真实插件的 `index.mjs` 是 80~715 行，而 `src/` 是 1.4k~3.7k 行 —— 而本模板现在是反过来的（index 535 行 / src 78 行） | 本文件「五、长大之后」 |
+
 ---
 
 ## 三、命令
@@ -67,10 +75,18 @@ npm pack --dry-run
 # 包名撞车检查（撞了 = magpie 的「更新」会装成别人的包）
 npm view <包名> version
 
+# 语义测试 —— check 查「形状」，它查「语义」（free 三分支 / 三态降级 / 404 vs 401 / 流式 usage）
+node --test
+
 # 卡片标题与 npm 包名不同（包内 name 是大写标题）时发布
 npm run publish:npm
 
-# Release：tag 与 package.json 的 version 一致
+# 一键发布：预演 → 真做 → 带 npm（tag + push + Release 一次做完）
+node scripts/release.mjs             # 预演：体检六项 + 打印计划，什么都不改
+node scripts/release.mjs --yes       # 真做（要 GITHUB_TOKEN 才建 Release）
+node scripts/release.mjs --yes --npm # 再加 npm publish
+
+# 手工版（release.mjs 用不了时）
 git tag v0.1.8 && git push origin v0.1.8
 
 # 重新提取 magpie 二进制里的钩子契约（核对 HOOKS.md 用）
@@ -100,7 +116,40 @@ python extract-contract.py [magpie 可执行文件]
 
 ---
 
-## 五、文档地图
+## 五、长大之后：从单文件到 `src/`
+
+本模板刻意是**单文件入门**（九个钩子一屏读完，五个 TODO 在底部）。但插件一旦有登录、
+缓存、多账号、签到…就会长。四个真实插件的实测形态是这样：
+
+| 仓库 | `index.mjs` | `src/` | `tests/` |
+|---|---|---|---|
+| 本模板 | 535 行 | 1 文件 / 78 行 | 0 |
+| `magpie-magicrew-auth` | **80** | 21 文件 / 3,683 行 | 6 |
+| `magpie-officeace` | 347 | 7 文件 / 1,397 行 | 0 |
+| `magpie-loomy-auth` | 611 | 9 文件 / 1,905 行 | 4 |
+| `magpie-today` | 715 | 18 文件 / 2,812 行 | 7 |
+
+结论：**`index.mjs` 只做装配，实现全在 `src/`** —— 最成熟的那个（magicrew）index 只有 80 行。
+
+已经备好三块骨架（`api` / `models` / `chat` 四个插件里 4/4 都有）：
+
+| 文件 | 里面写什么 | 为什么单独拎出来 |
+|---|---|---|
+| [`src/api.mjs`](./src/api.mjs) | `headersFor` / `read` / `get` / `asModelError` / `asSignInExpired` | 错误语义只在一处定义 —— 401 与 404 混用会打死整个账号 |
+| [`src/models.mjs`](./src/models.mjs) | `isUsable` / `priceOf` / `buildModels` / `defaultEntry` | 三态降级 + `free` 三分支，错法都长得像「正常」 |
+| [`src/chat.mjs`](./src/chat.mjs) | `passThrough` / `withUsage` / `singleShotToSSE` / `normalizeUsage` | 流式三坑：读干流、漏 `include_usage`、`stream:false` 不被接受 |
+| [`tests/semantics.test.mjs`](./tests/semantics.test.mjs) | 16 条语义锁 | `check.mjs` 查不到的那部分，只有它能拦 |
+
+**什么时候该搬**（出现任一情形就搬，别等）：
+
+- 某个钩子函数超过 60 行，或同一个 `fetch` 在三个钩子里重复出现 → 抽 `src/api.mjs`
+- 需要在两次调用之间记住东西（token、快照、当天做过的标记）→ 加 `src/store.mjs`，
+  **文件名里必须带账号**（坑 16）
+- 开始有第二个账号进来 → 先查有没有模块级变量在存 per-account 状态
+
+---
+
+## 六、文档地图
 
 | 文件 | 管什么 | 什么时候读 |
 |---|---|---|
@@ -114,7 +163,7 @@ python extract-contract.py [magpie 可执行文件]
 
 ---
 
-## 六、这份文件的维护规矩
+## 七、这份文件的维护规矩
 
 1. **任何一份专档新增/改写一条「会静默出错」的结论，就在第二节加一行**（症状 → 判据 → 出处）。
    不加的后果：这份表会慢慢过期，而 AI 会照样信它。
