@@ -339,7 +339,7 @@ mv node_modules/officeace-auth node_modules/OfficeAce
 ## 0.1.8 — 2026-10-26
 
 - **模型数纠错** —— README 与市场文案写「26 个」，实际界面只显示 7 个（平台目录 vs 计费清单）
-- **README 重写** —— 按 magpie-plugin-template 的九段结构；协议细节移入 `docs/internals.md`
+- **README 重写** —— 按 magpie-plugin-scaffold 的九段结构；协议细节移入 `docs/internals.md`
 - 删掉「跟随代理」一条 —— 包内没有代理代码
 - ⚠ **破坏性**：`xxx` 配置项改名，老配置需手动迁移
 

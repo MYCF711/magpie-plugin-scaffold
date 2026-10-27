@@ -209,7 +209,7 @@ cd YOUR_PROVIDER
 ### 方式二：本地直接开始
 
 ```bash
-git clone https://github.com/MYCF711/magpie-plugin-template.git my-provider
+git clone https://github.com/MYCF711/magpie-plugin-scaffold.git my-provider
 cd my-provider
 rm -rf .git && git init    # 换掉历史
 ```

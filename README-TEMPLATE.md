@@ -168,7 +168,7 @@ GitHub 的分类器会放弃解析：
 
 ```
 MYCF711/magpie-officeace  → NOASSERTION   ← 卡片没有许可那一格
-MYCF711/magpie-plugin-template → MIT
+MYCF711/magpie-plugin-scaffold → MIT
 ```
 
 **做法**：MIT 正文一字不动占满整个 `LICENSE`，归属说明放 `NOTICE.md`。自查：

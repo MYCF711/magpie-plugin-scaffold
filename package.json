@@ -1,7 +1,7 @@
 {
-  "name": "magpie-plugin-template",
+  "name": "magpie-plugin-scaffold",
   "version": "0.1.5",
-  "description": "A magpie / OpenCode provider plugin template: all nine hooks implemented — config, sign-in, token renewal, request takeover, usage, daily check-in, per-account models and chat headers. Clone it and implement five functions to make your own provider.",
+  "description": "A magpie / OpenCode provider plugin scaffold: all nine hooks implemented in one file, plus the enforceable rules a provider plugin must pass — icon in two places, MIT license, no helper functions exported, no secrets. Clone it, implement five functions, run the check.",
   "type": "module",
   "main": "./index.mjs",
   "exports": "./index.mjs",
