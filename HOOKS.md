@@ -225,9 +225,11 @@ auth.checkin(getAuth, provider) {
 这三条都是**静默失败**：钩子不抛异常、magpie 也不报错，只是卡片悄悄变成
 「剩余额度未知」，或者算出一个没有意义的百分比。实测撞过，代价是整个额度区报废。
 
-#### ① `aside: true` 的窗口**不要给 `amount` / `limit`**
+#### ① `aside: true` 是「这条窗口不存在」—— 不是「不参与排序」
 
-`aside` 的含义是「用光也不影响账号」，它本来就没有上限、没有周期。
+这条最贵，因为它有两个后果，而只有第一个显眼。
+
+先看**显示层**的坑：`aside` 的含义是「用光也不影响账号」，它本来就没有上限、没有周期。
 给了 `amount`/`limit`，magpie 会把它当成**一条真额度去算占比**：
 
 ```js
@@ -241,9 +243,41 @@ quotaCount(w){ if (!(w.limit > 0)) return w.display || ""; … }
 // ❌ 假占比：分母就是"剩余"本身，永远 100%
 { name: "积分余额", used: 0, amount: 0, limit: 6291, aside: true }
 
-// ✅ 只给 display，magpie 直接显示这行字（归一化后带 text: true）
+// ✅ 只想展示一行文字（这个号还有别的窗口参与路由）：只给 display
 { name: "积分余额", used: 0, aside: true, display: "6,291 积分", unit: "积分" }
 ```
+
+**再看路由层的坑（2026-10-28 真机踩中，代价是整个号在路由里消失）：**
+
+`aside: true`（以及 `used` 缺省后被判成的 `Text`）的窗口，会被 `allowanceOf()`
+**整条跳过**（`internal/provider/routing.go`）：
+
+```go
+for _, w := range ws {
+    if w.Aside || w.Text { continue }        // ← 整条跳过
+    ...
+}
+if len(a) == 0 { return nil, false }          // ← 一条不剩 ⇒ 这个号 Known = false
+```
+
+⇒ **一个账号的窗口全标了 `aside`，它在路由页就是「剩余额度未知」，
+而且一律排在已知账号之后。** 这不是「不参与排序」，是「这个号在路由里不存在」。
+
+**官方文档逐字（`docs/subsystems/provider-plugins.md`，issue #3650）：**
+> An account whose windows all tell no share has no allowance, so routing counts it
+> not known ... as one never read, rather than as the one with all of it left.
+> A window that says `used: 0` is a reading at 0, as before.
+
+**所以两种用法，别搞混：**
+
+| 目的 | 写法 |
+|---|---|
+| 一行文字要展示，**且这个号还有别的窗口参与路由** | `aside: true` + `display` ✅ |
+| 这个号**只有**这一条额度信息 | **不要标 `aside`**：给 `used` + `limit`（哪怕百分比没有信息量），否则路由里没有这个号 |
+
+**判据：** `curl -s http://127.0.0.1:3425/v1/magpie/trace`，看这个 provider 的
+`known` 是 `true` 还是**字段缺失**。缓存侧看 `~/.config/magpie/quotas.json` 的
+`spans`：`[{}]` = 没标，`[{"aside":true}]` = 还标着。
 
 #### ② `resetsAt` / `runsOutAt` 必须是 **ISO 字符串或数字**
 
