@@ -3,6 +3,29 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.1.15 — 2026-10-28
+
+**把「契约会不会落后」做成一条命令 —— 因为 0.1.14 那次是手工比对出来的**
+
+0.1.14 补的 6 个字段是靠人眼对出来的，这不可靠：magpie 一晚上就发了 1764→1767 四个版本。
+而且脚本第一次跑就抓到一条**我漏得更彻底的**：`capabilities` 这个词在 HOOKS.md 里
+出现 **0 次** —— 模型条目的能力（reasoning / attachment / tool_call / modalities）全挂
+在它下面，而原文没写这层结构。
+
+- **新增 [`scripts/contract-diff.mjs`](./scripts/contract-diff.mjs)** —— 契约定时比对的自动化：
+  `python extract-contract.py && node scripts/contract-diff.mjs`，自动列出「契约里有、
+  HOOKS.md 一个字都没提」的字段，退出码 2 表示有差集。它只扫插件相关的段落
+  （`one provider's hooks` 到 `the loop`），不切掉的话假阳性从 20 涨到 99
+- **[HOOKS](./HOOKS.md)「十一之三」按 `capabilities` 重排** —— 拆成「顶层」与
+  「`capabilities` 下面」两张表，并补 `apiId` / `released` / `family` / `temperature` /
+  `interleaved` / `maxTokens` / `imageSaid` 七个字段
+- **[AGENTS](./AGENTS.md) 命令区** —— 加「magpie 升级后必做：重新提取 + 跑 contract-diff」
+- 顺带：`extract-contract.py` 的产物已进 `.gitignore`（264 KB，不进仓库）
+
+> 起因：0.1.14 补完字段后意识到「下次 magpie 升级还是会漏」。脚本第一次跑出的差集是
+> 30 个（限段落前）/ 99 个（全文件），补完这一轮降到 20 个，且剩下 20 个全是 GUI / tools /
+> 内部变量，不是插件该写的 —— 这就是「差集收敛到噪声」的判据。
+
 ## 0.1.14 — 2026-10-28
 
 **按 magpie 0.1.1763 重新提取契约：补 6 个漏掉的字段 + 插件供图；另补 store 骨架、拆分示例、双站点改造流程**

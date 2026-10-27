@@ -950,17 +950,16 @@ for (const [id, m] of Object.entries(models)) console.log(id, m.free, m.rate)
 > 6 个字段：`searches` / `decides` / `rateWas` / `fast` / `serviceTiers` / `modalities`。
 > 漏了不会报错 —— 那些字段全是「不写就等于关掉某个能力」。
 
-**模型级**（`cfg.models[<id>]`，或 `provider.models` 返回的每条）：
+**模型级 · 顶层**（`cfg.models[<id>]`，或 `provider.models` 返回的每条）：
 
 | 字段 | 形状 | 不写会怎样 |
 |---|---|---|
 | `id` / `name` | string | 必须；`id` 是 agent 用的那个 |
+| `apiId` | string | 上游真正的模型 id 与 `id` 不同时才写（改名 / 加前缀时用） |
+| `providerID` | string | magpie 内部填的，插件一般不用写 |
 | `provider.api` / `provider.npm` | string | 不写就继承 provider 级 |
 | `limit.context` / `limit.output` | number | 0 时 magpie 会去查模型库；别填猜的数字（见十六节） |
-| `reasoning` | boolean | 不写则没有思考档位 |
-| `attachment` | boolean | **不写则不能收图** |
-| `tool_call` | boolean | 不写则不能调工具 |
-| `modalities.input` / `modalities.output` | `["text","image",…]` | 不写则按 text 处理 —— **图片/音频能力全靠它** |
+| `released` / `release_date` / `family` | string | 只影响排序与展示；**不写不会关掉能力** |
 | `cost` | object | 只用于显示 |
 | `variants` | object | 思考档位的可选值 |
 | `rate` | number \| `"x0.03"` | 不给就不画倍率胶囊 |
@@ -969,7 +968,26 @@ for (const [id, m] of Object.entries(models)) console.log(id, m.free, m.rate)
 | `fast` | boolean | `service_tier: priority` 时跑快（Cursor 那种）；不写就没有这档 |
 | `serviceTiers` | array | 厂商按档位服务的那些档（#2514）；不写则只有默认档 |
 | `decides` | boolean | **decision 模型**：从 agent 列表里隐藏，只作路由组的分类器用 |
-| `searches` | boolean | 这个模型**自己会联网**（用平实的话问就行）；不写则 magpie 会走它自己的搜索 |
+| `searches` | boolean | 这个模型**自己会联网**（用平实的话问就行）；不写则 magpie 走它自己的搜索 |
+| `headers` / `options` | object | 单模型额外的请求头 / 厂商专属参数 |
+
+**模型级 · `capabilities` 下面**（宿主会把 `reasoning` / `attachment` / `tool_call` /
+`modalities` 归到 `capabilities` 里，写的时候直接给这几个平字段，别自己嵌一层）：
+
+| 字段 | 形状 | 不写会怎样 |
+|---|---|---|
+| `reasoning` | boolean | 没有思考档位 |
+| `attachment` | boolean | **不能收文件/图片** |
+| `tool_call` | boolean | 不能调工具 |
+| `temperature` | boolean | 不给则视为支持（`false` 才关） |
+| `modalities.input` / `modalities.output` | `["text","image",…]` | 不写则按 text 处理 —— **图片 / 音频能力全靠它** |
+| `interleaved` | boolean | 思考与正文交错输出（少数厂商） |
+| `maxTokens` | number | 单次输出上限，与 `limit.output` 不同：这是「这一次」的上限 |
+| `imageSaid` | boolean | 「厂商说过它收不收图」的显式回答，与 `attachment` 分开记 |
+
+> `capabilities` 这一层最容易漏。漏了的效果是「模型能跑，但收不了图 / 不显示思考档」——
+> 不报错，只是能力少一块。`python extract-contract.py` + `node scripts/contract-diff.mjs`
+> 会把这类漏抄直接列出来。
 
 **provider 级**（`config` 钩子里的 `cfg.provider[<id>]`）：
 

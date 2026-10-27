@@ -98,6 +98,10 @@ git tag v0.1.8 && git push origin v0.1.8
 
 # 重新提取 magpie 二进制里的钩子契约（核对 HOOKS.md 用）
 python extract-contract.py [magpie 可执行文件]
+
+# magpie 升级后必做：重新提取 + 自动找出 HOOKS.md 漏写的字段
+python extract-contract.py && node scripts/contract-diff.mjs
+#   退出码 2 = 有差集（列出前 40 个）。挑「不写会关掉某个能力」的补进 HOOKS 十一之三。
 ```
 
 ---
