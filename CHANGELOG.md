@@ -3,6 +3,25 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.1.11 — 2026-10-28
+
+**读完四个真实插件之后补的四块东西 —— 都是「它们每个都重写了一遍」的部分**
+
+比对了 `magicrew-auth` / `officeace` / `loomy-auth` / `today` 与模板的代码分布：
+模板的 `src/` 只有 78 行，真实插件是 1,397~3,683 行；模板 `index.mjs` 535 行，
+最成熟的那个（magicrew）只有 80 行。差的不是钩子，是**钩子下面那一层**。
+
+- **新增 [`scripts/release.mjs`](./scripts/release.mjs)** —— 一键发布：体检六项（版本 / CHANGELOG 有该版本 / 工作区干净 / 在默认分支 / 不落后远端 / tag 未被占）→ push → tag → 建 Release，最后把第 7 步的四条验证命令打印出来。默认只预演，`--yes` 才动手；`--npm` 连 npm 一起发。**它故意不替你做第 0~3 步**（写 CHANGELOG / bump / pack 预演 / 提交）—— 那四步要人判断，而且体检会把它们当输入检查
+- **新增 [`src/api.mjs`](./src/api.mjs)** —— `headersFor` / `read` / `get` / `asModelError` / `asSignInExpired`。四个插件 4/4 都有这个文件，因为**错误语义只该在一处定义**：401 是登录失效（整个账号停）、404 是模型不可用（只影响这次），混用一次就打死一个账号
+- **新增 [`src/models.mjs`](./src/models.mjs)** —— `isUsable` / `priceOf` / `buildModels` / `defaultEntry`。把「部分成功三态」写成代码：整个接口失败 → 退回快照；接口成功但单条缺价格 → 不列；登录失效 → 抛 `signIn: "expired"`。`free` 按厂商声明三分支，不从 `rate` 反推
+- **新增 [`src/chat.mjs`](./src/chat.mjs)** —— `passThrough` / `withUsage` / `singleShotToSSE` / `normalizeUsage`。流式三坑：不要读干流、流式必须带 `stream_options.include_usage`、magpie 不接受 `stream:false`
+- **新增 [`tests/semantics.test.mjs`](./tests/semantics.test.mjs)** —— 16 条语义锁（`node --test tests/`）。`check.mjs` 查形状，这一份查语义：上面三块的错法全都「不报错」，只能靠它拦
+- [AGENTS](./AGENTS.md) —— 坑表补 3 条（按账号落盘、三态降级、index 只装配），新增「五、长大之后：从单文件到 `src/`」：给出四个真实插件的 index/src/tests 实测行数，和「什么时候该搬」的判据
+- [UPDATING](./UPDATING.md) —— 第 6 步改成三条路（`release.mjs` / workflow / 手工）并给「什么时候该有 `release.yml`」的判据；「四、更新内容怎么写」补一条：每个版本末尾用 `> 起因：` 记为什么（它不进 Release 正文）
+
+> 起因：读完四个真实插件后的对比。通用件不是钩子，是 `api` / `models` / `chat` 这三个文件
+> 加一份语义测试 —— 四个仓库里每一个都独立重写了一遍，而且每一份都踩过同样的坑。
+
 ## 0.1.10 — 2026-10-28
 
 - **新增 [AGENTS.md](./AGENTS.md)** —— 给 AI 执行者的入口：按「你在哪一步」给阅读顺序（开工 / 写钩子 / 交付 / 发版 / 用户说没更新），外加 15 条会静默出错的坑（症状 → 判据 → 出处）。派生仓库直接带走
