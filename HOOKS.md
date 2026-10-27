@@ -220,6 +220,66 @@ auth.checkin(getAuth, provider) {
 
 **时间可以是 ISO 字符串、秒、毫秒。**
 
+### ⚠⚠ 三条「写错不报错」的窗口规矩
+
+这三条都是**静默失败**：钩子不抛异常、magpie 也不报错，只是卡片悄悄变成
+「剩余额度未知」，或者算出一个没有意义的百分比。实测撞过，代价是整个额度区报废。
+
+#### ① `aside: true` 的窗口**不要给 `amount` / `limit`**
+
+`aside` 的含义是「用光也不影响账号」，它本来就没有上限、没有周期。
+给了 `amount`/`limit`，magpie 会把它当成**一条真额度去算占比**：
+
+```js
+quotaCount(w){ if (!(w.limit > 0)) return w.display || ""; … }
+```
+
+而「总量 = 当前余额」这种假总量，算出来永远是「剩余 100%」——数字看着漂亮，
+含义是错的（这也是市场现有插件被诟病的点）。
+
+```js
+// ❌ 假占比：分母就是"剩余"本身，永远 100%
+{ name: "积分余额", used: 0, amount: 0, limit: 6291, aside: true }
+
+// ✅ 只给 display，magpie 直接显示这行字（归一化后带 text: true）
+{ name: "积分余额", used: 0, aside: true, display: "6,291 积分", unit: "积分" }
+```
+
+#### ② `resetsAt` / `runsOutAt` 必须是 **ISO 字符串或数字**
+
+厂商接口常回 `"2026-10-28 23:59:59"`（空格分隔、无时区）。**直接塞进去，
+magpie 解析不了，整条窗口会被跳过** —— 表现是卡片「剩余额度未知」，而
+`usage()` 本身返回完全正常（有 plan、有 windows、没有 error），极难查。
+
+```js
+// ❌ 服务端原样格式
+{ resetsAt: "2026-10-28 23:59:59" }
+
+// ✅ 自己按本机时区拆字段再构造（别指望 new Date(str) 跨引擎一致）
+{ resetsAt: new Date(2026, 9, 28, 23, 59, 59).toISOString() }
+```
+
+#### ③ 有「哪批额度先作废」的信息时，用 `runsOutAt` + `runsOut`，别拼进 `display`
+
+`display` 是给「已用 / 总量」那种数字用的。把「185 分今天到期」拼进去，
+magpie 只当普通文字显示，不会当作失效提醒处理。这两个字段专为这件事准备：
+
+```js
+{ name: "积分余额", used: 0, aside: true, display: "6,291 积分",
+  runsOutAt: "2026-10-28T15:59:59.000Z", runsOut: 185 }   // 最早作废的那批
+```
+
+**判据**（三分钟自查）：
+
+```bash
+curl -s http://127.0.0.1:3425/v1/magpie/quotas
+```
+
+看这个 provider 的 `windows[0]`：
+- 有 `display` 且 `text: true` ⇒ aside 窗口被正确识别成文本
+- 有 `runsOutAt`（ISO 形式，如 `2026-10-28T15:59:59Z`）⇒ 失效提醒生效
+- 卡片显示「剩余额度未知」⇒ 八成是 ② 的时间格式，或窗口整个不合法
+
 ---
 
 ## 四、登录的陷阱

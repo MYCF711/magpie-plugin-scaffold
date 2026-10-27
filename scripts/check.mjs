@@ -224,7 +224,59 @@ for (const target of ["index.mjs", "src", "README.md", "docs", "tests", "tools",
   }
 }
 
-// ── ⑩ registry 条目与包名一致 ─────────────────────────────────────────
+// ── ⑩ usage 窗口的两条静默失败写法 ────────────────────────────────────
+//
+// 这两种写法都不会抛异常、magpie 也不报错，只是卡片悄悄变成「剩余额度未知」，
+// 或者算出一个假占比。实测踩过（magpie-magicrew-auth 0.3.18，三条账号全中）。
+// 判据与论证见 HOOKS.md 第三节「三条写错不报错的窗口规矩」。
+
+const ISO_LIKE = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/
+const ISO_STRICT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/
+
+for (const target of ["src", "index.mjs"]) {
+  const p = join(ROOT, target)
+  if (!existsSync(p)) continue
+  const files = statSync(p).isDirectory() ? walk(p) : [p]
+  for (const f of files) {
+    if (!/\.m?js$/.test(f)) continue
+    const text = readFileSync(f, "utf8")
+    if (!/usage|windows|aside|resetsAt/.test(text)) continue
+    const rel = f.replace(ROOT + "\\", "").replace(ROOT + "/", "")
+    const lines = text.split("\n")
+
+    // ① aside: true 的窗口不该给 amount / limit —— 给了就是假占比
+    lines.forEach((line, i) => {
+      if (!/\baside\s*:\s*true\b/.test(line)) return
+      if (/^\s*(\/\/|\*)/.test(line)) return // 注释里提一嘴不算
+      const around = lines.slice(Math.max(0, i - 6), i + 7).join("\n")
+      const hit = /\b(amount|limit)\s*:/.exec(around)
+      if (!hit) return
+      warn(
+        false,
+        `${rel}:${i + 1}  aside 窗口给了 ${hit[1]}`,
+        "magpie 会把它当真额度算占比，而「总量=剩余」的假总量永远算成 100%",
+        "aside 窗口只给 display + unit，把 amount/limit 去掉",
+      )
+    })
+
+    // ② resetsAt / runsOutAt 的字符串字面量必须是 ISO —— 否则整条窗口被跳过
+    const timeRe = /\b(resetsAt|runsOutAt)\s*:\s*(["'`])([^"'`\n]{4,60})\2/g
+    let m
+    while ((m = timeRe.exec(text)) !== null) {
+      const val = m[3]
+      if (!/^\d{4}-/.test(val)) continue // 不是时间字面量（表达式/变量）不管
+      if (ISO_STRICT.test(val)) continue
+      warn(
+        false,
+        `${rel}  ${m[1]} 不是 ISO 格式`,
+        `命中 "${val}" —— magpie 解析不了会把整条窗口丢掉（卡片显示「剩余额度未知」）`,
+        "厂商给的 \"2026-10-28 23:59:59\" 要先自己拆字段再 toISOString()",
+      )
+    }
+  }
+}
+
+// ── ⑪ registry 条目与包名一致 ─────────────────────────────────────────
 //
 // 条目是提交给 magpie-community/plugins 的那份 JSON。它**不属于运行时** ——
 // 插件不许把条目写进 magpie 的市场缓存（plugins#399 的 review 明确要求）。
