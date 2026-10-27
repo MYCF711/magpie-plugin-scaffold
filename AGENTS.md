@@ -67,6 +67,8 @@
 | 19 | 某个能力「明明实现了却没生效」：模型不会联网、不能收图、没有思考档、折扣前的倍率不显示 | 模型 / provider 条目上有一批**不写就等于关掉**的字段：`searches`（模型级=这条自己会搜，provider 级=上游整体会搜）、`decides`（decision 模型，从 agent 列表隐藏）、`rateWas`（折扣前倍率）、`fast`、`serviceTiers`、`modalities`（图片 / 音频能力全靠它） | HOOKS 十一之三 |
 | 20 | 厂商有画图模型，插件里当垃圾过滤掉了；或者反过来，列进去之后用户在 chat 里选中报 400 | magpie **0.1.1707 起**支持插件供图（`DrawsID` + `ImagesAPI` + npm 是 `@ai-sdk/openai-compatible`）。但它**同时**留在 chat 模型列表里 —— 列不列是取舍，判据见 [`src/models.mjs`](./src/models.mjs) 的 `LIST_IMAGE_MODELS` | HOOKS 十一之三的「插件供图」 |
 | 21 | 花一晚上追 magpie 的「每个版本」，改了一堆文档，用户那边一点变化都没有 | **判断要不要同步，看稳定渠道**（magpie 设置里那个「更新渠道：每个版本 / 稳定版」）。`curl -s "https://usemagpie.ai/api/latest?channel=stable"` 拿稳定版版本号；2026-10-28 实测：每版本 0.1.1763 / **稳定版 0.1.1327**，逐字段比对后插件相关字段**完全一致** —— 追每版本几乎全是白跑。一条命令判断：`node scripts/check-magpie-stable.mjs` | HOOKS 顶部 · UPDATING 一 |
+| 22 | 卡片上每个账号都显示「剩余额度未知」，而 `usage()` 明明返回了 plan / balance / windows、也没有 error | **窗口被 magpie 整条丢掉了**，两种写法都会导致：① `aside: true` 的窗口给了 `amount`/`limit`（假占比，magpie 算不出来）② `resetsAt`/`runsOutAt` 塞了厂商原样时间 `"2026-10-28 23:59:59"`（不是 ISO，解析失败）。判据：`curl -s http://127.0.0.1:3425/v1/magpie/quotas`，看 `windows[0]` 有没有 `text: true` 和 ISO 形式的 `runsOutAt` | HOOKS 三 · 三条「写错不报错」的窗口规矩 |
+| 23 | 有一批额度快到期了，卡片上却完全看不出来 | 用官方字段 `runsOutAt` + `runsOut`（剩余额度何时作废、损失多少），**不要拼进 `display`** —— 拼进去只是普通文字，magpie 不会当失效提醒。厂商给的时间要先转 ISO | HOOKS 三 · 规矩 ③ |
 
 ---
 
