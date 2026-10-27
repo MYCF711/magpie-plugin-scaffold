@@ -209,8 +209,8 @@ npm view <包名> version     # 有输出 = 被占了，换个名
 ```
 
 改名的三处必须同步（缺一个就静默错位）：
-`package.json` 的 `name`、`index.mjs` 里 `REGISTRY_ENTRY.package`（**一字不差**）、
-magpie 侧 `plugins.json` 的 spec 与 `plugins/package.json` 的依赖键。
+`package.json` 的 `name`、`registry-entry.json` 的 `package`（**一字不差**，那是提交给
+registry 的那份）、magpie 侧 `plugins.json` 的 spec 与 `plugins/package.json` 的依赖键。
 
 ### keywords 决定能不能被搜到
 

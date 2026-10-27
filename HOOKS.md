@@ -562,7 +562,7 @@ j.Serves = servesBeside(j.Moved, provs[e.Spec])  // 它自己注册的 provider 
 |---|---|---|
 | `package.json` 的 `name` | 包根 | **插件卡片标题** —— 插件列表那一行、详情页标题。链路：bun 按它写 `plugins/package.json` 的依赖键 → magpie 反查键名当标题 |
 | `config.provider[id].name` | 插件代码 | **供应商列表那一行**（`magicrew (超级麦吉, 27 models)` 里的「超级麦吉」） |
-| `REGISTRY_ENTRY.name` | 插件代码 | 市场条目里的显示名 —— **不是卡片标题** |
+| `registry-entry.json` 的 `name` | 仓库根（提交给 registry） | 市场条目里的显示名 —— **不是卡片标题** |
 | 仓库名 | GitHub | 只进链接（`repository`、源码按钮），不参与任何显示 |
 
 拿 `magpie-magicrew-auth` 举例：

@@ -50,7 +50,7 @@ node scripts/check.mjs          # 或 bun scripts/check.mjs
 | 许可 | `license: MIT` 且 `LICENSE` 是逐字 MIT 正文（归属说明不能夹在里面） |
 | 图标 | `magpie.icon` 是 `https://` 或 `data:image/`、≤1MB —— **插件卡片只认它** |
 | 导出形状 | 入口能 import、每个导出函数都真的返回钩子（官方：导出的每个函数都会被当插件） |
-| 一致性 | 自注册条目的 `package` 与 `name` 一字不差 |
+| 一致性 | `registry-entry.json` 的 `package` 与 package.json 的 `name` 一字不差 |
 | 卫生 | CHANGELOG 有当前版本、没有真 JWT、没有硬编码本机路径 |
 
 CI 每次 push 都跑它（`ci.yml`）。绿了说明符合 magpie 的插件契约，可以放心发布。
@@ -411,71 +411,38 @@ magpie 从**社区 registry** 读这几个字段：
 
 包不在那个 registry 里，卡片标题就退回包名，也没有「源码」按钮。
 
-### 模板已经处理好了
+### 载体是 registry 条目，不是缓存
 
-`src/self-register.mjs` 在插件加载时把条目**写一次**进 magpie 的市场缓存：
+模板根目录的 `registry-entry.json` 就是要提交的形状：
 
-```js
-const REGISTRY_ENTRY = {
-  package: "你的包名",     // ⚠ 一字不差等于 package.json 的 name
-  name: "市场条目里的显示名", // ⚠ 不是卡片标题！卡片标题来自 package.json 的 name
-  providers: ["你的provider"],
-  community: true,
-  summary: { en: "...", zh: "..." },
-}
-
-export const YourPlugin = async ({ client, directory }) => {
-  startSelfRegister(REGISTRY_ENTRY, { configDir: directory, log })
-  return { ... }
+```json
+{
+  "package": "your-package-name",
+  "name": "Your Provider",
+  "providers": ["your-provider-id"],
+  "summary": { "en": "...", "zh": "..." }
 }
 ```
 
-**改 `REGISTRY_ENTRY` 就行，不用动别的。**
+把它加进 [magpie-community/plugins](https://github.com/magpie-community/plugins) 的
+`registry.json`（两行 diff），合并之后卡片就有「源码」按钮和正确的标题。
+`community: true` 由维护者那边标，自己不用填。
 
-### 只写一次，绝不轮询
+### ⚠ 不要写 magpie 的缓存
 
-**实测（2026-10-25）：**
+`~/.cache/magpie/plugin-market.json` 是 **magpie 自己的文件**。早期模板（≤0.1.8）带过一个
+`src/self-register.mjs`，在插件加载时把条目 merge 进那份缓存 —— 这条路已被上游否掉：
 
-```
-手工往缓存里加一条 → 等 10 秒 → 没被覆盖
-再跑 plugin update → 也没被覆盖
-连续观察 3 分钟     → mtime 零变化
-```
+- 按包名 merge ⇒ 一旦包进了 registry，**每次启动都会把 registry 条目盖回**包里写死的那份；
+- 那份缓存是全局的（`Symbol.for` 的共享队列跨所有插件），一个插件能改另一个插件的条目。
 
-**magpie 只在启动时重写这个文件，静默运行期间完全不碰。**
+`magpie-community/plugins#399` 的 review 里，维护者要求把这个模块从包里删掉再发版。
+0.1.9 起模板里没有它了 —— **插件对 magpie 的目录只有读的份**。
 
-### 多插件同时启动不会打架
+### 由此推出的两条
 
-并发注册用「写完读回来验证 + 有限重试」：
-
-```
-5 个同时注册   → 5/5 存活  ✅
-10 个同时注册  → 10/10 存活 ✅（3 轮）
-8 个分批启动   → 8/8 存活  ✅
-官方条目       → 全部保留   ✅
-```
-
-### ⚠⚠ 绝对不要用 fs.watch 或 setInterval
-
-**这是我踩过的最大的坑。**
-
-我最初加了 `fs.watch` 去「补」magpie 的覆盖，结果是：
-
-```
-我们写文件（rename）→ 触发自己的 watch → 又写
-    ↓
-每秒 3-4 次，永不停止，日志刷屏
-```
-
-**实测数据：** 60 秒内 mtime 变化 19 次。
-
-**而且它是完全多余的** —— magpie 静默时根本不碰这个文件。
-删掉 watch 后，60 秒内变化 **0 次**。
-
-### 根本解法
-
-`magpie-community/plugins#394` 里建议 **拉取时合并进缓存而不是整体替换**，
-那样连这一次写都不需要。如果采纳，这一段可以整个删掉。
+- 想改卡片上看到的东西 → 改 registry 条目，别改缓存。
+- 想「绕开审核立刻生效」→ 没有这条路，也不该有。
 
 ## 调试
 
@@ -721,8 +688,10 @@ agent       @magpie-community/agent-<name>
 - 对自用/自发布的插件来说，前两条（npm + GitHub topic）已经够用；
 - 把精力花在这上面，回报接近零。
 
-真要自己维护一份自注册条目（让卡片显示对的标题与图标），`src/self-register.mjs`
-就是干这个的 —— 它写的是本地市场缓存，不依赖任何上游审核。
+想让卡片显示对的标题与「源码」按钮，唯一的路是把 `registry-entry.json` 提交成
+`registry.json` 里的一条 —— 但那属于「上架」，和能不能用无关：包不在里面，
+卡片标题退回包名，其余功能一律照常。**没有绕开的办法**（写本地市场缓存这条路
+已被上游否掉，见上面「不要写 magpie 的缓存」）。
 
 ### 之后每一次更新
 
@@ -766,7 +735,7 @@ agent       @magpie-community/agent-<name>
 |---|---|
 | `internal/plugin/` 的 Go 实现 | 九个钩子的调用时机、返回值形状、错误语义 |
 | 二进制里嵌的契约注释（约 200 KB / 21 章） | `HOOKS.md` 的正文，以及官方文档漏掉的 `auth.checkin` |
-| `internal/plugin/market.go` 的 `market()` | 为什么市场缓存会被整体替换、为什么自注册写一次就够 |
+| `internal/plugin/market.go` 的 `market()` | 市场缓存由 magpie 整体替换、且属于 magpie —— 所以插件不该去写它 |
 
 **`extract-contract.py`** 是提取那份嵌入契约的脚本，可以重新跑一遍核对。
 
