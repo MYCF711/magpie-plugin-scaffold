@@ -56,7 +56,7 @@ import { startSelfRegister } from "./src/self-register.mjs"
 // ⚠ package 必须等于 package.json 的 name。
 //
 const REGISTRY_ENTRY = {
-  package: "magpie-plugin-template",
+  package: "magpie-plugin-scaffold",
   name: "My Provider",
   providers: ["xxx"],
   community: true,
