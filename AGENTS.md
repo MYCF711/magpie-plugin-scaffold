@@ -66,6 +66,7 @@
 |---|---|---|---|
 | 19 | 某个能力「明明实现了却没生效」：模型不会联网、不能收图、没有思考档、折扣前的倍率不显示 | 模型 / provider 条目上有一批**不写就等于关掉**的字段：`searches`（模型级=这条自己会搜，provider 级=上游整体会搜）、`decides`（decision 模型，从 agent 列表隐藏）、`rateWas`（折扣前倍率）、`fast`、`serviceTiers`、`modalities`（图片 / 音频能力全靠它） | HOOKS 十一之三 |
 | 20 | 厂商有画图模型，插件里当垃圾过滤掉了；或者反过来，列进去之后用户在 chat 里选中报 400 | magpie **0.1.1707 起**支持插件供图（`DrawsID` + `ImagesAPI` + npm 是 `@ai-sdk/openai-compatible`）。但它**同时**留在 chat 模型列表里 —— 列不列是取舍，判据见 [`src/models.mjs`](./src/models.mjs) 的 `LIST_IMAGE_MODELS` | HOOKS 十一之三的「插件供图」 |
+| 21 | 花一晚上追 magpie 的「每个版本」，改了一堆文档，用户那边一点变化都没有 | **判断要不要同步，看稳定渠道**（magpie 设置里那个「更新渠道：每个版本 / 稳定版」）。`curl -s "https://usemagpie.ai/api/latest?channel=stable"` 拿稳定版版本号；2026-10-28 实测：每版本 0.1.1763 / **稳定版 0.1.1327**，逐字段比对后插件相关字段**完全一致** —— 追每版本几乎全是白跑。一条命令判断：`node scripts/check-magpie-stable.mjs` | HOOKS 顶部 · UPDATING 一 |
 
 ---
 
@@ -102,6 +103,11 @@ python extract-contract.py [magpie 可执行文件]
 # magpie 升级后必做：重新提取 + 自动找出 HOOKS.md 漏写的字段
 python extract-contract.py && node scripts/contract-diff.mjs
 #   退出码 2 = 有差集（列出前 40 个）。挑「不写会关掉某个能力」的补进 HOOKS 十一之三。
+
+# 该不该跟着 magpie 升级动这份文档？**看稳定渠道，不看每版本渠道**
+node scripts/check-magpie-stable.mjs
+#   0 = 基线就是当前稳定版，不用动；2 = 稳定版变了，按它打印的三步走
+#   裸查：curl -s "https://usemagpie.ai/api/latest?channel=stable"
 ```
 
 ---

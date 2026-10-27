@@ -3,6 +3,32 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.1.16 — 2026-10-28
+
+**判断「要不要跟着 magpie 升级」只看稳定渠道 —— 每版本渠道一晚四个，追它全是白跑**
+
+magpie 设置里有「更新渠道：每个版本 / 稳定版」。把两个渠道的契约都提取出来对比：
+
+| 渠道 | feed | 2026-10-28 的版本 | 契约段数 | 字符数 |
+|---|---|---|---|---|
+| 每版本 | `usemagpie.ai/api/latest` | **0.1.1763** | 23 | 264,822 |
+| **稳定版** | `usemagpie.ai/api/latest?channel=stable` | **0.1.1327** | 21 | 201,045 |
+
+差 400 多个版本，但**插件相关的字段一条不差**（`searches` / `decides` / `rateWas` /
+`serviceTiers` / `modalities` / `capabilities` 两边都有）。多出的 2 段是 `summaries` /
+`last seen`，属 GUI 历史，不是插件契约。
+
+- **新增 [`scripts/check-magpie-stable.mjs`](./scripts/check-magpie-stable.mjs)** —— 一条命令判断该不该动：
+  从 HOOKS.md 抓基线版本 → 查稳定渠道 → 比对。`0` = 不用动；`2` = 稳定版变了，并打印三步
+  （下稳定版 → `extract-contract.py` → `contract-diff.mjs`）
+- **[HOOKS](./HOOKS.md) 顶部基线改成 `0.1.1327`（stable）** —— 并附两渠道对比表，写明「看稳定渠道，不看每版本渠道」
+- **[UPDATING](./UPDATING.md) 新增第七节** —— magpie 自己升级了什么时候该动文档、三步、以及「内嵌契约抓不到的部分」（供图判据、ID 白名单）
+- **[AGENTS](./AGENTS.md) 坑表补第 21 条 + 命令** —— 「花一晚上追每版本，用户那边一点变化都没有」
+- **四个插件仓库的 AGENTS 同步了这一节**（`magicrew-auth` / `officeace` / `loomy-auth` / `today`）
+
+> 起因：主人指出 magpie 出了「稳定版」渠道。查证后确认：之前追 1763→1767 是追的每版本，
+> 而稳定版是 0.1.1327 —— 追了 400 多个版本号，插件契约却没变过。
+
 ## 0.1.15 — 2026-10-28
 
 **把「契约会不会落后」做成一条命令 —— 因为 0.1.14 那次是手工比对出来的**
