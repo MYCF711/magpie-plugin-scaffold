@@ -19,7 +19,7 @@
 // 需要 GitHub token 才能建 Release：
 //   GITHUB_TOKEN / GH_TOKEN 环境变量。没有也能跑 —— 它会打印手工建 Release 的命令。
 
-import { execSync } from "node:child_process"
+import { execSync, execFileSync } from "node:child_process"
 import { readFileSync, existsSync } from "node:fs"
 import { join } from "node:path"
 
@@ -251,33 +251,57 @@ const tagged = run(`git tag ${tag} && git push origin ${tag}`, `tag ${tag}`)
 
 let released = false
 if (token) {
+  // ⚠ 这里**故意不用 node 的 fetch**。实测（Windows + 本机证书库）node 的 https 栈打
+  //   api.github.com 会报 `fetch failed` / `UNABLE_TO_GET_ISSUER_CERT_LOCALLY`，
+  //   而系统 curl 走 schannel 正常。发布这一步失败会留下「tag 有了、Release 没有」的
+  //   半截状态，不值得赌运行时。
+  const payload = JSON.stringify({
+    tag_name: tag,
+    target_commitish: branch,
+    name: version,
+    body: releaseBody,
+    draft: false,
+    prerelease: false,
+  })
   try {
-    const res = await fetch(`https://api.github.com/repos/${gh.owner}/${gh.repo}/releases`, {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${token}`,
-        accept: "application/vnd.github+json",
-        "content-type": "application/json",
-        "user-agent": "magpie-plugin-release",
-      },
-      body: JSON.stringify({
-        tag_name: tag,
-        target_commitish: branch,
-        name: version,
-        body: releaseBody,
-        draft: false,
-        prerelease: false,
-      }),
-    })
-    const body = await res.json().catch(() => ({}))
-    if (res.ok) {
+    const out = execFileSync(
+      "curl",
+      [
+        "-sS",
+        "-X",
+        "POST",
+        "--max-time",
+        "40",
+        "-H",
+        `Authorization: Bearer ${token}`,
+        "-H",
+        "Accept: application/vnd.github+json",
+        "-H",
+        "User-Agent: magpie-plugin-release",
+        "-H",
+        "Content-Type: application/json; charset=utf-8",
+        "--data-binary",
+        "@-",
+        `https://api.github.com/repos/${gh.owner}/${gh.repo}/releases`,
+      ],
+      { input: payload, encoding: "utf8" },
+    )
+    let body = {}
+    try {
+      body = JSON.parse(out)
+    } catch {}
+    if (body?.html_url) {
       console.log(`  Release … ${C.green("ok")} ${body.html_url}`)
       released = true
     } else {
-      console.log(`  Release … ${C.red(`HTTP ${res.status}`)} ${body.message || ""}`)
+      console.log(`  Release … ${C.red("失败")} ${body?.message || String(out).slice(0, 160)}`)
     }
   } catch (e) {
-    console.log(`  Release … ${C.red("失败")} ${String(e.message).slice(0, 120)}`)
+    const detail = String(e.stderr || e.message).trim().slice(0, 160)
+    console.log(`  Release … ${C.red("失败")} ${detail}`)
+    if (/curl/i.test(detail)) {
+      console.log(C.dim("    这台机器没有 curl？手工建：GitHub → Releases → Draft a new release"))
+    }
   }
 } else {
   console.log(C.yellow("  Release … 跳过（没有 GITHUB_TOKEN / GH_TOKEN）"))

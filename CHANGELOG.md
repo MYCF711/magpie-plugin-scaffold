@@ -3,6 +3,19 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.1.12 — 2026-10-28
+
+**修 0.1.11 的 `release.mjs`：建 Release 那一步改走系统 `curl`，不用 node 的 fetch**
+
+0.1.11 自己发布时暴露的：`push` 和 `tag` 都成功，到建 Release 报 `fetch failed` ——
+node 的 https 栈在本机打 `api.github.com` 走不通（证书链），而系统 `curl` 走 schannel 正常。
+后果是「tag 有了、Release 没有」的半截状态，正是这个脚本想防的东西。
+
+- [`scripts/release.mjs`](./scripts/release.mjs) —— 建 Release 改成 `execFileSync("curl", …)`，
+  token 从环境变量进、正文走 stdin（`--data-binary @-`）；失败时把 curl 的 stderr 打出来，
+  不再吞成一句 `fetch failed`
+- 顺带留了注释说明为什么这一步**故意不用 fetch** —— 上次就是「文档里记着、代码里忘了」
+
 ## 0.1.11 — 2026-10-28
 
 **读完四个真实插件之后补的四块东西 —— 都是「它们每个都重写了一遍」的部分**
