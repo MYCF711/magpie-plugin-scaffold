@@ -33,6 +33,31 @@
 
 细节见 [README-TEMPLATE.md](./README-TEMPLATE.md) 的「仓库里还该有什么」一节。
 
+## 先跑一遍再动手
+
+```bash
+node scripts/check.mjs          # 或 bun scripts/check.mjs
+```
+
+24 项规定逐条过，退出码非 0 就是不合规。它查的是**能查的那部分**：
+
+| 组 | 查什么 |
+|---|---|
+| 身份 | name / version 语义化 / description / 入口声明 / files 白名单 |
+| 能被搜到 | keywords 含 `opencode` + `plugin|auth|provider` + `magpie` |
+| 许可 | `license: MIT` 且 `LICENSE` 是逐字 MIT 正文（归属说明不能夹在里面） |
+| 图标 | `magpie.icon` 是 `https://` 或 `data:image/`、≤1MB —— **插件卡片只认它** |
+| 导出形状 | 入口能 import、每个导出函数都真的返回钩子（官方：导出的每个函数都会被当插件） |
+| 一致性 | 自注册条目的 `package` 与 `name` 一字不差 |
+| 卫生 | CHANGELOG 有当前版本、没有真 JWT、没有硬编码本机路径 |
+
+CI 每次 push 都跑它（`ci.yml`）。绿了说明符合 magpie 的插件契约，可以放心发布。
+
+> 它**不**做任何「提交到社区」的动作 —— 收不收、收哪个，是维护者的事。
+> 把它的输出贴进 issue，比一句「我做了个插件」有用得多。
+
+---
+
 ## 目录
 
 - [写 README](./README-TEMPLATE.md) —— **插件介绍页的模板，照抄这份**
