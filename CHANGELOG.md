@@ -3,6 +3,21 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.1.10 — 2026-10-28
+
+- **新增 [AGENTS.md](./AGENTS.md)** —— 给 AI 执行者的入口：按「你在哪一步」给阅读顺序（开工 / 写钩子 / 交付 / 发版 / 用户说没更新），外加 15 条会静默出错的坑（症状 → 判据 → 出处）。派生仓库直接带走
+- **新增 [CHECKLIST.md](./CHECKLIST.md)** —— 两张勾选表：A 表代码交付前 13 项（`check.mjs` 查不到的：钩子语义、`usage.used`、`free` 不从 rate 反推、上下文窗口实测、404 vs 401…），B 表发版前七步带命令与判据
+- [README](./README.md) —— 「动手前先读这三份」改成**「必读四份」**，第四份是 `UPDATING.md`：它原来只出现在下面「目录」里，读完前三份就去写代码的人会漏掉发布
+- [README](./README.md) —— 开头补一句：`git push` 只是发布七步里的第 4 步；「之后每一次更新」里的「六步」改正成**七步**（原来漏了 `npm pack --dry-run` 与 tag/Release 的完整对应）
+- [UPDATING](./UPDATING.md) —— 开头加「不读这份的后果（真发生过）」：push 完所有命令都不报错，但 npm 上是旧版本、GitHub 写着「暂无发布版本」
+- [README-TEMPLATE](./README-TEMPLATE.md) —— 「仓库里还该有什么」补 `AGENTS.md` / `CHECKLIST.md` 两行，并写明为什么这两份对 AI 执行者尤其重要
+- [scripts/check.mjs](./scripts/check.mjs) —— 末尾输出加两行：把「脚本查不到的」指到 `CHECKLIST.md` 的 A / B 表。脚本绿了 ≠ 能发布
+
+> 起因：`magpie-magicrew-auth` 0.3.14 发布时**只 push 没发 npm、没打 tag、没建 Release**，
+> 而当时确实读过 README。根因不是「不知道有 `UPDATING.md`」，是它没进阅读路径 ——
+> README 顶部的必读清单只有三份。整理目标是：**任何 AI 从这个仓库的任何入口进来，
+> 都能在几分钟内知道「发布是七步，push 只是第 4 步」。**
+
 ## 0.1.9 — 2026-10-27
 
 - **删掉 `src/self-register.mjs`** —— 插件不再往 `~/.cache/magpie/plugin-market.json` 写条目：那是 magpie 的文件，按包名 merge 会把 registry 条目盖掉（上游 review `magpie-community/plugins#399` 明确要求删）
