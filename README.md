@@ -239,6 +239,29 @@ cd my-provider
 rm -rf .git && git init    # 换掉历史
 ```
 
+### 建好仓库后：四件 check 查不到的事
+
+`scripts/check.mjs` 只看**仓库里的文件**。下面这些在 GitHub 上一律查不到，
+漏了不会报错，但社区和 agent 都找不到你：
+
+| 事 | 怎么做 | 漏了会怎样 |
+|---|---|---|
+| **topics** | 仓库页 → About 右边齿轮 → Topics，加 `magpie` `magpie-plugin` `opencode` `opencode-plugin` `provider` | 社区按 topic 收，搜不到就是不存在 |
+| **仓库描述** | 同一个地方，一行话说清签入什么 | 发现页只显示它 |
+| **首个 tag** | `git tag v0.1.0 && git push origin v0.1.0` | `release.yml` 不触发，没有 Release |
+| **Actions 权限** | Settings → Actions → General → Workflow permissions → **Read and write** | `release.yml` 建不了 Release（403） |
+
+命令行一次做完（`gh` 已登录时）：
+
+```bash
+gh repo edit --add-topic magpie,magpie-plugin,opencode,opencode-plugin,provider
+gh repo edit --description "一句话说清楚签入什么"
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+> 这四项没写进 `check.mjs`，是因为它查的是本地文件 —— 硬要查就得连 GitHub API，
+> 而 CI 里的 token 未必有权限读你自己的仓库设置。放在这里当清单，建仓库时照着做一遍。
+
 ### 然后改三处
 
 **① `package.json`**
