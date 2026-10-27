@@ -81,3 +81,31 @@ jobs:
               --title "$GITHUB_REF_NAME" \
               --notes-file notes.md
           fi
+
+  # ── npm：作者自己的选择，不配 token 就跳过 ──────────────────────
+  #
+  # ⚠ npm 不允许包名含大写。想让卡片标题好看又要能发 npm，就在仓库里放
+  #   scripts/publish-npm.mjs（UPDATING.md「git 源想要大写标题、npm 又要能发」），
+  #   它在发布那一下换 name、跑完改回来；没有这个脚本就直接发。
+  npm:
+    runs-on: ubuntu-latest
+    needs: release
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - name: Publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "没配 NPM_TOKEN —— 跳过 npm 发布（想发就在 Settings → Secrets 里加）"
+            exit 0
+          fi
+          if [ -f scripts/publish-npm.mjs ]; then
+            node scripts/publish-npm.mjs
+          else
+            npm publish --access public
+          fi
