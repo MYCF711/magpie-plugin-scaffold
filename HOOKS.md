@@ -565,6 +565,31 @@ commandcode-plan  qoder  qoder-cn  devin  zed  factory  mimo-app  kiro  gemini  
 
 ## 九之二、插件名（卡片标题显示什么）
 
+### 先把三个「名字」分清
+
+这张表把最常混的三件事钉死：
+
+| 你写的 | 在哪 | 显示在哪 |
+|---|---|---|
+| `package.json` 的 `name` | 包根 | **插件卡片标题** —— 插件列表那一行、详情页标题。链路：bun 按它写 `plugins/package.json` 的依赖键 → magpie 反查键名当标题 |
+| `config.provider[id].name` | 插件代码 | **供应商列表那一行**（`magicrew (超级麦吉, 27 models)` 里的「超级麦吉」） |
+| `REGISTRY_ENTRY.name` | 插件代码 | 市场条目里的显示名 —— **不是卡片标题** |
+| 仓库名 | GitHub | 只进链接（`repository`、源码按钮），不参与任何显示 |
+
+拿 `magpie-magicrew-auth` 举例：
+
+```
+package.json        name: "Magicrew"      → 插件卡片标题「Magicrew」
+config.provider     name: "超级麦吉"       → 供应商列表「超级麦吉」
+                    name: "MagiCrew"      → 供应商列表「MagiCrew」
+仓库名               magpie-magicrew-auth  → 只出现在「源码」按钮的链接里
+```
+
+⚠ **「插件叫什么」和「供应商叫什么」是两件事。** 一个包两个供应商时，卡片标题只有一个
+（包的 `name`），供应商名有两个。把站点名写进包的 `name` 会让卡片变成
+「超级麦吉 / MagiCrew」这种缝合物。
+
+
 ### 结论先说：插件名**没有** `displayName`
 
 magpie 不读 `package.json` 的 `name`、也不读任何自定义显示字段来当卡片标题。标题来自

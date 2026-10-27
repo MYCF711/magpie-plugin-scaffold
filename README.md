@@ -414,8 +414,8 @@ magpie 从**社区 registry** 读这几个字段：
 
 ```js
 const REGISTRY_ENTRY = {
-  package: "你的包名",     // ⚠ 等于 package.json 的 name
-  name: "卡片标题",
+  package: "你的包名",     // ⚠ 一字不差等于 package.json 的 name
+  name: "市场条目里的显示名", // ⚠ 不是卡片标题！卡片标题来自 package.json 的 name
   providers: ["你的provider"],
   community: true,
   summary: { en: "...", zh: "..." },

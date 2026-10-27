@@ -55,7 +55,7 @@ export const FooIntlAuthPlugin = makePlugin(SITES.foo_intl)
 const SITES = {
   foo: {
     id: "foo",                    // ← 供应商 id，全局唯一，装过就不能改
-    name: "Foo",                  // ← 卡片标题
+    name: "Foo",                  // ← 供应商名（供应商列表里那一行），不是插件卡片标题
     host: "https://api.foo.cn",
     web: "https://www.foo.cn",
     icon: ICON_CN,                // ← 各站各的图

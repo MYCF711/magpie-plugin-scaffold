@@ -40,7 +40,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 //
 //   PROVIDER        改成厂商自己的 id（agent 用 <id>/<model> 命名）
-//   PROVIDER_NAME   卡片上显示的供应商名
+//   PROVIDER_NAME   供应商名 —— 供应商列表里那一行（插件卡片标题是 package.json 的 name）
 //   BASE            上游 API 基址
 //
 // 然后实现 index.mjs 底部的五个 TODO 函数。
