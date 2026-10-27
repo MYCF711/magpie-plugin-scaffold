@@ -250,57 +250,102 @@ const pushed = run(`git push origin ${branch}`, `push ${branch}`)
 const tagged = run(`git tag ${tag} && git push origin ${tag}`, `tag ${tag}`)
 
 let released = false
-if (token) {
-  // ⚠ 这里**故意不用 node 的 fetch**。实测（Windows + 本机证书库）node 的 https 栈打
-  //   api.github.com 会报 `fetch failed` / `UNABLE_TO_GET_ISSUER_CERT_LOCALLY`，
-  //   而系统 curl 走 schannel 正常。发布这一步失败会留下「tag 有了、Release 没有」的
-  //   半截状态，不值得赌运行时。
-  const payload = JSON.stringify({
-    tag_name: tag,
-    target_commitish: branch,
-    name: version,
-    body: releaseBody,
-    draft: false,
-    prerelease: false,
-  })
+
+/** 这个仓库有没有 release.yml（有的话推 tag 就会自动建 Release，我们不该再建一遍） */
+const hasReleaseWorkflow = existsSync(join(ROOT, ".github", "workflows", "release.yml"))
+
+/** GET /releases/tags/<tag>，返回 html_url 或 null */
+function existingRelease() {
+  if (!token) return null
   try {
     const out = execFileSync(
       "curl",
       [
         "-sS",
-        "-X",
-        "POST",
         "--max-time",
-        "40",
+        "20",
         "-H",
         `Authorization: Bearer ${token}`,
         "-H",
         "Accept: application/vnd.github+json",
         "-H",
         "User-Agent: magpie-plugin-release",
-        "-H",
-        "Content-Type: application/json; charset=utf-8",
-        "--data-binary",
-        "@-",
-        `https://api.github.com/repos/${gh.owner}/${gh.repo}/releases`,
+        `https://api.github.com/repos/${gh.owner}/${gh.repo}/releases/tags/${tag}`,
       ],
-      { input: payload, encoding: "utf8" },
+      { encoding: "utf8" },
     )
-    let body = {}
-    try {
-      body = JSON.parse(out)
-    } catch {}
-    if (body?.html_url) {
-      console.log(`  Release … ${C.green("ok")} ${body.html_url}`)
-      released = true
+    const j = JSON.parse(out)
+    return j?.html_url ?? null
+  } catch {
+    return null
+  }
+}
+if (token) {
+  // ⚠ 这里**故意不用 node 的 fetch**。实测（Windows + 本机证书库）node 的 https 栈打
+  //   api.github.com 会报 `fetch failed` / `UNABLE_TO_GET_ISSUER_CERT_LOCALLY`，
+  //   而系统 curl 走 schannel 正常。发布这一步失败会留下「tag 有了、Release 没有」的
+  //   半截状态，不值得赌运行时。
+  // 有 release.yml 的仓库：推 tag 就会自动建 Release，我们自己再建一遍会 422。
+  // 没 workflow 的：先查一次（可能上次手工建过 / 上次跑到一半），没有才建。
+  if (hasReleaseWorkflow) {
+    const url = existingRelease()
+    if (url) {
+      console.log(`  Release … ${C.green("ok")}（release.yml 已建）${url}`)
     } else {
-      console.log(`  Release … ${C.red("失败")} ${body?.message || String(out).slice(0, 160)}`)
+      console.log(C.yellow("  Release … 交给 release.yml（推 tag 已触发），约 1 分钟后按第 ④ 条确认"))
     }
-  } catch (e) {
-    const detail = String(e.stderr || e.message).trim().slice(0, 160)
-    console.log(`  Release … ${C.red("失败")} ${detail}`)
-    if (/curl/i.test(detail)) {
-      console.log(C.dim("    这台机器没有 curl？手工建：GitHub → Releases → Draft a new release"))
+    released = true
+  } else if (existingRelease()) {
+    console.log(`  Release … ${C.green("ok")}（这个 tag 的 Release 已经存在，不重复建）`)
+    released = true
+  } else {
+    const payload = JSON.stringify({
+      tag_name: tag,
+      target_commitish: branch,
+      name: version,
+      body: releaseBody,
+      draft: false,
+      prerelease: false,
+    })
+    try {
+      const out = execFileSync(
+        "curl",
+        [
+          "-sS",
+          "-X",
+          "POST",
+          "--max-time",
+          "40",
+          "-H",
+          `Authorization: Bearer ${token}`,
+          "-H",
+          "Accept: application/vnd.github+json",
+          "-H",
+          "User-Agent: magpie-plugin-release",
+          "-H",
+          "Content-Type: application/json; charset=utf-8",
+          "--data-binary",
+          "@-",
+          `https://api.github.com/repos/${gh.owner}/${gh.repo}/releases`,
+        ],
+        { input: payload, encoding: "utf8" },
+      )
+      let body = {}
+      try {
+        body = JSON.parse(out)
+      } catch {}
+      if (body?.html_url) {
+        console.log(`  Release … ${C.green("ok")} ${body.html_url}`)
+        released = true
+      } else {
+        console.log(`  Release … ${C.red("失败")} ${body?.message || String(out).slice(0, 160)}`)
+      }
+    } catch (e) {
+      const detail = String(e.stderr || e.message).trim().slice(0, 160)
+      console.log(`  Release … ${C.red("失败")} ${detail}`)
+      if (/curl/i.test(detail)) {
+        console.log(C.dim("    这台机器没有 curl？手工建：GitHub → Releases → Draft a new release"))
+      }
     }
   }
 } else {

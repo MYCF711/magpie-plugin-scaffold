@@ -3,6 +3,20 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.1.13 — 2026-10-28
+
+**`release.mjs` 不再和 `release.yml` 抢着建 Release**
+
+发现过程：0.1.11 那版脚本建 Release 报 `fetch failed`（0.1.12 修成 curl），
+但 GitHub 上 `v0.1.11` 的 Release 还是出现了 —— 是仓库自带的 `release.yml` 被推 tag 触发、
+自己建的。也就是说**有 workflow 的仓库里，脚本那一步是重复劳动**，谁先谁后还成了竞态
+（后到的一方会 422）。
+
+- [`scripts/release.mjs`](./scripts/release.mjs) — 有 `.github/workflows/release.yml` → 只推 tag，
+  然后查一次确认（查到就报 `release.yml 已建`，没查到就提示「约 1 分钟后按第 ④ 条确认」）；
+  没有 workflow → 先 `GET /releases/tags/<tag>` 查一次，已存在就跳过，避免重复建
+- 顺带把「有 workflow 的仓库脚本别抢活」写进 [UPDATING](./UPDATING.md) 第 6 步那张三条路的表
+
 ## 0.1.12 — 2026-10-28
 
 **修 0.1.11 的 `release.mjs`：建 Release 那一步改走系统 `curl`，不用 node 的 fetch**
