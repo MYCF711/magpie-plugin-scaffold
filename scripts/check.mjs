@@ -301,4 +301,10 @@ for (const r of results) {
   if (r.level !== "pass" && r.fix) console.log(`      → ${r.fix}`)
 }
 console.log(`\n  通过 ${passes.length} · 警告 ${warns.length} · 失败 ${fails.length}\n`)
+
+// 这个脚本只能查「能查的那部分」。剩下两件事它看不见，但漏了照样出事 ——
+// 而且通常不报错。把出口指过去，别让「脚本绿了」被当成「能发布了」。
+console.log(`  它还看不到的（${"CHECKLIST.md"}）：`)
+console.log(`    交付前 —— A 表：钩子语义、上下文窗口实测、模型错误码用了 404 还是 401`)
+console.log(`    发版前 —— B 表：七步，git push 只是第 4 步；少一步不会报错，只会没人拿到新版\n`)
 process.exit(fails.length ? 1 : 0)

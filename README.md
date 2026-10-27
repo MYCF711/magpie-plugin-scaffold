@@ -3,10 +3,18 @@
 一个可直接克隆的 magpie / OpenCode 供应商插件模板 —— **九项全实现，一项不缺**。
 
 > 克隆这个仓库，改三处配置，实现五个 TODO，就是一个标准 magpie 插件。
+> 然后**把它发出去** —— 那是另一套动作，见 [UPDATING.md](./UPDATING.md)：
+> `git push` 只是发布七步里的第 4 步。
 
 ---
 
-## ⚠ 动手前先读这三份
+## ⚠ 动手前先读这四份
+
+> **前三份管「写出来」，第四份管「发出去」。** 第四份最容易被跳过 —— 跳过它的表现
+> 不是报错，是东西永远发不到用户手上。
+>
+> **AI 执行者从这里进**：[AGENTS.md](./AGENTS.md) —— 按「你在哪一步」给阅读顺序，
+> 外加十几条会静默出错的坑（症状 → 判据 → 出处）。
 
 **1. [README-TEMPLATE.md](./README-TEMPLATE.md) —— 写插件介绍页的模板，照抄。**
 用户只看 README 决定装不装：开头给数字、功能一句一条、不踩别人、安装放最后、
@@ -23,6 +31,21 @@
 **3. [MULTI-PROVIDER.md](./MULTI-PROVIDER.md) —— 同一厂商两套云，一个包放两个供应商。**
 国内版 / 国际版这种情形，做对了在 magpie 里是**两张卡、两组登录态**；做错了是
 登录态互相覆盖。判据、骨架、五条铁律、验证清单都在里面。**只有一个站点的插件不用读这份。**
+
+**4. [UPDATING.md](./UPDATING.md) —— 发版本，以及用户怎么拿到它。**
+
+每次发版本**必读**，而且是七步、一步不能少：
+
+```
+写 CHANGELOG → bump version → npm pack --dry-run → 提交 → push 默认分支
+  → npm publish → tag + GitHub Release → 四条验证
+```
+
+`git push` 只是**第 4 步**。少了后三步，GitHub 仓库右侧会一直写着「暂无发布版本」，
+npm 上的用户永远停在旧版本 —— 而本地一切看起来都对。发版前逐条过
+[CHECKLIST.md](./CHECKLIST.md) 的 B 表。
+
+---
 
 写完代码，这几件事**每件都踩过**：
 
@@ -62,8 +85,10 @@ CI 每次 push 都跑它（`ci.yml`）。绿了说明符合 magpie 的插件契�
 
 ## 目录
 
+- [给 AI 的入口](./AGENTS.md) —— **按「你在哪一步」给阅读顺序，外加十几条静默出错的坑（症状→判据→出处）**
+- [交付清单](./CHECKLIST.md) —— **两张勾选表：代码交付前 / 发版前（check 脚本查不到的那部分）**
 - [写 README](./README-TEMPLATE.md) —— **插件介绍页的模板，照抄这份**
-- [更新途径](./UPDATING.md) —— **发下一个版本、用户拿更新，照这份走**
+- [更新途径](./UPDATING.md) —— **发版本七步、用户怎么拿更新，每次发版前必读**
 - [单插件多供应商](./MULTI-PROVIDER.md) —— **同一厂商两套云（国内/国际），一个包两个供应商**
 - [最小交付面](#最小交付面) —— 这个模板的设计原则
 - [magpie 是什么](#magpie-是什么)
@@ -700,10 +725,15 @@ agent       @magpie-community/agent-<name>
 
 - magpie 怎么发现新版本（npm 源比 `version`、git 源比默认分支 HEAD 的 commit，
   **两条路都不看 GitHub Release / tag**）
-- 发版六步：写 CHANGELOG → bump → push 默认分支 → `npm publish`（显示名与包名不同的
-  插件用 `npm run publish:npm`）→
-  GitHub Release（tag + 更新内容一条条列）→ 验证
-- 用户侧怎么拿到更新（npm 源自动、git 源要手动；`rm` + `add` 会把卡片显示名重置成包名）
+- **发版七步，一步不能少**：写 CHANGELOG → bump → `npm pack --dry-run` → 提交 →
+  push 默认分支 → `npm publish`（显示名与包名不同的插件用 `npm run publish:npm`）→
+  tag + GitHub Release → 四条验证
+- 用户侧怎么拿到更新（npm 源自动、git 源要手动点「更新」；`rm` + `add` 会把卡片显示名
+  重置成包名）
+
+> ⚠ 只做到「push 默认分支」就宣布发版，是本仓库历史上真实踩过的坑：
+> GitHub 右侧一直显示「暂无发布版本」，npm 上的版本号没动。逐条过
+> [CHECKLIST.md](./CHECKLIST.md) 的 B 表能挡住这件事。
 
 ---
 

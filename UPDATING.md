@@ -4,7 +4,18 @@
 > 首次发布（`npm publish` + 进市场）见 [README](./README.md) 的「怎么发布」——
 > 这一份只管**之后每一次**。
 
-发出去就不管，用户永远停在第一个版本。所以这份和「怎么发布」一样是必读的。
+发出去就不管，用户永远停在第一个版本。所以这份和「怎么发布」一样是**必读**的。
+
+## 不读这份的后果（真发生过）
+
+`git push origin main` 跑完、`git status` 干净、代码确实在远端 —— 看起来发完了。
+实际上 npm 上还是旧版本，GitHub 仓库右侧一直写着「暂无发布版本」。
+**没有任何一条命令会报错**，只有用户那边永远没动静。
+
+发版是**七步**：写 CHANGELOG → bump → `npm pack --dry-run` → 提交 → push →
+`npm publish` → tag + Release → 四条验证。**push 是第 4 步。**
+
+逐条勾 [CHECKLIST.md](./CHECKLIST.md) 的 B 表，别凭记忆。
 
 ---
 
