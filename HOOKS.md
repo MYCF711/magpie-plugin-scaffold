@@ -5,6 +5,10 @@
 
 **这份契约比 `usemagpie.ai/docs/plugins` 更全** —— 官方文档漏了 `auth.checkin`。
 
+> 一个包装多个供应商（国内 / 国际这种）时，`config` / `auth` / `provider` 三处都要
+> 按站点参数化，而 `auth` 里**不能**再存站点字段 —— 写法、五条铁律与验证清单见
+> [MULTI-PROVIDER.md](./MULTI-PROVIDER.md)。
+
 ---
 
 ## 一、六个钩子（不是五个）
