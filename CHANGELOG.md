@@ -3,6 +3,16 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 未发布
+
+- [MULTI-PROVIDER](./MULTI-PROVIDER.md) —— 铁律加第 6 条：卡片上那个「承载 X、Y」的徽章由 `package.json` 的 `magpie.carries` 自己给（1–8 项、每项 ≤48 字、空白项丢弃），只有承载两个及以上供应商时才写
+- [README](./README.md) —— 「数据字段（不是钩子，但决定 UI）」表加一行 `magpie.carries`
+- [scripts/check.mjs](./scripts/check.mjs) —— 设了 `magpie.carries` 就查形状（数组 / 1–8 项 / 非空 / ≤48 字）；没设不查，一个供应商的包照旧 24 项过
+
+> **这一节先挂着，不 bump 版本。** `magpie.carries` 现在还只在 magpie 侧的分支里，
+> 没上游合并 —— 装官方 magpie 的人加了字段也不会有那个徽章（字段被忽略，不报错）。
+> 等 magpie 那边合了、能装上带 `carries` 的版本，再定版本号发出去。
+
 ## 0.1.7 — 2026-10-27
 
 - [README-TEMPLATE](./README-TEMPLATE.md) —— **模型段改版**：开头写发行商（`DeepSeek / GLM / GPT`），不写「支持 N 个模型」；表格只留各家最新 / 热门一两行，全量交给 `magpie plugin list`

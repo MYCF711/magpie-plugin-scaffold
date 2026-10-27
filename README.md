@@ -151,6 +151,7 @@ magpie 把每个插件加载进一个 Bun 进程（plugin host），通过 stdin
 | ⑨ | 登录返回的 `accountId` / `uid` | 卡片显示名 / 区分同名账号 |
 | | `auth.icon` 或 `magpie.icon` | 卡片图标 |
 | | `auth.maxConcurrency` 或 `magpie.maxConcurrency` | 并发数 |
+| | `magpie.carries` | 卡片上那个「承载 X、Y」徽章 —— 一个包承载多个供应商时你自己说，见 [MULTI-PROVIDER.md](MULTI-PROVIDER.md) 铁律 6 |
 
 ### 非钩子但必需
 
