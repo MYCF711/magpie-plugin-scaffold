@@ -3,6 +3,17 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.1.8 — 2026-10-27
+
+- [MULTI-PROVIDER](./MULTI-PROVIDER.md) —— 铁律 6 重写：卡片上那个「承载 X、Y」**不是 package.json 字段**，magpie ≥ 0.1.1744（`766356c`，issue #3902）从插件**注册的 provider 名**派生；草案里的 `magpie.carries` 从未随任何 magpie 发布。附「什么时候出现」与「名字带不带站点」的判据
+- [HOOKS](./HOOKS.md) —— 九之三原来断言「第三方插件挣不到这个徽章」，改成派生规则：`servesBeside` 的四条行为、`moved` 与 `serves` 怎么拼成一个 chip、tooltip 只留给 `moved`
+- [README](./README.md) —— 「数据字段」表那一行改成「没有字段」；会过期的「24 项规定」换成脚本自己报的总数
+- [scripts/check.mjs](./scripts/check.mjs) —— 撤掉 `magpie.carries` 的 4 条形状检查，换成 1 条：写了这个已作废的字段就警告，提示删掉
+
+> 起因：issue #3902。上游没走「包里自己声明」（option 1），选了「从注册的 provider 派生」（option 2）。
+> 本仓库按 option 1 写的草稿（PR #1）随之作废；这一版记录的是上游**实际发布**的行为。
+> 实测环境：magpie v0.1.1744 + windows/amd64 + magpie-magicrew-auth 0.3.8 的文件夹安装。
+
 ## 0.1.7 — 2026-10-27
 
 - [README-TEMPLATE](./README-TEMPLATE.md) —— **模型段改版**：开头写发行商（`DeepSeek / GLM / GPT`），不写「支持 N 个模型」；表格只留各家最新 / 热门一两行，全量交给 `magpie plugin list`

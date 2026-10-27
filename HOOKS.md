@@ -517,48 +517,37 @@ func InstalledIcon(spec string) string {
 | `已是最新` / `有新提交` / `v{x} out` | npm 版本、git HEAD，magpie 自己比 | 间接（发版即可） |
 | `已自动更新` | magpie 自己更新过 | — |
 | `供应商` / `Request hook` / `中间件` / `页面` | 插件导出里带了什么钩子 | ✓ 有钩子就有 |
-| **`承载 {names}`** | `provider.MovedOnto`，**内置订阅被迁移到这个插件**的清单 | ✗ **做不到** |
+| **`承载 {names}`** | `moved`（内置订阅迁到插件的）+ `serves`（**它注册的 provider 名**） | ✓ **就是你的供应商名字**（magpie ≥ 0.1.1744） |
 
-### `承载` 为什么第三方插件做不出来
+### `承载` 现在由宿主派生（v0.1.1744 起）
 
-`internal/gui/plugins.go`：
-
-```go
-j.Moved = provider.MovedOnto(e.Spec)
-```
-
-`internal/provider/migrate.go`：
+`766356c` 之后（issue [#3902](https://github.com/yetone/magpie/issues/3902)），
+`internal/gui/plugins.go` 在 `moved` 之外再填一份 `serves`：
 
 ```go
-// MovedOnto are the built-ins moved onto the plugin named (its spec or package name).
-func MovedOnto(name string) []string {
-	var out []string
-	for _, e := range plugin.Load().Plugins {
-		if plugin.Name(e.Spec) != name && e.Spec != name { continue }
-		pkg := plugin.PackageName(e.Spec)
-		for _, id := range OnPlugins() {   // ← 只遍历「可迁移的内置订阅」
-			if m, _ := MigrationOf(id); m.Package == pkg && !slices.Contains(out, id) {
-				out = append(out, id)
-			}
-		}
-	}
-	return out
-}
+j.Moved = provider.MovedOnto(e.Spec)          // 内置订阅迁过来的
+j.Serves = servesBeside(j.Moved, provs[e.Spec])  // 它自己注册的 provider 名
 ```
 
-`OnPlugins()` 只返回 `readMigrations()` 里 `State == MovePlugin` 的 id，而这些 id 来自
-`movers` —— **magpie 自己内置的订阅**。当前 19 个：
+`servesBeside` 的规矩（`internal/gui/plugins.go`）：
 
-```
-claude  codex  chatgpt-api  cursor  grok  copilot  zcode  workbuddy  workbuddy-ai
-commandcode-plan  qoder  qoder-cn  devin  zed  factory  mimo-app  kiro  gemini  antigravity
-```
+- 取每个注册 provider 的 `name`（空则退回 `id`），每个一次，大小写不同算重名；
+- `moved` 里的 id 跳过 —— 页面已经按内置名画了，不重复；
+- **`moved` 为空且只注册了一个 provider ⇒ 返回 nil**，不画徽章（行标题已经说了）；
+- 前端把 `moved` 的名字和 `serves` 拼成一个 chip：
+  `承载 {moved 的名字 + serves}`；tooltip「… 正由此插件代替内置运行」**只在 `moved` 非空时**才挂。
 
-不在这个清单里的产品，哪怕插件写得一模一样，`MovedOnto` 也永远返回空，
-`Serves {names}` 那个 chip 永远不出现。**这不是配置问题，是宿主没把它当自家订阅。**
+所以第三方插件现在**能**挣到这个徽章了 —— 徽章内容就是你的供应商名：
 
-> 想有那个徽章只有一条路：把产品加进 magpie 的内置订阅（改宿主、重编译）——
-> 不是改插件能解决的事。写 README 时别承诺它。
+| 你的包 | 卡片 |
+|---|---|
+| 一个 provider | 无徽章 |
+| 两个 provider，品牌名不同 | `承载 超级麦吉、MagiCrew` |
+| 两个 provider，共用一个品牌名 | `承载 Qoder 国际版 (qoder.com)、Qoder CN`（名字里得带站点，magpie 内置名就这么写） |
+
+> ⚠ 曾经草案里有个 `magpie.carries` 字段（#3902 的 option 1），从未随任何 magpie 发布：
+> 上游选了派生。写了不报错，只是没人读；`scripts/check.mjs` 会提醒删掉。
+> 插件关闭时（`off`）不画这个 chip，和别的 chip 一样。
 
 
 ---
