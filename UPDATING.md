@@ -458,3 +458,36 @@ README 里只留路标 —— 别把 changelog 抄一遍进 README，那是两�
 
 ⚠ **未实测**：`magpie plugin update` 对 git 源插件的具体行为（没构造出「本地落后于
 main」的状态）。上面写的是它该有的语义。
+
+---
+
+## 七、magpie 自己升级了，什么时候该动这些文档
+
+**看稳定渠道，不看每版本渠道。** magpie 设置里有「更新渠道：每个版本 / 稳定版」——
+用户默认跑后者，插件契约要跟的也是后者。
+
+```bash
+curl -s "https://usemagpie.ai/api/latest?channel=stable"   # {"version":"0.1.1327",…,"channel":"stable"}
+curl -s "https://usemagpie.ai/api/latest"                  # 每版本：同一时刻可能是 0.1.1763
+```
+
+实测（2026-10-28）：两档差 **400 多个版本**（每版本 0.1.1763 / 稳定版 0.1.1327），
+但把两边的内嵌契约都提取出来逐字段比对后 —— **插件相关的字段一条不差**。
+多出来的两段（`summaries` / `last seen`）是 GUI 历史，不是插件契约。
+
+⇒ 追每版本几乎全是白跑。判据只有一条：**稳定版版本号变了**。
+
+```bash
+node scripts/check-magpie-stable.mjs
+#   0 = 基线（HOOKS.md 顶部那行「当前基线：x.y.z」）就是当前稳定版，不用动
+#   2 = 稳定版变了，按它打印的三步走：下稳定版 → 提取 → contract-diff
+```
+
+稳定版变了之后的三步：
+
+1. `curl -sL -o /tmp/magpie-<v>.exe https://github.com/yetone/magpie-releases/releases/download/v<v>/magpie-windows-amd64.exe`
+2. `python extract-contract.py /tmp/magpie-<v>.exe`
+3. `node scripts/contract-diff.mjs` → 差集里挑「不写会关掉某个能力」的补进 HOOKS
+
+⚠ **内嵌契约抓不到的部分**（插件供图的 `DrawsID` / `ImagesAPI`、各类 ID 白名单）
+在 Go 源码与 `docs/subsystems/*.md` 里，那部分只能读 release notes 与源码。
