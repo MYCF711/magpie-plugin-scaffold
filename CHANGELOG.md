@@ -3,6 +3,23 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.1.14 — 2026-10-28
+
+**按 magpie 0.1.1763 重新提取契约：补 6 个漏掉的字段 + 插件供图；另补 store 骨架、拆分示例、双站点改造流程**
+
+- **[HOOKS](./HOOKS.md) 新增「十一之三：模型条目上的全部字段」** —— 用 `extract-contract.py` 从 magpie **0.1.1763** 重新提取（23 段 / 258,708 字符），比对后发现原来漏了 6 个字段。它们全是「**不写就等于关掉某个能力**」，不会报错：`searches`（模型级=这条自己会搜，provider 级=上游整体会搜）、`decides`（decision 模型）、`rateWas`（折扣前倍率）、`fast`、`serviceTiers`、`modalities`（图片/音频能力全靠它）
+- **[HOOKS](./HOOKS.md) 补「插件供图（`draw`）」** —— magpie **0.1.1707 起**支持插件提供图像模型（0.1.1747 接入 SenseNova `sensenova-u1.5-lite`）：id 命中 `catalog.DrawsID` 且 `catalog.ImagesAPI`、npm 是 `@ai-sdk/openai-compatible` → 进 Settings 的「图像生成」选择器，请求走 `/v1/images/generations`。⚠ 但它**同时留在 chat 模型列表里**，列不列是取舍
+- **[`src/models.mjs`](./src/models.mjs) 新增 `LIST_IMAGE_MODELS` 开关（默认 `false`）** —— 原来 `NOT_CHAT` 一刀切把 `image` / `flux` / `sd` 全砍掉，等于默默放弃这个能力；现在把选择摆到明面上：想供图就打开，并且把 `capabilities.output` 写成 `{ text: false, image: true }`
+- **新增 [`src/store.mjs`](./src/store.mjs)** —— 缓存三规矩（只写 `~/.cache/magpie`、文件名带账号、可整目录删）+ 原子写 + 快照/登录态/一次性标记三件套。这是四个插件里每个都重写过一遍的那部分
+- **新增 [`examples/split/`](./examples/split/)** —— 「`index.mjs` 只装配」的实样：三个钩子各占一个文件（纯声明 / 异步取数 / 纯计算三种形态），index 缩到 40 行。钩子只有这三种形态，其余五个照同一规则搬
+- **[MULTI-PROVIDER](./MULTI-PROVIDER.md) 新增「三之二、已经写成单例了，怎么改成两个」** —— 五步改造流程，每步带验证判据（`grep` 什么、`node -e` 验什么、装两站怎么测），外加三条「不要做的事」
+- **[AGENTS](./AGENTS.md) 坑表补两条**（19 契约字段漏写 = 关能力、20 生图模型的列与不列），「长大之后」四块骨架齐了
+- `extract-contract.py` 的产物 `magpie-plugin-contract-full.txt`（264 KB）加进 `.gitignore`
+
+> 起因：主人问「magpie 更新了哪些、脚手架要不要同步」。查证：本机与上游都是 0.1.1763/1764；
+> 最近 60 个版本里插件相关的实质变更只有供图（0.1.1707/1747）与 Serves chip（0.1.1744，已在 0.1.8 同步）。
+> 真正的问题不在「新版加了什么」，而在**旧版就有、HOOKS 漏抄的 6 个字段** —— 重新提取才看见。
+
 ## 0.1.13 — 2026-10-28
 
 **`release.mjs` 不再和 `release.yml` 抢着建 Release**

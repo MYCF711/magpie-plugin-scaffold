@@ -1,7 +1,17 @@
 # magpie 插件钩子清单（权威版）
 
-来源：`magpie-windows-amd64.exe` 内嵌的插件契约源码
-（偏移 ~56929980，904 行，39 KB，用 `extract-contract.py` 提取）
+来源：`magpie-windows-amd64.exe` 内嵌的插件契约源码，用 `extract-contract.py` 提取。
+
+**基线与重提取记录**
+
+| 日期 | magpie 版本 | 结果 |
+|---|---|---|
+| 2026-10-26 | 0.1.1254 | 首次整理（这一份的主体） |
+| **2026-10-28** | **0.1.1763** | 重新提取：全部 23 段、258,708 字符。比对后补了「十一之三」那一节 —— 模型条目漏掉的 6 个字段 + 插件供图 |
+
+⚠ **内嵌契约抓不到的东西**：`draw`（插件供图）、`DrawsID` / `ImagesAPI` 这些判据
+都在 Go 实现和 `docs/subsystems/provider-plugins.md` 里，不在契约源码里 ——
+见「十一之三」末尾那段的说明。
 
 **这份契约比 `usemagpie.ai/docs/plugins` 更全** —— 官方文档漏了 `auth.checkin`。
 
@@ -931,6 +941,70 @@ for (const [id, m] of Object.entries(models)) console.log(id, m.free, m.rate)
 ⚠ `free` 只影响 `free` 这个路由模式；`pace` / `usage` / `weight` 等不看它。
 但它标错的后果很实：本该免费被优先派发的模型拿不到优先，或者反过来
 把收费模型当免费一直用。
+
+---
+
+## 十一之三、模型条目上的全部字段（这一版的完整表）
+
+> 2026-10-28 从 magpie **0.1.1763** 的二进制重新提取契约后补的。原来这一份漏了
+> 6 个字段：`searches` / `decides` / `rateWas` / `fast` / `serviceTiers` / `modalities`。
+> 漏了不会报错 —— 那些字段全是「不写就等于关掉某个能力」。
+
+**模型级**（`cfg.models[<id>]`，或 `provider.models` 返回的每条）：
+
+| 字段 | 形状 | 不写会怎样 |
+|---|---|---|
+| `id` / `name` | string | 必须；`id` 是 agent 用的那个 |
+| `provider.api` / `provider.npm` | string | 不写就继承 provider 级 |
+| `limit.context` / `limit.output` | number | 0 时 magpie 会去查模型库；别填猜的数字（见十六节） |
+| `reasoning` | boolean | 不写则没有思考档位 |
+| `attachment` | boolean | **不写则不能收图** |
+| `tool_call` | boolean | 不写则不能调工具 |
+| `modalities.input` / `modalities.output` | `["text","image",…]` | 不写则按 text 处理 —— **图片/音频能力全靠它** |
+| `cost` | object | 只用于显示 |
+| `variants` | object | 思考档位的可选值 |
+| `rate` | number \| `"x0.03"` | 不给就不画倍率胶囊 |
+| `rateWas` | 同上 | **折扣前倍率**（Qoder 的 `price_factor`）；折扣中时两个一起给 |
+| `free` | boolean | 判据见十一之二，**不能从 rate 反推** |
+| `fast` | boolean | `service_tier: priority` 时跑快（Cursor 那种）；不写就没有这档 |
+| `serviceTiers` | array | 厂商按档位服务的那些档（#2514）；不写则只有默认档 |
+| `decides` | boolean | **decision 模型**：从 agent 列表里隐藏，只作路由组的分类器用 |
+| `searches` | boolean | 这个模型**自己会联网**（用平实的话问就行）；不写则 magpie 会走它自己的搜索 |
+
+**provider 级**（`config` 钩子里的 `cfg.provider[<id>]`）：
+
+| 字段 | 形状 | 含义 |
+|---|---|---|
+| `searches` | boolean | 这个 provider 的上游**自己回答** web_search（Anthropic 或 Responses API 上，#2027）：客户的 `web_search` 原样发过去，不走 magpie 的搜索 |
+| `decide` | boolean | 这个 provider 服务一个 **decision API**（System One），在 base `/systemone`，走它的 `fetch` |
+
+> ⚠ 这两个 `searches` 不是一回事：provider 级是「上游整体会搜」，模型级是「这一条会搜」。
+> 给错的后果是 magpie 把搜索请求发给一个不会搜的模型 —— 它不会报错，只会答非所问。
+
+### 插件供图（`draw`）
+
+magpie **0.1.1707 起**支持插件提供图像模型（0.1.1747 接入 SenseNova 的
+`sensenova-u1.5-lite`）。三条判据同时在，才会出现在 Settings 的「图像生成」选择器里：
+
+1. 模型 id 像画图的：`catalog.DrawsID` —— 含 `image` / `imagen` / `dall-e` / `flux` /
+   `seedream` / `cogview` / `stable-diffusion` / `sdxl` / `wanx` / `kolors` / `hidream` /
+   `banana` / `sensenova-u1` 之一
+2. 它走 images API 而不是在 chat 里回图：`catalog.ImagesAPI` —— 同上列表减去
+   `gemini-*-image` 与 `gpt-5-image`（那两类在 chat 里回图）
+3. 这个模型所在的 npm 包是 `@ai-sdk/openai-compatible`
+
+满足后，magpie 把请求发到 `/v1/images/generations`（或 `/v1/images/edits`），
+走插件的 `fetch`，签名方式与 chat 一样。
+
+⚠ **但它同时也会出现在模型列表里。** `pluginCatalog` 不按 `DrawsID` 过滤 —— 所以用户
+可能在 chat 里选中一个只会画图的模型，然后收到 400。要不要列，是个取舍：
+- 列 → 多了「用它画图」的能力，代价是 chat 列表里多一条选不得的条目
+- 不列 → 干净，但放弃一个 magpie 已经支持的能力
+
+⚠ 这条**不在二进制契约里**（是 Go 实现 + `docs/subsystems/provider-plugins.md`），
+所以 `extract-contract.py` 抓不到。判据来自源码：`internal/catalog/catalog.go` 的
+`DrawsID` / `ImagesAPI`，`internal/gateway/draw.go` 的 `Drawers`，
+`internal/provider/plugins.go` 的 `PluginOpenAICompatible`。
 
 ---
 

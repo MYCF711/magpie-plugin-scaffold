@@ -116,6 +116,84 @@ tree-shaking、以及「我到底装了几个供应商」的排查都看不见�
 
 ---
 
+## 三之二、已经写成单例了，怎么改成两个
+
+上面是「从零开始」的骨架。真实情况多半是：**单站点版本已经发出去了，现在要加第二个站**。
+照这个顺序改，每一步都能单独验，不要一次改完再测。
+
+### 先确认该改（三个信号，出现一个就改）
+
+- 代码里开始出现 `if (host.includes("intl"))` 这种分支 —— 站点差异已经渗到逻辑里了
+- README / CHANGELOG 里开始写「另一个站点暂不支持」
+- 有人问「你们国际版怎么配」而你要回一段安装说明
+
+### 第 1 步：抽 `SITES` 常量表
+
+把散在各处的 host / web / 名字收成一张表，**只留 id / label / host / web 四个字段**：
+
+```js
+export const SITES = {
+  cn:   { id: "foo",      label: "Foo（国内）",  host: "https://api.foo.cn",    web: "https://www.foo.cn" },
+  intl: { id: "foo-intl", label: "Foo（国际）",  host: "https://api.foo.ai",    web: "https://www.foo.ai" },
+}
+```
+
+**验**：`grep -rn "https://api.foo" src/ index.mjs` 只剩这一个文件有。
+还有别处 → 说明站点差异还没收干净，先收完再往下。
+
+### 第 2 步：把「站点差异」与「站点逻辑」分开
+
+差异只允许集中在三处：`SITES` 表、`headersFor(site)` 里那几个头、以及模型条目的 `api.url`。
+逻辑（登录流程、额度解析、模型过滤）里**不许出现 host 判断** —— 出现就把差异提成参数。
+
+**验**：`grep -rn "\.cn\|\.ai\|letsmagic\|magicrew" src/ --include=*.mjs | grep -v "SITES\|context.mjs"`
+应该只剩注释。
+
+### 第 3 步：工厂化，具名导出
+
+```js
+function makePlugin(site) {
+  return async (ctx, options) => ({ config, auth, provider, chat })   // 全部闭包在 site 上
+}
+
+export const FooAuthPlugin     = makePlugin(SITES.cn)
+export const FooIntlAuthPlugin = makePlugin(SITES.intl)
+```
+
+⚠ **一个一个写，不要循环生成**（原因见上一节）。
+⚠ **导出名的数量 = 供应商的数量**，加一个站就是加一行。
+
+**验**：`node -e "import('./index.mjs').then(m=>console.log(Object.keys(m)))"` 要看到两个名字；
+`node scripts/check.mjs` 里那条「导出函数返回了钩子」对每个都要过。
+
+### 第 4 步：`auth` 里清掉站点字段
+
+这一步最容易漏，而且漏了**不会立刻报错**：magpie 把 `auth` 按账号存，
+两个站点的账号如果共用同一个 `auth` 结构里的 `site` 字段，后登录的会盖掉先登录的。
+
+- `auth.methods` 里要区分站点 → 用 `auth.provider` / `auth.accountId` 判断，或者干脆每个站点一份 methods
+- `auth.icon` / `auth.maxConcurrency` / `auth.refreshLead` → 每个站点各一份，**不要共用一个对象**
+- 任何 `auth.site` / `auth.host` 字段 → 删掉（HOOKS 的 `inScope` 已经是隔离机制）
+
+**验**：装两个站，A 站登录后 B 站登录，再回 A 站看是不是还登录着。
+
+### 第 5 步：图标、名字、registry 条目分得开
+
+- 两个 `auth.icon` 不能一样（否则卡片上两张卡长得一模一样，用户选错站）
+- `package.json` 的 `magpie.icon` 只有一份 → 它是**插件**的图标，不是供应商的；供应商图标在 `auth.icon`
+- `registry-entry.json` 的 `providers` 数组要写**两个 id**
+- **npm 发布**仍是**一个包**（这是这个模式的意义：一个包两个供应商）
+
+**验**：`magpie plugin list` 里两行供应商、各自登录态；卡片上两个图标不同。
+
+### 不要做的事
+
+- **别拆成两个 npm 包。** 一个包两个供应商是标准形态，拆包意味着两份代码、两次发版、两个 registry 条目
+- **别改已经发布过的 `SITE.id`。** 它是登录态与用量记录的主键，改一次所有人重新登录（见铁律 1）
+- **别在 `loader` / `models` 里做「A 站有、B 站没有」的字段分支。** 换参数，不要分支
+
+---
+
 ## 四、五条铁律
 
 ### 1. `SITE.id` 一旦发布就别改
