@@ -119,6 +119,13 @@ python extract-contract.py && node scripts/contract-diff.mjs
 node scripts/check-magpie-stable.mjs
 #   0 = 基线就是当前稳定版，不用动；2 = 稳定版变了，按它打印的三步走
 #   裸查：curl -s "https://usemagpie.ai/api/latest?channel=stable"
+
+# 模型「说自己能收图」是不是真的？发一张写着字的内嵌图问它，按回答分四类
+#   假声明 = magpie 当它能收图、直发上游，而上游答「看不见」或直接拒绝（坑 25）
+node scripts/probe-vision.mjs                 # 测网关 /v1/models 里的每个模型
+node scripts/probe-vision.mjs --vision-only   # 只测设置里那个识图模型
+node scripts/probe-vision.mjs <provider/model> …
+#   退出码 2 = 有假声明；只读本机网关与 settings.json，不改任何配置
 ```
 
 ---
