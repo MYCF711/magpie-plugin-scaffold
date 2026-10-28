@@ -20,13 +20,16 @@ node scripts/score.mjs ../my-plugin
 | `package.json` 的 `name` 不是 `magpie-plugin-scaffold` / `magpie-plugin-template` | ☐ |
 | `package.json` 的 `repository` 不是 `github.com/MYCF711/magpie-plugin-scaffold` | ☐ |
 | `registry-entry.json` 的 `package` 与 `package.json` 的 `name` 一字不差 | ☐ |
-| 入口文件的 `const PROVIDER` 不是 `xxx` / `acme` / `your-provider` | ☐ |
-| 入口文件的 `const BASE` 不是 `*.example.*` / 含 `xxx` 的占位 | ☐ |
+| 入口文件或 `src/**` 里的 `const PROVIDER` 不是 `xxx` / `acme` / `your-provider` | ☐ |
+| 入口文件或 `src/**` 里的 `const BASE` 不是模板默认值 `https://api.xxx.example/v1`，也不含 `xxx` | ☐ |
 | 入口文件里没有 `throw new Error("TODO…")`（模板的五个 TODO 函数都已实现） | ☐ |
 
 **任一条不中 → 总分封顶 60，且 `score.mjs` 会明说「这是模板原样，不是你的插件」。**
 这条门不占分，它只决定你有没有资格被算分。
 **改名字很容易，改 `PROVIDER` 和 `BASE` 才是真的开始做插件。**
+
+> ⚠ `.example` 域名**不会被误判**（虚构/示例供应商本来就该用它）：判据是「和模板默认值不同」，
+> 不是「含 example」。`src/` 里的常量也认 —— 按 AGENTS 第五节把 `index.mjs` 只做装配是允许的。
 
 ---
 

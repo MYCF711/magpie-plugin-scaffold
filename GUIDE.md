@@ -32,6 +32,10 @@ cd my-provider && rm -rf .git && git init
 
 判据：`node scripts/check.mjs` 能跑（此时 2 条警告是正常的：name 还叫脚手架、registry 还是占位）。
 
+⚠ **`scripts/` 和 `src/` 要一起带走，不能只留 `index.mjs`。**
+`scripts/check.mjs` 是你自己仓库的检查器，`scripts/score.mjs` 打分时读的正是**你自己仓库里的**
+`scripts/check.mjs` —— 删了它，A 层直接 0 分。`src/` 同理：`tests/semantics.test.mjs` import 的就是它。
+
 ---
 
 ## 2 · 改身份（5 分钟）
@@ -99,6 +103,11 @@ const MODELS = [
 `loader(getAuth)` 返回 `{ baseURL, apiKey, headers, fetch }`；**不要在 `fetch` 里读流**，
 把 `Response` 原样交回去。
 
+⚠ **`type: "api"` 没有「格式校验」这一层。** 官方只给 `label` 和 `placeholder`，
+没有 method 级的 `validate`；不写 `authorize` 时 magpie 把用户粘的 key **原样保存**。
+所以 `placeholder: "nimbus-…"` 只是**提示**，挡不住用户粘一个 `sk-...` 进来 ——
+要挡就在 `loader` 里自己判断并返回 `{}`（让请求失败），别指望界面拦。
+
 判据：`node scripts/check.mjs` 的「导出函数返回了钩子」通过；`node --test` 全过。
 
 官方锚点：[`#signin`](https://usemagpie.ai/docs/zh/plugins#signin) · [`#renew`](https://usemagpie.ai/docs/zh/plugins#renew) · [`#requests`](https://usemagpie.ai/docs/zh/plugins#requests)
@@ -139,6 +148,11 @@ const MODELS = [
 `claimed` / `done` / `ineligible` / `inactive` / `captcha` / `failed` 六个之一。
 **永远不要解验证码** —— 返回 `captcha`，让用户去厂商 App 签。
 
+⚠ **上游端点、方法、请求体、字段名，官方一个都不规定** —— 那是厂商自己的 API，由你定。
+要遵守的只有**返回形状**：`usage` 里的 `used` / `resetsAt` / `span`，`checkin` 里的
+`outcome` 与 `streak`。所以模板里 `fetchUsage` / `doCheckin` 两个函数是空的 —— 不是没写，
+是**故意留给你填厂商自己的接口**。多返回的字段（如 `message`）magpie 会忽略，不报错。
+
 判据：`curl -s http://127.0.0.1:3425/v1/magpie/quotas` 看窗口里有没有 `text: true` 和 ISO 的 `runsOutAt`。
 
 官方锚点：[`#usage`](https://usemagpie.ai/docs/zh/plugins#usage) · [`#checkin`](https://usemagpie.ai/docs/zh/plugins#checkin)
@@ -151,8 +165,13 @@ const MODELS = [
 ```bash
 node scripts/check.mjs        # 规定：失败必须 0
 node --test                   # 语义：16 条必须全过
-node scripts/score.mjs        # 打分：自动分 ≥45，总分要 ≥80
+node scripts/score.mjs        # 打分：身份门通过 + 自动分 ≥55，总分要 ≥80
 ```
+
+⚠ **`tests/semantics.test.mjs` 不是「照抄就能用」的通用测试** —— 它 `import` 的是
+`../src/models.mjs`、`../src/api.mjs`、`../src/chat.mjs`，锁的是模板那套计费/降级实现。
+所以 **`src/` 要跟 `tests/` 一起带走**；你要换成自己的实现，就把测试里对应的断言一起改，
+否则它测的是模板，不是你的插件。
 
 三条都过，才算「代码写完了」。**没过别往下走。**
 

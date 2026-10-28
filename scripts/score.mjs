@@ -189,18 +189,30 @@ let idRe = null
 try {
   idRe = JSON.parse(readFileSync(join(ROOT, "registry-entry.json"), "utf8"))
 } catch {}
+// 常量可能按 AGENTS 第五节的建议放在 src/ 里（index.mjs 只装配），所以入口和 src 一起找
+function readTree(dir) {
+  let out = ""
+  if (!existsSync(dir)) return out
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const p = join(dir, e.name)
+    if (e.isDirectory()) out += readTree(p)
+    else if (/\.(mjs|js|ts)$/.test(e.name)) { try { out += readFileSync(p, "utf8") + "\n" } catch {} }
+  }
+  return out
+}
 let entrySrc = ""
 try {
   entrySrc = readFileSync(join(ROOT, String(idPkg?.main ?? "index.mjs")), "utf8")
 } catch {}
-const providerOf = entrySrc.match(/const\s+PROVIDER\s*=\s*["'`]([^"'`]+)["'`]/)?.[1] ?? ""
-const baseOf = entrySrc.match(/const\s+BASE\s*=\s*["'`]([^"'`]+)["'`]/)?.[1] ?? ""
+const allSrc = entrySrc + "\n" + readTree(join(ROOT, "src"))
+const providerOf = allSrc.match(/const\s+PROVIDER\s*=\s*["'`]([^"'`]+)["'`]/)?.[1] ?? ""
+const baseOf = allSrc.match(/const\s+BASE\s*=\s*["'`]([^"'`]+)["'`]/)?.[1] ?? ""
 const gate = {
   "name 不是脚手架默认值": !!idPkg?.name && !["magpie-plugin-scaffold", "magpie-plugin-template"].includes(idPkg.name),
   "repository 不是模板地址": !!idPkg?.repository?.url && !String(idPkg.repository.url).includes("MYCF711/magpie-plugin-scaffold"),
   "registry-entry 的 package 与 name 一致": !!idRe?.package && idRe.package === idPkg?.name,
   "PROVIDER 不是模板占位": !!providerOf && !["xxx", "acme", "your-provider", "your_provider"].includes(providerOf),
-  "BASE 不是 example 占位": !!baseOf && !/(^|\.)example\./i.test(baseOf) && !/xxx/i.test(baseOf),
+  "BASE 不是模板占位": !!baseOf && baseOf !== "https://api.xxx.example/v1" && !/xxx/i.test(baseOf),
   "TODO 函数已实现（不再 throw TODO）": !/throw\s+new\s+Error\(\s*["'`]TODO/.test(entrySrc),
 }
 const gateOk = Object.values(gate).every(Boolean)

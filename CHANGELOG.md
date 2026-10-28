@@ -3,6 +3,42 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.1.19 — 2026-10-28
+
+**盲测做了，抓出 6 个真缺陷 —— 其中 2 个会让合法插件永远过不了身份门**
+
+方法：把脚手架交给一个**只读 `GUIDE.md` / `SCORING.md` / `AGENTS.md` 三份**的执行者，
+让它做虚构供应商 Nimbus 的插件（API key 登录 / 两个模型 / 5 小时额度 / 每日签到）。
+它做到了：`check.mjs` **29 通过 · 0 警告 · 0 失败**、`score.mjs` **身份门通过 · 65/65**、
+`node --test` **18 通过 · 0 失败**。**但它第一轮被卡住过一次，卡住的点全是我们的错。**
+
+### 它指出的问题 → 这一版修了什么
+
+- **身份门 `BASE` 判据会误杀 `.example` 域名** —— 原判据是 `!/(^|\.)example\./i`，而虚构/示例厂商
+  本来就该用 `api.<vendor>.example`，于是**合法插件永远过不了门**（它只能把字面量拆成两段绕过去）。
+  改成「和模板默认值 `https://api.xxx.example/v1` 不同」+ 不含 `xxx`。
+- **身份门只认入口文件里的 `const PROVIDER`** —— 而 [AGENTS](./AGENTS.md) 第五节又建议 `index.mjs` 只做装配、
+  常量进 `src/`。它照 AGENTS 做了，身份门直接判失败。改成**入口 + `src/**` 一起找**。
+- **[GUIDE](./GUIDE.md) 第 1 步没说要带走 `scripts/`** —— `score.mjs` 的 A 层读的是**你自己仓库里**的
+  `scripts/check.mjs`，删了它 A 层直接 0 分。已在第 1 步写明「`scripts/` 和 `src/` 一起带走」。
+- **[GUIDE](./GUIDE.md) 没讲 `type: "api"` 挡不住 key 格式** —— 官方没有 method 级 `validate`，
+  `placeholder` 只是提示。已补：要拦就在 `loader` 里自己判断。
+- **[GUIDE](./GUIDE.md) 没讲 usage/checkin 的上游端点由谁定** —— 官方只规定返回形状，端点/方法/请求体是厂商自己的。
+  已补：模板里 `fetchUsage` / `doCheckin` 空着是**故意**留给你的。
+- **[GUIDE](./GUIDE.md) 说「照抄 tests 再改」是误导** —— `tests/semantics.test.mjs` import 的是
+  `../src/*.mjs`，只抄测试会 import 失败。已补：`src/` 必须跟 `tests/` 一起带走。
+- **[HOOKS](./HOOKS.md) 把 `capabilities` 下的字段写成 `tool_call`** —— 官方 `#provider` 是 `toolcall`（无下划线），
+  而 `#quick` 的静态模型才用 `tool_call`。**两个位置两种拼写**，已在那张表上方写明，别混。
+
+> 另外两条它提的、核对后**不是缺陷**：① 模板 `checkin` 返回 `streak: r.streakDays` —— `streakDays` 是厂商字段，
+> 返回给 magpie 的 key 仍是 `streak`，正确；② 「SCORING 的 D2 与 score.mjs 不一致」—— 它读到的是我改之前那一版，
+> 现在两边都是「≥240 字符」。
+
+### 保留意见（必须写明）
+
+那个执行者与我是**同一个模型**（deepseek-v4.1），**不能代表「任何模型」**。
+换弱模型要重测；重测方法见本节开头（只给它三份文档，不给提示）。
+
 ## 0.1.18 — 2026-10-28
 
 **从「模板」变成「说明书」：官方 22 个锚点逐条可追，80 分能打分、能验**
