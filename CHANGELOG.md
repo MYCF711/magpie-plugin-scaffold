@@ -3,6 +3,30 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.1.17 — 2026-10-28
+
+**「官方文档漏了 auth.checkin」已经过时了 —— 那条缺口在 2026-10-26 就被补上了，留着会打脸**
+
+`auth.checkin` 确实曾不在官方文档里，2026-10-25 以 [magpie-community/plugins#392](https://github.com/magpie-community/plugins/issues/392) 报给社区，
+yetone 当天回复（[magpie v0.1.1582 / commit `c28d3e8b0`](https://github.com/yetone/magpie/commit/c28d3e8b0)），en / zh / ja 三语补齐，issue 已关闭。
+四处「官方漏了 `auth.checkin`」的说法因此全部失效：
+
+- **[README](./README.md) 必读四份** —— 改成「官方讲行为、这份讲字段，两者并用」，并挂上那个缺口的故事
+- **[README](./README.md)「一个曾经的缺口，已经补上」** —— 保留证据链（issue 号、commit、三语），并写明它为什么值得留：**拿证据指官方漏了什么，比说「我做了个东西」有用**
+- **[HOOKS](./HOOKS.md) 开头** —— 不再声称「比官方全」，只声称「比官方细」（字段级 vs 行为级）
+- **[AGENTS](./AGENTS.md) 文档地图** —— 同一句改正
+
+顺带三处硬缺陷（都是对外的，不改会被人当场指出来）：
+
+- **`package.json` 的 `repository` / `bugs` / `homepage` 还指着旧仓库名 `magpie-plugin-template`** —— 已改成 `magpie-plugin-scaffold`（旧名靠 GitHub 的 301 重定向活着，但链接显示的是错的名字）
+- **[AGENTS](./AGENTS.md) 命令区的 `npm run publish:npm`** —— 这是**派生仓库自己加的**脚本，本模板 `package.json` 里没有，裸跑报 `Missing script`。已加限定语，并写明 `release.mjs` 会自动检测（有就用、没有退回 `npm publish`）
+
+> 起因：讨论「要不要找 magpie 官方/社区合作或归并」。先去核了官方现状 —— yetone/magpie 24,439 star、
+> `docs/subsystems/provider-plugins.md` 64,931 字节且**当天还在改**；`usemagpie.ai/docs/zh/plugins`
+> 已有「五分钟写一个插件」的完整 quick start。结论是**归并没有路**（官方 PR 只对 collaborator 开放；
+> registry 只收插件；社区 `skills/` 是维护者自留地），而**合作有路且已走通过 —— 形态是 issue**。
+> 但这条路的第一步是：自己文档里不能有错的陈述。
+
 ## 0.1.16 — 2026-10-28
 
 **判断「要不要跟着 magpie 升级」只看稳定渠道 —— 每版本渠道一晚四个，追它全是白跑**

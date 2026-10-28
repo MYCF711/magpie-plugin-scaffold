@@ -24,7 +24,10 @@
 全量交给 `magpie plugin list`；数量跟着平台上下架变，写死必然过期。
 
 **2. [HOOKS.md](./HOOKS.md) —— 钩子契约。**
-从 magpie 二进制里提取的 21 章，比官方文档全（官方漏了 `auth.checkin`）。
+从 magpie 二进制里提取的 21 章，**字段级**：每个字段少写会怎样、写错会怎样。
+官方文档 [`usemagpie.ai/docs/plugins`](https://usemagpie.ai/docs/plugins) 讲**行为**，
+两者并用 —— 官方文档已经补上 `auth.checkin`（2026-10-26，v0.1.1582，见 [README 里那段](#一个曾经的缺口已经补上)），
+所以「官方漏了什么」不再是这份文件的价值；它的价值是「官方写了规则，没写写错的后果」。
 其中一条最容易错：**`usage` 的 `used` 是必填**，它不只画进度条，还是路由排序输入 ——
 漏了会被当成 0% = 满额，空号反而排到队首。
 
@@ -185,12 +188,25 @@ npm README      → 插件卡片上的介绍页正文（magpie 读 npm 的 READM
 package.json    → 版本、许可证、repository 链接（卡片上自动显示）
 ```
 
-**⚠ 官方文档漏了 `auth.checkin`。** 它只写了
-「the hooks magpie calls are `config`, `auth` (its methods, loader and usage),
-`provider.models` and `chat.headers`」—— 少了签到钩子。
+### 一个曾经的缺口，已经补上
 
-但 magpie 二进制里嵌着 **200 KB / 21 章**的插件契约源码，其中有一整章
-`// ---- check-in ----`。这份契约才是权威。`extract-contract.py` 能把它提出来。
+**2026-10-25** 官方文档的钩子清单里确实没有 `auth.checkin` —— 它只写了
+「the hooks magpie calls are `config`, `auth` (its methods, loader and usage),
+`provider.models` and `chat.headers`」。而 magpie 二进制里嵌着 **200 KB / 21 章**的
+插件契约源码，其中有一整章 `// ---- check-in ----`。
+
+这条以 issue 形式报给了社区仓库：
+[magpie-community/plugins#392](https://github.com/magpie-community/plugins/issues/392)
+（附二进制契约原文、社区三个包的实际用法、`plugin-checkin.json` 真实状态、第三方适配器引用）。
+
+**2026-10-26 官方在 magpie v0.1.1582 补齐了**（commit `c28d3e8b0`），en / zh / ja 三语，
+六个 outcome 全列。issue 当天关闭。
+
+**所以现在：** 判断某个钩子「有没有、叫什么」，用官方文档；判断某个字段「写错会怎样」，
+用这份 HOOKS.md 和 `extract-contract.py` 提的契约。前者讲行为，后者讲字段 —— 谁都不知道对方的全部。
+
+> 这段留着不是因为「我们曾经更全」，而是因为它是这个仓库最有效的用法示范：
+> **拿证据指官方漏了什么，比说「我做了个东西」有用一百倍。**
 
 ---
 
