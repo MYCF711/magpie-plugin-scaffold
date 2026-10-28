@@ -1084,14 +1084,19 @@ for (const [id, m] of Object.entries(models)) console.log(id, m.free, m.rate)
 | `searches` | boolean | 这个模型**自己会联网**（用平实的话问就行）；不写则 magpie 走它自己的搜索 |
 | `headers` / `options` | object | 单模型额外的请求头 / 厂商专属参数 |
 
-**模型级 · `capabilities` 下面**（宿主会把 `reasoning` / `attachment` / `tool_call` /
+**模型级 · `capabilities` 下面**（宿主会把 `reasoning` / `attachment` / `toolcall` /
 `modalities` 归到 `capabilities` 里，写的时候直接给这几个平字段，别自己嵌一层）：
+
+> ⚠ **两个位置两种拼写，别混**：`provider.models` 返回的模型走 OpenCode 的 `Model` 形状，
+> 里面是 **`toolcall`**（无下划线，[官方 `#provider`](https://usemagpie.ai/docs/zh/plugins#provider) 这么写的）；
+> `config` 钩子里写死的静态模型用的是 **`tool_call`**（官方 `#quick` 的示例这么写的）。
+> 写错位置的拼写不会报错，只会让「能不能调工具」这一项静默为假。
 
 | 字段 | 形状 | 不写会怎样 |
 |---|---|---|
 | `reasoning` | boolean | 没有思考档位 |
 | `attachment` | boolean | **不能收文件/图片** |
-| `tool_call` | boolean | 不能调工具 |
+| `toolcall` | boolean | 不能调工具 |
 | `temperature` | boolean | 不给则视为支持（`false` 才关） |
 | `modalities.input` / `modalities.output` | `["text","image",…]` | 不写则按 text 处理 —— **图片 / 音频能力全靠它** |
 | `interleaved` | boolean | 思考与正文交错输出（少数厂商） |
