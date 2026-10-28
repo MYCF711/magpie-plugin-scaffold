@@ -163,7 +163,20 @@ node scripts/check-magpie-stable.mjs
 | [`src/models.mjs`](./src/models.mjs) | `isUsable` / `priceOf` / `buildModels` / `defaultEntry` | 三态降级 + `free` 三分支，错法都长得像「正常」 |
 | [`src/chat.mjs`](./src/chat.mjs) | `passThrough` / `withUsage` / `singleShotToSSE` / `normalizeUsage` | 流式三坑：读干流、漏 `include_usage`、`stream:false` 不被接受 |
 | [`src/store.mjs`](./src/store.mjs) | `fileOf` / `readJson` / `writeJson` + 快照 / 登录态 / 一次性标记三件套 | 只写 `~/.cache/magpie`、文件名带账号、原子写、可整目录删 |
-| [`tests/semantics.test.mjs`](./tests/semantics.test.mjs) | 16 条语义锁 | `check.mjs` 查不到的那部分，只有它能拦 |
+| [`src/quota.mjs`](./src/quota.mjs) | `usageWindow` / `usage` / `toIso` / `QuotaShapeError` | **把「写错不报错、但 GUI 和智能路由会坏」的五类窗口写法变成运行时错误** —— 见下方的表 |
+| [`tests/semantics.test.mjs`](./tests/semantics.test.mjs) | 22 条语义锁（含 6 条额度窗口） | `check.mjs` 查不到的那部分，只有它能拦 |
+
+**为什么 `src/quota.mjs` 值得单独一个文件**：额度窗口是 magpie **画卡片**和**智能路由排序**的同一个输入。
+写错不会崩，只会让卡片显示「剩余额度未知」、让这个号在路由里被当成不存在 —— 用户以为插件坏了，
+插件作者在日志里什么都看不到。这个构造器把五类写法直接变成 throw：
+
+| 写法 | 不拦的后果 | 构造器的行为 |
+|---|---|---|
+| 缺 `used` | 按 0% = 满额算，空号排到路由队首（坑 1） | 抛 |
+| `aside: true` 又给 `amount`/`limit` | `allowanceOf()` 整条跳过 ⇒ `routedAllowance` 不 ok ⇒ 该号不进路由（坑 22 / 24） | 抛 |
+| 钱包型（`balance`）又给 `used` | 被当占比读，余额显示错 | 抛 |
+| `resetsAt` 塞厂商原样时间 | 解析失败，整条窗口被丢掉（坑 22） | 抛 |
+| `span` 不是正整数 | 窗口长度算错，重置时间显示乱 | 抛 |
 
 **拆分示例**：[`examples/split/`](./examples/split/) 把「index 只装配」这件事摆了一遍
 （三个钩子各占一个文件 + 一个 40 行的 index）。钩子只有三种形态，其余五个照同一规则搬。

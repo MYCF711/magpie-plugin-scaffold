@@ -144,6 +144,24 @@ const MODELS = [
 | `resetsAt` 用厂商原样时间 | 解析失败，窗口不显示 | 先转 ISO |
 | `used` 缺省 | 被当 0% = 满额，空号排到队首 | 必填，有限数字 |
 
+**别自己拼窗口对象 —— 用 [`src/quota.mjs`](./src/quota.mjs) 的构造器：**
+
+```js
+import { usage as buildUsage, usageWindow } from "./src/quota.mjs"
+
+return buildUsage({
+  plan: "Pro",
+  windows: [
+    usageWindow({ name: "5 小时", used: 37, resetsAt: u.resets_at, span: 18000 }),
+    usageWindow({ name: "积分", balance: 6291, unit: "积分" }),   // 钱包型：只给 balance
+  ],
+})
+```
+
+上面三种错法**在这个构造器里会直接抛错**，不会变成「GUI 显示不对但日志里什么都没有」。
+这几条不是风格问题：额度窗口是 magpie **画卡片**和**智能路由排序**的同一个输入 ——
+`aside: true` 给了 `amount` 会让 `allowanceOf()` 整条跳过，这个号在路由里就等于不存在。
+
 **`checkin`**：返回 `{ outcome, credit?, streak?, message? }`，`outcome` 只能是
 `claimed` / `done` / `ineligible` / `inactive` / `captcha` / `failed` 六个之一。
 **永远不要解验证码** —— 返回 `captcha`，让用户去厂商 App 签。
