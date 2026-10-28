@@ -28,7 +28,11 @@
 都在 Go 实现和 `docs/subsystems/provider-plugins.md` 里，不在契约源码里 ——
 见「十一之三」末尾那段的说明。
 
-**这份契约比 `usemagpie.ai/docs/plugins` 更全** —— 官方文档漏了 `auth.checkin`。
+**这份契约和 `usemagpie.ai/docs/plugins` 分工**：官方文档讲**行为**（哪个钩子、什么时候调、
+返回值什么意思），这里讲**字段**（少写一个会怎样、写错一个会怎样）。
+`auth.checkin` 曾经是官方文档的缺口，2026-10-26 已在 magpie **v0.1.1582** 补齐
+（en/zh/ja，[issue #392](https://github.com/magpie-community/plugins/issues/392)）——
+所以这里不再声称「比官方全」，只声称「比官方细」。
 
 > 一个包装多个供应商（国内 / 国际这种）时，`config` / `auth` / `provider` 三处都要
 > 按站点参数化，而 `auth` 里**不能**再存站点字段 —— 写法、五条铁律与验证清单见

@@ -90,6 +90,9 @@ npm view <包名> version
 node --test
 
 # 卡片标题与 npm 包名不同（包内 name 是大写标题）时发布
+#   ⚠ 这个脚本是**派生仓库自己加的**，本模板的 package.json 里没有 —— 裸跑会 Missing script。
+#   派生仓库按 UPDATING.md「包名与卡片标题不同怎么办」加 scripts["publish:npm"]；
+#   release.mjs 会自动检测：有它就用它，没有就退回 npm publish。
 npm run publish:npm
 
 # 一键发布：预演 → 真做 → 带 npm（tag + push + Release 一次做完）
@@ -179,7 +182,7 @@ node scripts/check-magpie-stable.mjs
 | 文件 | 管什么 | 什么时候读 |
 |---|---|---|
 | [README](./README.md) | 这个模板的设计原则：最小交付面、九项清单、三条铁律、常见坑 | 开工前 |
-| [HOOKS.md](./HOOKS.md) | 21 章钩子契约（**比官方文档全**，官方漏了 `auth.checkin`） | 写代码时按钩子查 |
+| [HOOKS.md](./HOOKS.md) | 21 章钩子契约（**字段级**：少写/写错会怎样。官方文档讲行为，两者并用；`auth.checkin` 已于 v0.1.1582 补进官方文档） | 写代码时按钩子查 |
 | [MULTI-PROVIDER.md](./MULTI-PROVIDER.md) | 一个包两个供应商（国内/国际）：判据、骨架、五条铁律 | 只有多站点时 |
 | [UPDATING.md](./UPDATING.md) | 发版本的七步、magpie 怎么发现新版本、用户怎么拿到 | **每次发布前** |
 | [README-TEMPLATE.md](./README-TEMPLATE.md) | 插件介绍页模板（用户只看它决定装不装） | 写 README 时 |
