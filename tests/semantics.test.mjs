@@ -15,6 +15,7 @@ import assert from "node:assert/strict"
 import { buildModels, priceOf, isUsable, defaultEntry } from "../src/models.mjs"
 import { ApiError, asModelError, read } from "../src/api.mjs"
 import { withUsage, singleShotToSSE, normalizeUsage } from "../src/chat.mjs"
+import { usage, usageWindow } from "../src/quota.mjs"
 
 // 在测试里显式写出来：倍率系数是实测值，改了必须连测试一起改
 const MULT_BASE = 2000
@@ -141,4 +142,51 @@ test("chat: normalizeUsage 兼容两套字段名，坏数据返回 null", () => 
   assert.deepEqual(normalizeUsage({ input_tokens: 5, output_tokens: 6 }), { prompt: 5, completion: 6, total: 11 })
   assert.equal(normalizeUsage(null), null)
   assert.equal(normalizeUsage({ prompt_tokens: "x" }), null)
+})
+
+// ── 额度窗口：五类「写错不报错，但 GUI / 智能路由会坏」的写法 ────────
+// 这些错误不会让插件崩：卡片显示「剩余额度未知」、这个号在路由里被当成不存在，
+// 而日志里什么都没有。src/quota.mjs 把它们变成运行时错误 —— 这里锁住那些错误。
+
+test("quota: aside 窗口给 amount/limit → 抛（否则整条窗口被丢掉，路由当它不存在）", () => {
+  assert.throws(
+    () => usageWindow({ name: "赠送", used: 0, aside: true, amount: 1, limit: 2 }),
+    /aside: true 的窗口不能给 amount\/limit/,
+  )
+})
+
+test("quota: used 缺省 → 抛（否则按 0% = 满额算，空号排到路由队首）", () => {
+  assert.throws(() => usageWindow({ name: "5 小时", resetsAt: "2026-10-28T00:00:00Z" }), /used 必填/)
+  assert.throws(() => usageWindow({ name: "5 小时", used: "37%" }), /used 必填/)
+})
+
+test("quota: 厂商原样时间 / 秒级时间戳 → 统一成 ISO", () => {
+  assert.equal(usageWindow({ name: "a", used: 1, resetsAt: "2026-10-28 23:59:59" }).resetsAt, new Date(2026, 9, 28, 23, 59, 59).toISOString())
+  assert.equal(usageWindow({ name: "a", used: 1, resetsAt: 1793000000 }).resetsAt, new Date(1793000000 * 1000).toISOString())
+  assert.throws(() => usageWindow({ name: "a", used: 1, resetsAt: "昨天" }), /无法解析/)
+})
+
+test("quota: 钱包型（balance）不能再给 used → 抛（否则被当占比读）", () => {
+  assert.throws(() => usageWindow({ name: "积分", balance: 6291, used: 0, unit: "积分" }), /钱包型/)
+  const w = usageWindow({ name: "积分", balance: 6291, unit: "积分" })
+  assert.equal(w.balance, 6291)
+  assert.equal(w.used, undefined)
+})
+
+test("quota: span 不是正整数 → 抛；正常窗口原样通过", () => {
+  assert.throws(() => usageWindow({ name: "a", used: 1, span: 0 }), /span/)
+  assert.throws(() => usageWindow({ name: "a", used: 1, span: 1.5 }), /span/)
+  const w = usageWindow({ name: "5 小时", used: 37, span: 18000, resetsAt: 1793000000 })
+  assert.deepEqual(w, { name: "5 小时", used: 37, span: 18000, resetsAt: new Date(1793000000 * 1000).toISOString() })
+})
+
+test("quota: usage() 逐个过一遍窗口，并且不改动其余字段", () => {
+  const u = usage({
+    plan: "Pro",
+    windows: [{ name: "5 小时", used: 37, span: 18000 }, { name: "积分", balance: 100, unit: "积分" }],
+  })
+  assert.equal(u.plan, "Pro")
+  assert.equal(u.windows.length, 2)
+  assert.equal(u.windows[0].used, 37)
+  assert.equal(u.windows[1].balance, 100)
 })

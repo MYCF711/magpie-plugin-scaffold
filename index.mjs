@@ -47,6 +47,11 @@
 //
 // ═══════════════════════════════════════════════════════════════════════
 
+// ── 额度窗口的构造器 ─────────────────────────────────────────────────
+// 见 src/quota.mjs：它把「写错不报错、但 GUI 和智能路由会坏」的五类写法变成运行时错误。
+// 派生仓库把 src/ 一起带走即可（GUIDE 第 1 步已写明）。
+import { usage as buildUsage, usageWindow } from "./src/quota.mjs"
+
 // ── 配置 ──────────────────────────────────────────────────────────────
 
 const PROVIDER = "xxx" // ⚠ 改成厂商 id，如 "acme"
@@ -344,54 +349,52 @@ export const XxxAuthPlugin = async (_ctx, _options) => {
       const auth = await getAuth()
       if (!auth) return { error: "未登录", windows: [] }
 
+      let u
       try {
-        const u = await fetchUsage(auth) // TODO
-        return {
-          plan: u.plan, // 卡片上的 "Free plan" 标签
-          user: u.user, // 厂商那边这个账号的名字
-          until: u.until, // 套餐到期
-          renew: "auto", // "auto" | "off"
-          balance: u.balance, // "$12.40"
-
-          // ⚠⚠ 每条窗口都必须有 used（数值，0-100），它不只是画进度条：
-          //   magpie 用 `used` 排序账号（>=98 归 spent 排到最后），
-          //   而 `used: Math.max(0, num(w?.used))` 会把「没上报」当成 0 = 满额。
-          //   漏了它，一个耗尽的账号会被顶到路由队首，还会显示「剩余 100%」。
-          //   详见 HOOKS.md 第十一节。
-          windows: [
-            {
-              name: "积分",
-              used: u.percentUsed, // ← 必填，0-100，超额可 >100
-              display: `${u.used} / ${u.total} 积分`,
-              amount: u.used,
-              limit: u.total,
-              unit: "积分",
-              resetsAt: u.resetsAt,
-              aside: false,
-            },
-            // 边角情形也要给 used，但可以配合 aside 说「我不知道」：
-            //
-            //   上限拿不到（厂商不下发 total）：
-            //   { name: "积分", used: 0, aside: true, display: "1,234 剩余（上限未知）" }
-            //
-            //   号被蹬空（没有任何额度）：
-            //   // 千万不要「什么都不画」—— 不画 = 没有参与路由的窗口 = 它继续排前面
-            //   { name: "积分", used: 100, display: "已耗尽" }
-            //
-            //   无周期、无上限的池（永久积分/赠送额度）：
-            //   { name: "永久积分", used: 0, aside: true, display: "5,500" }
-          ],
-
-          // 可选：还能用几次重置
-          // resets: { count: 2, fiveHour: 1, weekly: 1 },
-
-          // 可选：这次读取对登录态意味着什么
-          // signIn: "expired" | "kept" | "renewed",
-        }
+        u = await fetchUsage(auth) // TODO
       } catch (e) {
-        // error 字段会替代 windows 显示
+        // 上游失败 → 让卡片显示原因。抛出去 magpie 只会记成「读取失败」，用户看不到原因。
         return { error: String(e?.message ?? e), windows: [] }
       }
+
+      // ⚠ 下面的窗口由 src/quota.mjs 的构造器生成 —— 它在**写法错**时直接抛 QuotaShapeError：
+      //   写错的窗口不会让插件崩，只会让 GUI 显示「剩余额度未知」、让这个号在智能路由里
+      //   被当成不存在，而日志里什么都没有。把这几类错变成运行时错误，是这个构造器唯一的用途。
+      return buildUsage({
+        plan: u.plan,       // 卡片上的 "Free plan" 标签
+        user: u.user,       // 厂商那边这个账号的名字
+        until: u.until,     // 套餐到期
+        renew: "auto",      // "auto" | "off"
+        balance: u.balance, // "$12.40"
+
+        windows: [
+          // ① 占比型：used 必填，漏了按 0% = 满额算，空号反而排到路由队首
+          usageWindow({
+            name: "5 小时",
+            used: u.percentUsed,  // 0-100，超额可 >100
+            resetsAt: u.resetsAt, // ISO / 秒 / 毫秒都行，构造器统一转 ISO
+            span: 18000,          // 窗口长度（秒）
+          }),
+
+          // ② 数量型（有上限）：amount / limit 必须成对，limit > 0
+          // usageWindow({ name: "积分", used: 37, amount: 370, limit: 1000, unit: "积分", resetsAt: u.resetsAt }),
+
+          // ③ 钱包型（只有余额、没有上限）：给 balance，**不要**给 used
+          // usageWindow({ name: "积分", balance: 6291, unit: "积分" }),
+
+          // ④ 附加额度（用光也不停账号）：aside: true，**不要**给 amount/limit
+          // usageWindow({ name: "赠送", used: 0, aside: true, display: "5,500" }),
+
+          // ⑤ 号被蹬空：给 used: 100，别「什么都不画」—— 不画 = 没有参与路由的窗口 = 它继续排前面
+          // usageWindow({ name: "积分", used: 100, display: "已耗尽" }),
+        ],
+
+        // 可选：还能用几次重置
+        // resets: { count: 2, fiveHour: 1, weekly: 1 },
+
+        // 可选：这次读取对登录态意味着什么
+        // signIn: "expired" | "kept" | "renewed",
+      })
     },
 
     // ═══ ⑥ 签到 ═══════════════════════════════════════════════════
