@@ -46,7 +46,7 @@
 
 ```
 写 CHANGELOG → bump version → npm pack --dry-run → 提交 → push 默认分支
-  → npm publish → tag + GitHub Release → 四条验证
+  → npm publish → tag + GitHub Release → 五条验证
 ```
 
 `git push` 只是**第 4 步**。少了后三步，GitHub 仓库右侧会一直写着「暂无发布版本」，

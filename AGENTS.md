@@ -17,7 +17,7 @@
 | **决定要不要拆成两个供应商**（国内版 / 国际版） | [MULTI-PROVIDER.md](./MULTI-PROVIDER.md)（只有一个站点：跳过） | 两张卡、两组登录态，互不覆盖 |
 | **填那五个 TODO / 改钩子** | [HOOKS.md](./HOOKS.md) —— **按钩子查章节，不要通读** | 每个钩子的返回值形状与第 21 章一致 |
 | **代码写完，准备交付** | [CHECKLIST.md](./CHECKLIST.md) 的 **A 表** | A 表全勾 + `node scripts/check.mjs` 退出 0 |
-| **要发一个版本** | **[UPDATING.md](./UPDATING.md) 全文** | [CHECKLIST.md](./CHECKLIST.md) 的 **B 表**全勾 + 四条验证 |
+| **要发一个版本** | **[UPDATING.md](./UPDATING.md) 全文** | [CHECKLIST.md](./CHECKLIST.md) 的 **B 表**全勾 + 五条验证 |
 | **用户说「有新版本但我这边没动静」** | UPDATING 的「一、magpie 怎么发现新版本」 | 分清是 npm 源（比 `version`）还是 git 源（比 HEAD commit） |
 
 **最容易漏的是第 5 行。** `git push` 不是发布 —— 它是七步里的第 4 步。
@@ -43,7 +43,7 @@
 | 10 | 改了代码重装，行为一点没变 | 同版本号重打包会命中 bun 缓存（`no changes`）—— 必须 bump `version` | UPDATING 第 1 步 |
 | 11 | `magpie plugin add xxx.tgz` 跑完像成功，实际没装上 | 这个命令有 bug，改 `plugins.json` + `plugins/package.json` 两处 | README 常见坑 1 |
 | 12 | 想让卡片标题/文案对，去改了 magpie 的缓存文件 | 插件对 magpie 的目录**只有读的份**；唯一载体是 `registry-entry.json` | README「不要写 magpie 的缓存」 |
-| 13 | 用户那边没更新 / Release 页面是空的 / 「暂无发布版本」 | 发布是**七步**（写 CHANGELOG → bump → pack 预演 → 提交 → push → `npm publish` → tag + Release → 四条验证）。**push 只是第 4 步** | UPDATING 二 · CHECKLIST B |
+| 13 | 用户那边没更新 / Release 页面是空的 / 「暂无发布版本」 | 发布是**七步**（写 CHANGELOG → bump → pack 预演 → 提交 → push → `npm publish` → tag + Release → 五条验证）。**push 只是第 4 步** | UPDATING 二 · CHECKLIST B |
 
 补充两条只在发布侧出现的：
 
@@ -89,6 +89,10 @@ npm view <包名> version
 # 语义测试 —— check 查「形状」，它查「语义」（free 三分支 / 三态降级 / 404 vs 401 / 流式 usage）
 node --test
 
+# 维护检查 —— 改了代码有没有 bump、bump 了有没有打 tag、CHANGELOG 有没有这一节
+#   六条全不报错，但后果同一个：用户永远拿不到新版。发布前必跑。
+node scripts/check-maintenance.mjs
+
 # 卡片标题与 npm 包名不同（包内 name 是大写标题）时发布
 #   ⚠ 这个脚本是**派生仓库自己加的**，本模板的 package.json 里没有 —— 裸跑会 Missing script。
 #   派生仓库按 UPDATING.md「包名与卡片标题不同怎么办」加 scripts["publish:npm"]；
@@ -132,7 +136,7 @@ node scripts/check-magpie-stable.mjs
 
 ```
 □ CHECKLIST.md 的 B 表全勾
-□ 四条验证都跑过：npm 版本 / tarball 内容 / 本机 magpie 认得 / Release 在
+□ 五条验证都跑过（含 check-maintenance.mjs）：npm 版本 / tarball 内容 / 本机 magpie 认得 / Release 在
 ```
 
 ⚠ **没过门 2 不许说「已发布」。** 只 push 过就说已发布，是在用印象代替验证。

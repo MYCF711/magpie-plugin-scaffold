@@ -108,12 +108,13 @@
       出处：UPDATING 二 · 第 6 步
       ⚠ Release / tag **不参与** magpie 的更新检测 —— 但少了用户就没有地方看这一版改了什么
 
-□ 第 7 步 · 四条验证（每条都要真跑）
+□ 第 7 步 · 五条验证（每条都要真跑）
+      ⓪ node scripts/check-maintenance.mjs → 退出码 0（改了代码必须 bump / bump 必须打 tag）
       ① npm view <包名> version            → 已是新版本
       ② 下载 dist.tarball 解包看内容       → 别只看版本号，要看到新代码
       ③ magpie plugin list                → 本机认得新版本（git 源看 commit）
       ④ GET /releases/tags/v<version>     → 200 且 draft=false
-      判据：四条全过；没过不许说「已发布」
+      判据：五条全过；没过不许说「已发布」
       出处：UPDATING 二 · 第 7 步
 ```
 

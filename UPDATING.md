@@ -13,7 +13,7 @@
 **没有任何一条命令会报错**，只有用户那边永远没动静。
 
 发版是**七步**：写 CHANGELOG → bump → `npm pack --dry-run` → 提交 → push →
-`npm publish` → tag + Release → 四条验证。**push 是第 4 步。**
+`npm publish` → tag + Release → 五条验证。**push 是第 4 步。**
 
 逐条勾 [CHECKLIST.md](./CHECKLIST.md) 的 B 表，别凭记忆。
 
@@ -104,7 +104,7 @@ npm publish
 
 | 路 | 怎么做 | 适合 |
 |---|---|---|
-| **`node scripts/release.mjs --yes`** | 模板自带。体检六项（版本 / CHANGELOG / 干净 / 分支 / 落后 / tag 被占）→ push → tag → 建 Release，第 7 步的四条验证也一并打印出来 | **默认走这条**。没有 token 也能建 tag，只是 Release 要手工补 |
+| **`node scripts/release.mjs --yes`** | 模板自带。体检六项（版本 / CHANGELOG / 干净 / 分支 / 落后 / tag 被占）→ push → tag → 建 Release，第 7 步的五条验证也一并打印出来 | **默认走这条**。没有 token 也能建 tag，只是 Release 要手工补 |
 | 有 `release.yml` | 推 `v*` tag，workflow 用仓库自己的 token 把 CHANGELOG 对应那段抽出来建 Release | 想让 CI 长期接管（见下「什么时候该有 workflow」） |
 | 手工 | 网页 Draft a new release，正文把 CHANGELOG 那段粘过去 | 一次性仓库、没装 node |
 
@@ -179,9 +179,12 @@ Release 的价值在另外三处：
 2. tag 让「某个 bug 出在哪个版本」有据可查
 3. GitHub 会自动附上该 tag 的源码包
 
-### 第 7 步 · 验证（四条都要过）
+### 第 7 步 · 验证（五条都要过）
 
 ```bash
+# ⓪ 维护状态：改了代码必须 bump、bump 了必须有 tag、CHANGELOG 必须有这一节
+node scripts/check-maintenance.mjs      # 退出码非 0 就别发布
+
 # ① npm 上是不是新版本（发布后可能要等一两分钟才可见）
 npm view <包名> version
 
@@ -195,6 +198,10 @@ magpie plugin list | grep -A1 <名>
 # ④ Release 在（tag 与 version 一致）
 gh release view v<新版本> --json tagName,url
 ```
+
+> **第 ⓪ 条是这一节唯一能自动化的一步**，也是唯一能查出「直接覆盖仓库不发新版本」的一步。
+> 它抓四种静默失配：改了代码没 bump、bump 了没 tag、CHANGELOG 没这一节、跳版本发。
+> 四种都不会报错，只是用户永远拿不到新版。
 
 ---
 
