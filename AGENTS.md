@@ -13,7 +13,7 @@
 
 | 你在做什么 | 必读（按顺序） | 做完的判据 |
 |---|---|---|
-| **还没开工**，手上只有一台 magpie | 本文件 → [README](./README.md) 的「必读四份」「最小交付面」「三条铁律」 | 能说清「哪些事 magpie 已经做了、插件不该重做」 |
+| **还没开工**，手上只有一台 magpie | [GUIDE.md](./GUIDE.md)（30 分钟主线，每步带官方锚点）→ 本文件 → [README](./README.md) 的「必读五份」「最小交付面」「三条铁律」 | 能说清「哪些事 magpie 已经做了、插件不该重做」 |
 | **决定要不要拆成两个供应商**（国内版 / 国际版） | [MULTI-PROVIDER.md](./MULTI-PROVIDER.md)（只有一个站点：跳过） | 两张卡、两组登录态，互不覆盖 |
 | **填那五个 TODO / 改钩子** | [HOOKS.md](./HOOKS.md) —— **按钩子查章节，不要通读** | 每个钩子的返回值形状与第 21 章一致 |
 | **代码写完，准备交付** | [CHECKLIST.md](./CHECKLIST.md) 的 **A 表** | A 表全勾 + `node scripts/check.mjs` 退出 0 |
@@ -181,6 +181,9 @@ node scripts/check-magpie-stable.mjs
 
 | 文件 | 管什么 | 什么时候读 |
 |---|---|---|
+| [GUIDE](./GUIDE.md) | **说明书主线**：30 分钟，拿模板 → 改身份 → config → auth → models → usage/checkin → 自检 → 打分 → 发布 | **第一次做插件时，从头读** |
+| [OFFICIAL-SOURCES](./OFFICIAL-SOURCES.md) | **官方 22 个锚点 → 本仓库的映射**；每条结论的官方出处 + 版本基线 + 我们补的 8 条 | 想知道「这条规矩官方有没有写」时 |
+| [SCORING](./SCORING.md) | 100 分怎么算、80 分卡在哪、`node scripts/score.mjs` | 交付前自评时 |
 | [README](./README.md) | 这个模板的设计原则：最小交付面、九项清单、三条铁律、常见坑 | 开工前 |
 | [HOOKS.md](./HOOKS.md) | 21 章钩子契约（**字段级**：少写/写错会怎样。官方文档讲行为，两者并用；`auth.checkin` 已于 v0.1.1582 补进官方文档） | 写代码时按钩子查 |
 | [MULTI-PROVIDER.md](./MULTI-PROVIDER.md) | 一个包两个供应商（国内/国际）：判据、骨架、五条铁律 | 只有多站点时 |
