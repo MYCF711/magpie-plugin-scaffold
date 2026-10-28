@@ -62,6 +62,11 @@
 
 □ 13. node scripts/check.mjs 退出码 = 0
       判据：末尾「失败 0」；警告逐条判断是否可接受
+
+□ 14. 每个模型都显式声明了 capabilities.input.image
+      判据：grep 源码里每个模型定义都有 image: true/false，没有省略；
+            text-only 用 { input: { text: true, image: false, audio: false, video: false, pdf: false } }
+      出处：HOOKS 十一之三（不写 = 厂商未表态，magpie 会按 models.dev 裸 id 投票误判）
 ```
 
 ---

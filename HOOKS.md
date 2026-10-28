@@ -1098,10 +1098,25 @@ for (const [id, m] of Object.entries(models)) console.log(id, m.free, m.rate)
 | `attachment` | boolean | **不能收文件/图片** |
 | `toolcall` | boolean | 不能调工具 |
 | `temperature` | boolean | 不给则视为支持（`false` 才关） |
-| `modalities.input` / `modalities.output` | `["text","image",…]` | 不写则按 text 处理 —— **图片 / 音频能力全靠它** |
+| `modalities.input` / `modalities.output` | `["text","image",…]` | **必须显式写全，`image` 要写成布尔值。** 省掉不等于「按 text 处理」：magpie 只认 `typeof input.image === "boolean"`（宿主按它算 `imageSaid`），没写就是**厂商未表态**，会退到 models.dev 按裸模型 id 投票 —— 同名模型只要在别家标过 `image`，这个实际收不了图的模型就会被当成能收图 |
 | `interleaved` | boolean | 思考与正文交错输出（少数厂商） |
 | `maxTokens` | number | 单次输出上限，与 `limit.output` 不同：这是「这一次」的上限 |
-| `imageSaid` | boolean | 「厂商说过它收不收图」的显式回答，与 `attachment` 分开记 |
+| `imageSaid` | boolean | **宿主自动算的**（`typeof capabilities.input.image === "boolean"`），插件不用写、写了也不读。想让 magpie 把「厂商说过」当真，就把 `input.image` 写成布尔值 |
+
+> ⚠ **text-only 接口的写法（照抄）**：静态模型和 `provider.models` 返回的每条都要给全，
+> 只写 `input: { text: true }` 等于没说。模板：
+>
+> ```js
+> const TEXT_ONLY = { input: { text: true, image: false, audio: false, video: false, pdf: false } }
+> // config 钩子里的静态模型
+> { id, name, attachment: false, modalities: { input: ["text"], output: ["text"] } }
+> // provider.models 返回的模型
+> capabilities: { ..., attachment: false, input: { ...TEXT_ONLY.input, ...(base.capabilities?.input ?? {}) } }
+> ```
+>
+> 实测代价（2026-10-29，magpie 0.1.1932）：CodeArts 8 个模型全部漏写 `image`，
+> 四天里 161 次把截图直发上游，全部被 `The request model is not multimodal (InferHub.001001020.406)` 拒绝；
+> 补上 `image: false` 后同一个请求改走识图模型描述，正常读出图内文字。
 
 > `capabilities` 这一层最容易漏。漏了的效果是「模型能跑，但收不了图 / 不显示思考档」——
 > 不报错，只是能力少一块。`python extract-contract.py` + `node scripts/contract-diff.mjs`
