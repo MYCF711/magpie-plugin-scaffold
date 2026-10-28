@@ -3,6 +3,18 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.1.23 — 2026-10-29
+
+**模型能力那一栏，「不写」不等于「不支持」—— 补上这个静默误判**
+
+- **HOOKS 十一之三**：`modalities.input` 的「不写则按 text 处理」是错的 —— magpie 只认 `input.image` 的布尔值（宿主按它算 `imageSaid`）；省略 = 厂商未表态 = 退到 models.dev 按裸模型 id 投票，同名模型在别家标过 `image` 就会被当成能收图。补了 text-only 模板与实测代价（CodeArts 0.2.3 的 161 次 `InferHub.001001020.406`）。
+- **HOOKS 十一之三**：`imageSaid` 行改正为「宿主自动算的，插件不用写」。
+- **CHECKLIST A 表**：加第 14 条 —— 每个模型都要显式声明 `capabilities.input.image`。
+- **AGENTS 第二节**：加坑 25；坑 19 的 `modalities` 说明补上「`image` 省略 ≠ 关掉」。
+- **新增 `scripts/probe-vision.mjs`** —— 把「这个模型到底能不能看见图」变成一条命令：内嵌一张写着 `MAGPIE-VISION-TEST 42` 的 PNG，对模型的回答分四类（能读到图 / 假声明 / 已标文本 / 看不出），有假声明时退出码 2。只读本机网关与 `settings.json`，不改任何配置。AGENTS 命令区已接上。
+
+> 起因：本机 magpie 0.1.1932 上，ima / magicrew 的三个模型被手动勾成「接受图片」但厂商明确说 `image: false`，实测一个回「图片无法查看」、一个 400「不支持多模态输入」；CodeArts 则是插件漏写 `image` 被 models.dev 投票带偏，四天 161 次直发被拒。magpie 侧的三个修复点已提 issue yetone/magpie#4110。
+
 ## 0.1.22 — 2026-10-28
 
 **把维护检查接进三个入口 —— 否则它只是一个「你知道才会跑」的脚本**

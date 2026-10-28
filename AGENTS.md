@@ -64,12 +64,13 @@
 
 | # | 症状 | 判据 | 出处 |
 |---|---|---|---|
-| 19 | 某个能力「明明实现了却没生效」：模型不会联网、不能收图、没有思考档、折扣前的倍率不显示 | 模型 / provider 条目上有一批**不写就等于关掉**的字段：`searches`（模型级=这条自己会搜，provider 级=上游整体会搜）、`decides`（decision 模型，从 agent 列表隐藏）、`rateWas`（折扣前倍率）、`fast`、`serviceTiers`、`modalities`（图片 / 音频能力全靠它） | HOOKS 十一之三 |
+| 19 | 某个能力「明明实现了却没生效」：模型不会联网、不能收图、没有思考档、折扣前的倍率不显示 | 模型 / provider 条目上有一批**不写就等于关掉**的字段：`searches`（模型级=这条自己会搜，provider 级=上游整体会搜）、`decides`（decision 模型，从 agent 列表隐藏）、`rateWas`（折扣前倍率）、`fast`、`serviceTiers`、`modalities`（图片 / 音频能力全靠它；其中 `image` 省略 **≠** 关掉，见坑 25） | HOOKS 十一之三 |
 | 20 | 厂商有画图模型，插件里当垃圾过滤掉了；或者反过来，列进去之后用户在 chat 里选中报 400 | magpie **0.1.1707 起**支持插件供图（`DrawsID` + `ImagesAPI` + npm 是 `@ai-sdk/openai-compatible`）。但它**同时**留在 chat 模型列表里 —— 列不列是取舍，判据见 [`src/models.mjs`](./src/models.mjs) 的 `LIST_IMAGE_MODELS` | HOOKS 十一之三的「插件供图」 |
 | 21 | 花一晚上追 magpie 的「每个版本」，改了一堆文档，用户那边一点变化都没有 | **判断要不要同步，看稳定渠道**（magpie 设置里那个「更新渠道：每个版本 / 稳定版」）。`curl -s "https://usemagpie.ai/api/latest?channel=stable"` 拿稳定版版本号；2026-10-28 实测：每版本 0.1.1763 / **稳定版 0.1.1327**，逐字段比对后插件相关字段**完全一致** —— 追每版本几乎全是白跑。一条命令判断：`node scripts/check-magpie-stable.mjs` | HOOKS 顶部 · UPDATING 一 |
 | 22 | 卡片上每个账号都显示「剩余额度未知」，而 `usage()` 明明返回了 plan / balance / windows、也没有 error | **窗口被 magpie 整条丢掉了**，两种写法都会导致：① `aside: true` 的窗口给了 `amount`/`limit`（假占比，magpie 算不出来）② `resetsAt`/`runsOutAt` 塞了厂商原样时间 `"2026-10-28 23:59:59"`（不是 ISO，解析失败）。判据：`curl -s http://127.0.0.1:3425/v1/magpie/quotas`，看 `windows[0]` 有没有 `text: true` 和 ISO 形式的 `runsOutAt` | HOOKS 三 · 三条「写错不报错」的窗口规矩 |
 | 23 | 有一批额度快到期了，卡片上却完全看不出来 | 用官方字段 `runsOutAt` + `runsOut`（剩余额度何时作废、损失多少），**不要拼进 `display`** —— 拼进去只是普通文字，magpie 不会当失效提醒。厂商给的时间要先转 ISO | HOOKS 三 · 规矩 ③ |
 | 24 | **卡片上额度正常，路由页里这个号却是「剩余额度未知」，还总排在别人后面** | 窗口标了 `aside: true`（或 `used` 缺省被判成 `Text`）⇒ `allowanceOf()` 整条跳过 ⇒ `routedAllowance` 不 ok ⇒ `weighed()` 不设 `Known`。**`aside` 不是「不参与排序」，是「这个号在路由里不存在」**。判据：`curl -s http://127.0.0.1:3425/v1/magpie/trace` 看这个 provider 的 `known` 是 `true` 还是**字段缺失**；`~/.config/magpie/quotas.json` 的 `spans` 是 `[{}]` 还是 `[{"aside":true}]` | HOOKS 三 · 规矩 ① |
+| 25 | **模型明明收不了图，却被当成能收图**：截图直发上游报 `The request model is not multimodal` / 400，或者模型回「图片无法查看」 | 模型条目的 `capabilities.input.image` **必须写成布尔值**：省略不等于 text，等于「厂商未表态」，magpie 会拿 models.dev 的裸模型 id 投票补 —— 同名模型在别家标过 `image`，这个模型就会被带成能收图。text-only 模板见 HOOKS 十一之三；反向的手动覆盖（厂商说 `false` 却勾了 `Accepts images`）在 magpie 侧暂无警告 | HOOKS 十一之三 · CHECKLIST A-14 |
 
 ---
 
@@ -118,6 +119,13 @@ python extract-contract.py && node scripts/contract-diff.mjs
 node scripts/check-magpie-stable.mjs
 #   0 = 基线就是当前稳定版，不用动；2 = 稳定版变了，按它打印的三步走
 #   裸查：curl -s "https://usemagpie.ai/api/latest?channel=stable"
+
+# 模型「说自己能收图」是不是真的？发一张写着字的内嵌图问它，按回答分四类
+#   假声明 = magpie 当它能收图、直发上游，而上游答「看不见」或直接拒绝（坑 25）
+node scripts/probe-vision.mjs                 # 测网关 /v1/models 里的每个模型
+node scripts/probe-vision.mjs --vision-only   # 只测设置里那个识图模型
+node scripts/probe-vision.mjs <provider/model> …
+#   退出码 2 = 有假声明；只读本机网关与 settings.json，不改任何配置
 ```
 
 ---
