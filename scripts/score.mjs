@@ -31,11 +31,13 @@ function section(key, title, points, got, detail) {
 
 // ── A · 合规（40）────────────────────────────────────────────────────
 
-const checkPath = join(ROOT, "scripts/check.mjs")
+// 优先用目标仓库自己的检查器；没有就用评分器自带的那份
+// （这样「从零做的插件」也能被评分，而不是因为没带 scripts/ 直接 0 分）
+const checkPath = [join(ROOT, "scripts/check.mjs"), join(import.meta.dirname ?? new URL(".", import.meta.url).pathname, "check.mjs")].find(existsSync)
 let checkOk = false
 let checkDetail = ""
-if (!existsSync(checkPath)) {
-  checkDetail = "没有 scripts/check.mjs —— 从脚手架复制一份"
+if (!checkPath) {
+  checkDetail = "找不到 check.mjs"
 } else {
   const r = spawnSync(process.execPath, [checkPath, ROOT], { encoding: "utf8", timeout: 120000 })
   const out = `${r.stdout ?? ""}${r.stderr ?? ""}`

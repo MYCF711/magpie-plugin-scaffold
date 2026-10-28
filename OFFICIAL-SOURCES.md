@@ -104,7 +104,7 @@
 |---|---|---|---|---|
 | 1 | `free` 不能从 `rate === 0` 反推 | 未提 | `grep -c "rate === 0" provider-plugins.md` = **0** | [HOOKS 十一之二](./HOOKS.md) |
 | 2 | 模型级错误用 404，不用 401 | 未提 | `grep -c "404" provider-plugins.md` = **0** | [README 常见坑 2](./README.md) |
-| 3 | `aside: true` 的窗口给了 amount/limit 会被整条丢掉 | 只写了「省略 used」的情形，未写「显式 aside + amount」 | `provider-plugins.md` 的 §A usage window that says no share 只覆盖省略 `used` | [HOOKS 三 规矩 ①](./HOOKS.md) |
+| 3 | `aside: true` 的窗口给了 amount/limit 会被整条丢掉 | 只写了「省略 used」的情形，未写「显式 aside + amount」 | `provider-plugins.md` 的 §A usage window that says no share 只覆盖省略 `used` | [HOOKS 三 规矩 ①](./HOOKS.md) · [`src/quota.mjs`](./src/quota.mjs)（已变成运行时检查） |
 | 4 | LICENSE 文件必须是逐字 MIT 正文，否则 GitHub 返回 `NOASSERTION` | 官方只在 `#quick` 的 `package.json` 里出现过 `"license": "MIT"` 字段，**没有讲 LICENSE 文件本身** | 官方中文文档里「许可/license」只出现 1 次（就是那个字段）；`grep -c "NOASSERTION"` 官方文档 = 0、社区 README = 0 | [README 顶部四件](./README.md) |
 | 5 | 同版本重打包命中 bun 缓存，行为不变 | 未提 | 官方 `#run` 只讲「重启」，未讲缓存 | [AGENTS 坑 10](./AGENTS.md) |
 | 6 | `magpie plugin add xxx.tgz` 有 bug | 未提 | 官方 `#run` 只讲 npm / git / 文件夹三种来源 | [README 常见坑 1](./README.md) |
