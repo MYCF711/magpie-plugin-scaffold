@@ -4,7 +4,7 @@
 
 > 克隆这个仓库，改三处配置，实现五个 TODO，就是一个标准 magpie 插件。
 > 然后**把它发出去** —— 那是另一套动作，见 [UPDATING.md](./UPDATING.md)：
-> `git push` 只是发布七步里的第 4 步。
+> 只能推功能分支，PR 检查全绿并合并后，才能从默认分支发布。
 
 ---
 
@@ -42,16 +42,15 @@
 
 **4. [UPDATING.md](./UPDATING.md) —— 发版本，以及用户怎么拿到它。**
 
-每次发版本**必读**，而且是七步、一步不能少：
+每次发版本**必读**，而且一步不能少：
 
 ```
-写 CHANGELOG → bump version → npm pack --dry-run → 提交 → push 默认分支
-  → npm publish → tag + GitHub Release → 五条验证
+起功能分支 → 写 CHANGELOG + bump → 合规 / 测试 / pack → 推功能分支
+  → PR 检查全绿后合并 → npm publish → tag + GitHub Release → 五条验证
 ```
 
-`git push` 只是**第 4 步**。少了后三步，GitHub 仓库右侧会一直写着「暂无发布版本」，
-npm 上的用户永远停在旧版本 —— 而本地一切看起来都对。发版前逐条过
-[CHECKLIST.md](./CHECKLIST.md) 的 B 表。
+**禁止直接推默认分支。** 少了 PR 门禁，坏提交会直接抵达 git 源用户；少了发布与验证，
+npm 用户又可能停在旧版或拿到未验包。发版前逐条过 [CHECKLIST.md](./CHECKLIST.md) 的 B 表。
 
 ---
 
@@ -84,7 +83,8 @@ node scripts/check.mjs          # 或 bun scripts/check.mjs
 | 一致性 | `registry-entry.json` 的 `package` 与 package.json 的 `name` 一字不差 |
 | 卫生 | CHANGELOG 有当前版本、没有真 JWT、没有硬编码本机路径 |
 
-CI 每次 push 都跑它（`ci.yml`）。绿了说明符合 magpie 的插件契约，可以放心发布。
+CI 在功能分支与 PR 上跑合规、语义测试和 `npm pack --dry-run`（`ci.yml`）。
+`rules` 是合并前的必需检查；它绿了只代表可以合并，发布还要走 `release.mjs` / `release.yml`。
 
 > 它**不**做任何「提交到社区」的动作 —— 收不收、收哪个，是维护者的事。
 > 把它的输出贴进 issue，比一句「我做了个插件」有用得多。
@@ -764,15 +764,15 @@ agent       @magpie-community/agent-<name>
 
 - magpie 怎么发现新版本（npm 源比 `version`、git 源比默认分支 HEAD 的 commit，
   **两条路都不看 GitHub Release / tag**）
-- **发版七步，一步不能少**：写 CHANGELOG → bump → `npm pack --dry-run` → 提交 →
-  push 默认分支 → `npm publish`（显示名与包名不同的插件用 `npm run publish:npm`）→
-  tag + GitHub Release → 四条验证
+- **分支 + PR 门禁，一步不能少**：起功能分支 → CHANGELOG + bump → 合规 / 测试 / pack →
+  推功能分支 → PR 全绿后合并 → `npm publish`（显示名与包名不同的插件用 `npm run publish:npm`）→
+  tag + GitHub Release → 五条验证
 - 用户侧怎么拿到更新（npm 源自动、git 源要手动点「更新」；`rm` + `add` 会把卡片显示名
   重置成包名）
 
-> ⚠ 只做到「push 默认分支」就宣布发版，是本仓库历史上真实踩过的坑：
-> GitHub 右侧一直显示「暂无发布版本」，npm 上的版本号没动。逐条过
-> [CHECKLIST.md](./CHECKLIST.md) 的 B 表能挡住这件事。
+> ⚠ 直接推默认分支会把未验证代码交给 git 源用户；只推代码不打 tag / 不发 npm，
+> 又会让版本状态彼此错位。逐条过 [CHECKLIST.md](./CHECKLIST.md) 的 B 表，
+> 并把 GitHub 的必需 PR 与 `rules` 检查打开，才算有发布门。
 
 ---
 

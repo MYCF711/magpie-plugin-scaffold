@@ -20,8 +20,8 @@
 | **要发一个版本** | **[UPDATING.md](./UPDATING.md) 全文** | [CHECKLIST.md](./CHECKLIST.md) 的 **B 表**全勾 + 五条验证 |
 | **用户说「有新版本但我这边没动静」** | UPDATING 的「一、magpie 怎么发现新版本」 | 分清是 npm 源（比 `version`）还是 git 源（比 HEAD commit） |
 
-**最容易漏的是第 5 行。** `git push` 不是发布 —— 它是七步里的第 4 步。
-少做一步的表现不是报错，而是「本地全对、用户永远停在旧版本」。
+**最容易漏的是第 5 行。** 只能推功能分支；PR 的必需检查全绿并合并后，
+才从与 `origin/main` 完全一致的提交发布。直接推 main 会把未验证代码分发给现有用户。
 
 ---
 
@@ -43,7 +43,7 @@
 | 10 | 改了代码重装，行为一点没变 | 同版本号重打包会命中 bun 缓存（`no changes`）—— 必须 bump `version` | UPDATING 第 1 步 |
 | 11 | `magpie plugin add xxx.tgz` 跑完像成功，实际没装上 | 这个命令有 bug，改 `plugins.json` + `plugins/package.json` 两处 | README 常见坑 1 |
 | 12 | 想让卡片标题/文案对，去改了 magpie 的缓存文件 | 插件对 magpie 的目录**只有读的份**；唯一载体是 `registry-entry.json` | README「不要写 magpie 的缓存」 |
-| 13 | 用户那边没更新 / Release 页面是空的 / 「暂无发布版本」 | 发布是**七步**（写 CHANGELOG → bump → pack 预演 → 提交 → push → `npm publish` → tag + Release → 五条验证）。**push 只是第 4 步** | UPDATING 二 · CHECKLIST B |
+| 13 | 用户那边没更新 / Release 页面是空的 / 「暂无发布版本」 | 起功能分支 → CHANGELOG + bump → 检查 / 测试 / pack → 推功能分支 → PR 全绿合并 → npm / tag / Release → 五条验证。**禁止直接推 main** | UPDATING 二 · CHECKLIST B |
 
 补充两条只在发布侧出现的：
 
@@ -102,9 +102,9 @@ node scripts/check-maintenance.mjs
 #   release.mjs 会自动检测：有它就用它，没有就退回 npm publish。
 npm run publish:npm
 
-# 一键发布：预演 → 真做 → 带 npm（tag + push + Release 一次做完）
-node scripts/release.mjs             # 预演：体检六项 + 打印计划，什么都不改
-node scripts/release.mjs --yes       # 真做（要 GITHUB_TOKEN 才建 Release）
+# 受控发布：只在 PR 合并后运行；脚本不推 main，只推 tag
+node scripts/release.mjs             # 预演：已合并 HEAD + 检查 / 测试 / pack，什么都不改
+node scripts/release.mjs --yes       # 真做：tag + Release（要 GITHUB_TOKEN 才建 Release）
 node scripts/release.mjs --yes --npm # 再加 npm publish
 
 # 手工版（release.mjs 用不了时）
@@ -221,7 +221,7 @@ node scripts/probe-vision.mjs <provider/model> …
 | [README](./README.md) | 这个模板的设计原则：最小交付面、九项清单、三条铁律、常见坑 | 开工前 |
 | [HOOKS.md](./HOOKS.md) | 21 章钩子契约（**字段级**：少写/写错会怎样。官方文档讲行为，两者并用；`auth.checkin` 已于 v0.1.1582 补进官方文档） | 写代码时按钩子查 |
 | [MULTI-PROVIDER.md](./MULTI-PROVIDER.md) | 一个包两个供应商（国内/国际）：判据、骨架、五条铁律 | 只有多站点时 |
-| [UPDATING.md](./UPDATING.md) | 发版本的七步、magpie 怎么发现新版本、用户怎么拿到 | **每次发布前** |
+| [UPDATING.md](./UPDATING.md) | 功能分支 + PR 门禁、合并后的受控发布、用户怎么拿到 | **每次发布前** |
 | [README-TEMPLATE.md](./README-TEMPLATE.md) | 插件介绍页模板（用户只看它决定装不装） | 写 README 时 |
 | [CHECKLIST.md](./CHECKLIST.md) | 两张勾选表：交付前 / 发版前 | 两个交付门 |
 | [CHANGELOG.md](./CHANGELOG.md) | 本模板自己的更新记录（格式即范例） | 找「为什么这样改」 |
