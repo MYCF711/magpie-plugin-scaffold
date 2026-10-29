@@ -82,7 +82,7 @@
 | # | 官方锚点 | 官方讲什么 | 本仓库对应 | 增量 |
 |---|---|---|---|---|
 | 16 | [`#test` 测试](https://usemagpie.ai/docs/zh/plugins#test) | 沙箱 HOME 的一套命令：`m plugin add` / `plugin` / `login` / `provider test` / `quota` / `logout`；`bun test`；`_internal`；`bun scripts/check.mjs`；`scripts/try.sh` | [CHECKLIST A](./CHECKLIST.md)、[tests/semantics.test.mjs](./tests/semantics.test.mjs) | **补充**：check.mjs 里「发布合规」那一层（许可逐字 MIT、registry-entry 一致、icon 大小、无真 JWT、无硬编码本机路径）—— 官方和社区脚本都不查 |
-| 17 | [`#publish` 发布与上架](https://usemagpie.ai/docs/zh/plugins#publish) | npm 包名 / keywords / README / `registry.json` 推荐位 / `MAGPIE_PLUGIN_MARKET` / GitHub topic `magpie-plugin` / 社区仓库命名 | [UPDATING](./UPDATING.md)、[README-TEMPLATE](./README-TEMPLATE.md) | **补充**：发布是七步，`git push` 只是第 4 步；同版本重打包会命中 bun 缓存 |
+| 17 | [`#publish` 发布与上架](https://usemagpie.ai/docs/zh/plugins#publish) | npm 包名 / keywords / README / `registry.json` 推荐位 / `MAGPIE_PLUGIN_MARKET` / GitHub topic `magpie-plugin` / 社区仓库命名 | [UPDATING](./UPDATING.md)、[README-TEMPLATE](./README-TEMPLATE.md) | **补充**：只能推功能分支，PR 全绿合并后才发布；同版本重打包会命中 bun 缓存 |
 
 ### 8. 官方文档的其余锚点（本仓库不涉及，但要知道它们存在）
 
@@ -108,7 +108,7 @@
 | 4 | LICENSE 文件必须是逐字 MIT 正文，否则 GitHub 返回 `NOASSERTION` | 官方只在 `#quick` 的 `package.json` 里出现过 `"license": "MIT"` 字段，**没有讲 LICENSE 文件本身** | 官方中文文档里「许可/license」只出现 1 次（就是那个字段）；`grep -c "NOASSERTION"` 官方文档 = 0、社区 README = 0 | [README 顶部四件](./README.md) |
 | 5 | 同版本重打包命中 bun 缓存，行为不变 | 未提 | 官方 `#run` 只讲「重启」，未讲缓存 | [AGENTS 坑 10](./AGENTS.md) |
 | 6 | `magpie plugin add xxx.tgz` 有 bug | 未提 | 官方 `#run` 只讲 npm / git / 文件夹三种来源 | [README 常见坑 1](./README.md) |
-| 7 | 发布是七步，`git push` 只是第 4 步 | 官方 `#publish` 讲「推到 main 就发」，但没给检查清单 | 官方 `#publish` = 叙事，无步骤门 | [UPDATING](./UPDATING.md) · [CHECKLIST B](./CHECKLIST.md) |
+| 7 | 只能推功能分支，PR 全绿合并后才发布 | 官方 `#publish` 讲「推到 main 就发」，但没给分支保护与检查门 | 官方 `#publish` = 叙事，无步骤门 | [UPDATING](./UPDATING.md) · [CHECKLIST B](./CHECKLIST.md) |
 | 8 | `registry-entry.json` 与 `package.json` 的 `name` 必须一字不差 | 官方 `#publish` 给了 registry 条目示例，没说要和 package.json 对齐 | 官方示例是独立片段 | [check.mjs](./scripts/check.mjs) |
 
 > ⚠ 这份清单会随官方文档更新而缩短 —— 这是**正常**的。每次 `check-magpie-stable.mjs` 报 `2` 时，
