@@ -144,20 +144,56 @@ test("chat: normalizeUsage 兼容两套字段名，坏数据返回 null", () => 
   assert.equal(normalizeUsage({ prompt_tokens: "x" }), null)
 })
 
-// ── 额度窗口：五类「写错不报错，但 GUI / 智能路由会坏」的写法 ────────
-// 这些错误不会让插件崩：卡片显示「剩余额度未知」、这个号在路由里被当成不存在，
-// 而日志里什么都没有。src/quota.mjs 把它们变成运行时错误 —— 这里锁住那些错误。
+// ── 额度窗口：写错不报错、但卡片和智能路由会坏的写法 ──────────────────
+// 机制已于 2026-10-29 按上游结论更正（issue #468，magpie v0.1.1934）：
+//   · 判断「有没有占比」只看 used，与 aside 无关；没有 used 的窗口是 text-only，路由不计入
+//   · 有 amount + limit 但没 used：≥0.1.1934 会用 amount/limit 推算，更旧的版本会丢掉
+//   · aside 窗口只上卡片，路由从不读它
 
-test("quota: aside 窗口给 amount/limit → 抛（否则整条窗口被丢掉，路由当它不存在）", () => {
-  assert.throws(
-    () => usageWindow({ name: "赠送", used: 0, aside: true, amount: 1, limit: 2 }),
-    /aside: true 的窗口不能给 amount\/limit/,
-  )
+test("quota: 数量型没给 used → 自动按 amount/limit 算出（跨版本一致，不靠 magpie 推算）", () => {
+  const w = usageWindow({ name: "积分", amount: 370, limit: 1000, unit: "积分" })
+  assert.equal(w.used, 37)
+  assert.equal(w.amount, 370)
+  assert.equal(w.limit, 1000)
 })
 
-test("quota: used 缺省 → 抛（否则按 0% = 满额算，空号排到路由队首）", () => {
+test("quota: amount 与 limit 必须成对，limit > 0", () => {
+  assert.throws(() => usageWindow({ name: "积分", amount: 370 }), /必须成对/)
+  assert.throws(() => usageWindow({ name: "积分", limit: 1000 }), /必须成对/)
+  assert.throws(() => usageWindow({ name: "积分", amount: 5, limit: 0 }), /limit > 0/)
+})
+
+test("quota: 既没有 used 也没有 amount/limit、又没声明 textOnly → 抛（那是 text-only 窗口，路由不计入）", () => {
   assert.throws(() => usageWindow({ name: "5 小时", resetsAt: "2026-10-28T00:00:00Z" }), /used 必填/)
   assert.throws(() => usageWindow({ name: "5 小时", used: "37%" }), /used 必填/)
+})
+
+test("quota: text-only 窗口必须显式声明，且必须有 display", () => {
+  const w = usageWindow({ name: "积分", textOnly: true, display: "1,234 剩余（上限未知）" })
+  assert.equal(w.used, undefined)
+  assert.equal(w.textOnly, undefined) // 不是 magpie 的字段，不能漏进去
+  assert.throws(() => usageWindow({ name: "积分", textOnly: true }), /必须有 display/)
+  assert.throws(() => usageWindow({ name: "积分", textOnly: true, display: "x", used: 5 }), /不能再给/)
+})
+
+test("quota: aside 窗口不许给 amount/limit（分母是余额本身 ⇒ 永远剩余 100%）", () => {
+  assert.throws(() => usageWindow({ name: "赠送", amount: 50, limit: 100, aside: true }), /假占比|剩余 100%/);
+  const w = usageWindow({ name: "赠送", used: 0, aside: true, display: "5,500" })
+  assert.equal(w.aside, true)
+})
+
+test("quota: 所有窗口都不参与路由 → 抛（这个号在路由里等于不存在）", () => {
+  assert.throws(
+    () => usage({ windows: [{ name: "赠送", used: 0, aside: true, display: "5,500" }] }),
+    /所有窗口都不参与路由/,
+  )
+  assert.throws(
+    () => usage({ windows: [{ name: "用量", textOnly: true, display: "1,234" }] }),
+    /所有窗口都不参与路由/,
+  )
+  // 只要有一条参与路由就放行
+  const u = usage({ windows: [{ name: "赠送", used: 0, aside: true, display: "5,500" }, { name: "5 小时", used: 37 }] })
+  assert.equal(u.windows.length, 2)
 })
 
 test("quota: 厂商原样时间 / 秒级时间戳 → 统一成 ISO", () => {
@@ -166,8 +202,9 @@ test("quota: 厂商原样时间 / 秒级时间戳 → 统一成 ISO", () => {
   assert.throws(() => usageWindow({ name: "a", used: 1, resetsAt: "昨天" }), /无法解析/)
 })
 
-test("quota: 钱包型（balance）不能再给 used → 抛（否则被当占比读）", () => {
+test("quota: 钱包型（balance）不能再给 used / amount / limit", () => {
   assert.throws(() => usageWindow({ name: "积分", balance: 6291, used: 0, unit: "积分" }), /钱包型/)
+  assert.throws(() => usageWindow({ name: "积分", balance: 6291, amount: 1, limit: 2 }), /钱包型/)
   const w = usageWindow({ name: "积分", balance: 6291, unit: "积分" })
   assert.equal(w.balance, 6291)
   assert.equal(w.used, undefined)
