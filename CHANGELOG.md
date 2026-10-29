@@ -3,6 +3,18 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.1.27 — 2026-10-29
+
+**维护方式从「可以直接推 main」改成「功能分支 → PR 门禁 → 合并后受控发布」。**
+
+- **默认分支禁直推**：UPDATING / GUIDE / CHECKLIST 与派生仓库维护入口统一为功能分支流程；GitHub 保护要求 PR、`rules` 检查、分支最新、讨论解决，管理员也不绕过。
+- **CI 不再吞测试失败**：删除 `|| true`，`rules` 现在依次跑 `check.mjs`、语义测试和 `npm pack --dry-run`。
+- **`release.mjs` 不再推默认分支**：本地 HEAD 领先 `origin/main` 就拒绝；只有与已合并远端完全一致的提交才能发。发布前会真实重跑合规、测试和打包预演。
+- **`release.yml` 增加发布门**：tag 必须匹配 `package.json`，tag 提交必须已经进默认分支，检查 / 测试 / pack 全过才建 Release 或发 npm；手动刷新 Release 正文也正确使用输入的 tag。
+- **成熟实践来源**：采用 GitHub protected branches 的必需 PR / 状态检查模型；参考 release-please 的 Release PR 思路，但保留本仓库现有发布脚本，不新增第二套版本机器人。
+
+> 起因：主人指出，直接推包可能把坏包分发给正在使用的人；以后只能起分支，确认没问题后经 PR 合并成新版本。
+
 ## 0.1.26 — 2026-10-29
 
 **账号名那条规矩补齐：`accountId` 是名字，`uid` 是身份 —— 内部 ID 不许当名字。**
