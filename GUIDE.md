@@ -140,7 +140,7 @@ const MODELS = [
 
 | 错法 | 结果 | 正确做法 |
 |---|---|---|
-| `aside: true` 的窗口给了 `amount`/`limit` | 整条窗口被丢掉，路由页「剩余额度未知」 | `aside` 窗口只给 `display` |
+| 窗口有 `amount`/`limit` 却没有 `used` | magpie < 0.1.1934 把它当 text-only 丢掉；≥ 0.1.1934 才用 amount/limit 推算 | 用构造器，它自动补 `used` |
 | `resetsAt` 用厂商原样时间 | 解析失败，窗口不显示 | 先转 ISO |
 | `used` 缺省 | 被当 0% = 满额，空号排到队首 | 必填，有限数字 |
 
@@ -160,7 +160,7 @@ return buildUsage({
 
 上面三种错法**在这个构造器里会直接抛错**，不会变成「GUI 显示不对但日志里什么都没有」。
 这几条不是风格问题：额度窗口是 magpie **画卡片**和**智能路由排序**的同一个输入 ——
-`aside: true` 给了 `amount` 会让 `allowanceOf()` 整条跳过，这个号在路由里就等于不存在。
+**判断一条窗口有没有占比只看 `used`** —— 没有 `used` 的窗口路由不计入；`aside: true` 是另一个独立条件，路由也从不读它。一个号所有窗口都不参与路由，它在路由页就是「剩余额度未知」，而且排在已知账号之后。（机制按 [issue #468](https://github.com/magpie-community/plugins/issues/468) 于 2026-10-29 更正）
 
 **`checkin`**：返回 `{ outcome, credit?, streak?, message? }`，`outcome` 只能是
 `claimed` / `done` / `ineligible` / `inactive` / `captcha` / `failed` 六个之一。
@@ -207,8 +207,8 @@ C 层五项要**逐条在代码里找到判据**，不是「我觉得对」。�
 
 ## 9 · 发布前（照 CHECKLIST 的 B 表）
 
-七步，`git push` 只是第 4 步：
-写 CHANGELOG → bump version → `npm pack --dry-run` → 提交 → push → `npm publish` → tag + Release → 四条验证。
+**只推功能分支，不推 main**：写 CHANGELOG → bump → 合规 / 测试 / pack →
+推功能分支 → PR 全绿后合并 → `npm publish` → tag + Release → 五条验证。
 
 完整流程：[UPDATING.md](./UPDATING.md) · [CHECKLIST.md](./CHECKLIST.md)
 
@@ -234,7 +234,7 @@ C 层五项要**逐条在代码里找到判据**，不是「我觉得对」。�
 
 1. **`config.models` 不能空** —— 空了等于没装。
 2. **模型级错误用 404，不用 401** —— 401 会打死整个账号。
-3. **`git push` 不是发布** —— 七步里的第 4 步，少一步用户永远拿不到新版。
+3. **只推功能分支** —— PR 检查全绿并合并后才发布；直接推 main 会把坏包分发给用户。
 
 ---
 
