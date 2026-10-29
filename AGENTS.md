@@ -20,8 +20,12 @@
 | **要发一个版本** | **[UPDATING.md](./UPDATING.md) 全文** | [CHECKLIST.md](./CHECKLIST.md) 的 **B 表**全勾 + 五条验证 |
 | **用户说「有新版本但我这边没动静」** | UPDATING 的「一、magpie 怎么发现新版本」 | 分清是 npm 源（比 `version`）还是 git 源（比 HEAD commit） |
 
-**最容易漏的是第 5 行。** 只能推功能分支；PR 的必需检查全绿并合并后，
-才从与 `origin/main` 完全一致的提交发布。直接推 main 会把未验证代码分发给现有用户。
+**最容易漏的是第 5 行。** 而且要记住分支和 `main` 是**两条分发通道**，不是「先放着」和「正式」：
+- **分支 = 测试版通道**：用户写 `magpie plugin add owner/repo#feat-x` 才拿得到，不影响用 `main` 的人
+- **`main` = 稳定版通道**：git 源跟随默认分支 HEAD，进了就是所有人
+
+所以「怕把别人在用的插件炸了」的解法是**推分支**，不是「晚点推」。
+PR 是 GitHub 对受保护分支的技术要求（直推报 `GH006`），批准数 0、自己就能合。
 
 ---
 
@@ -43,7 +47,7 @@
 | 10 | 改了代码重装，行为一点没变 | 同版本号重打包会命中 bun 缓存（`no changes`）—— 必须 bump `version` | UPDATING 第 1 步 |
 | 11 | `magpie plugin add xxx.tgz` 跑完像成功，实际没装上 | 这个命令有 bug，改 `plugins.json` + `plugins/package.json` 两处 | README 常见坑 1 |
 | 12 | 想让卡片标题/文案对，去改了 magpie 的缓存文件 | 插件对 magpie 的目录**只有读的份**；唯一载体是 `registry-entry.json` | README「不要写 magpie 的缓存」 |
-| 13 | 用户那边没更新 / Release 页面是空的 / 「暂无发布版本」 | 起功能分支 → CHANGELOG + bump → 检查 / 测试 / pack → 推功能分支 → PR 全绿合并 → npm / tag / Release → 五条验证。**禁止直接推 main** | UPDATING 二 · CHECKLIST B |
+| 13 | 用户那边没更新 / Release 页面是空的 / 「暂无发布版本」 | 起功能分支 → CHANGELOG + bump → 检查 / 测试 / pack → 推分支 → 提 PR 等 `rules` 绿 → 合并 → npm / tag / Release → 五条验证。**直接推 main 会被分支保护拒绝** | UPDATING 二 · CHECKLIST B |
 
 补充两条只在发布侧出现的：
 
@@ -222,7 +226,7 @@ node scripts/probe-vision.mjs <provider/model> …
 | [README](./README.md) | 这个模板的设计原则：最小交付面、九项清单、三条铁律、常见坑 | 开工前 |
 | [HOOKS.md](./HOOKS.md) | 21 章钩子契约（**字段级**：少写/写错会怎样。官方文档讲行为，两者并用；`auth.checkin` 已于 v0.1.1582 补进官方文档） | 写代码时按钩子查 |
 | [MULTI-PROVIDER.md](./MULTI-PROVIDER.md) | 一个包两个供应商（国内/国际）：判据、骨架、五条铁律 | 只有多站点时 |
-| [UPDATING.md](./UPDATING.md) | 功能分支 + PR 门禁、合并后的受控发布、用户怎么拿到 | **每次发布前** |
+| [UPDATING.md](./UPDATING.md) | 功能分支 + PR + `rules` 门禁、进 main 后的受控发布、用户怎么拿到 | **每次发布前** |
 | [README-TEMPLATE.md](./README-TEMPLATE.md) | 插件介绍页模板（用户只看它决定装不装） | 写 README 时 |
 | [CHECKLIST.md](./CHECKLIST.md) | 两张勾选表：交付前 / 发版前 | 两个交付门 |
 | [CHANGELOG.md](./CHANGELOG.md) | 本模板自己的更新记录（格式即范例） | 找「为什么这样改」 |

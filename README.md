@@ -4,7 +4,8 @@
 
 > 克隆这个仓库，改三处配置，实现五个 TODO，就是一个标准 magpie 插件。
 > 然后**把它发出去** —— 那是另一套动作，见 [UPDATING.md](./UPDATING.md)：
-> 只能推功能分支，PR 检查全绿并合并后，才能从默认分支发布。
+> **分支 = 测试版通道**（`owner/repo#feat-x`），**`main` = 稳定版通道**（所有人）。
+> 测试版走分支，稳定版才进 `main` —— 这样分支上怎么折腾都不会把正在用的人炸了。
 
 ---
 
@@ -46,10 +47,10 @@
 
 ```
 起功能分支 → 写 CHANGELOG + bump → 合规 / 测试 / pack → 推功能分支
-  → PR 检查全绿后合并 → npm publish → tag + GitHub Release → 五条验证
+  → PR 的 `rules` 全绿后合并 → npm publish → tag + GitHub Release → 五条验证
 ```
 
-**禁止直接推默认分支。** 少了 PR 门禁，坏提交会直接抵达 git 源用户；少了发布与验证，
+**禁止直接推默认分支。** 少了 PR + `rules` 门禁，坏提交会直接抵达 git 源用户；少了发布与验证，
 npm 用户又可能停在旧版或拿到未验包。发版前逐条过 [CHECKLIST.md](./CHECKLIST.md) 的 B 表。
 
 ---
@@ -99,7 +100,7 @@ CI 在功能分支与 PR 上跑合规、语义测试和 `npm pack --dry-run`（`
 - [给 AI 的入口](./AGENTS.md) —— **按「你在哪一步」给阅读顺序，外加十几条静默出错的坑（症状→判据→出处）**
 - [交付清单](./CHECKLIST.md) —— **两张勾选表：代码交付前 / 发版前（check 脚本查不到的那部分）**
 - [写 README](./README-TEMPLATE.md) —— **插件介绍页的模板，照抄这份**
-- [更新途径](./UPDATING.md) —— **功能分支 + PR 门禁、合并后受控发布，每次发版前必读**
+- [更新途径](./UPDATING.md) —— **功能分支 + PR + `rules` 门禁、合并后受控发布，每次发版前必读**
 - [单插件多供应商](./MULTI-PROVIDER.md) —— **同一厂商两套云（国内/国际），一个包两个供应商**
 - [最小交付面](#最小交付面) —— 这个模板的设计原则
 - [magpie 是什么](#magpie-是什么)
@@ -764,15 +765,15 @@ agent       @magpie-community/agent-<name>
 
 - magpie 怎么发现新版本（npm 源比 `version`、git 源比默认分支 HEAD 的 commit，
   **两条路都不看 GitHub Release / tag**）
-- **分支 + PR 门禁，一步不能少**：起功能分支 → CHANGELOG + bump → 合规 / 测试 / pack →
-  推功能分支 → PR 全绿后合并 → `npm publish`（显示名与包名不同的插件用 `npm run publish:npm`）→
+- **分支 + PR + `rules` 门禁，一步不能少**：起功能分支 → CHANGELOG + bump → 合规 / 测试 / pack →
+  推功能分支 → 提 PR 等 `rules` 绿 → 合并 → `npm publish`（显示名与包名不同的插件用 `npm run publish:npm`）→
   tag + GitHub Release → 五条验证
 - 用户侧怎么拿到更新（npm 源自动、git 源要手动点「更新」；`rm` + `add` 会把卡片显示名
   重置成包名）
 
 > ⚠ 直接推默认分支会把未验证代码交给 git 源用户；只推代码不打 tag / 不发 npm，
 > 又会让版本状态彼此错位。逐条过 [CHECKLIST.md](./CHECKLIST.md) 的 B 表，
-> 并把 GitHub 的必需 PR 与 `rules` 检查打开，才算有发布门。
+> 并把 GitHub 的「Require a pull request」与 `rules` 检查都打开，才算有发布门。
 
 ---
 
