@@ -3,6 +3,63 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.1.29 — 2026-10-30
+
+**「自己给自己提 PR 有必要吗」—— 实测答案：是必须的。我上一版的推断错了，实测把它推翻了**
+
+主人问：在分支实验，没问题了就推主仓库，不行吗？我先查了分支保护 API，看到
+`required_pull_request_reviews.required_approving_review_count = 0`，判断「PR 没有评审 ⇒ 只是仪式」，
+于是把 5 个文件的表述改成了「PR 可选」。**然后实测直推 `main`：**
+
+```
+$ git push origin docs/pr-optional:main
+remote: error: GH006: Protected branch update failed for refs/heads/main.
+remote: - Changes must be made through a pull request.
+ ! [remote rejected] docs/pr-optional -> main (protected branch hook declined)
+```
+
+**为什么推断错了**：GitHub 的 `required_pull_request_reviews` 这个字段，
+**为 `null` = 不要求 PR；为一个对象（哪怕 `required_approving_review_count = 0`）= 要求 PR，只是不需要批准**。
+我只读了对象里的数字，没读「对象存在」这件事本身。
+
+所以真正的结论是：
+
+| 项 | 值 | 含义 |
+|---|---|---|
+| `required_pull_request_reviews` | 对象存在，`count = 0` | **必须走 PR 通道，但零批准** —— 自己就能合并 |
+| `required_status_checks` | `["rules"]`, `strict: true` | PR 上必须 `rules` 绿 |
+| `enforce_admins` | enabled | 管理员也绕不过 |
+
+**所以 PR 不是仪式，是 GitHub 对受保护分支硬性要求的唯一入口。**
+可省的不是 PR，而是 **`required approvals`**（保持 0，否则自己合不了）。
+
+- 本版把上一版改错的 5 处表述全部回滚成「必须 PR」，并在 [UPDATING](./UPDATING.md) 的配置表里写明这次实测的报错原文与 `null` vs 对象的区别
+- **[UPDATING](./UPDATING.md) 新增一节**「为什么 PR 不能省」，附实测命令与输出
+
+> 起因：自己给自己提 PR 看着确实像仪式。但**「像仪式」和「是仪式」是两件事** ——
+> 这次靠一次真推就分清了。教训：**读 GitHub API 的布尔语义，要看字段是否存在，不只看里面的数字。**
+
+**主人随后补了一句，把这条规矩的真实来由说清楚了：**
+
+> 建分支曾经是因为怕把别人在用的插件炸了。所以要分支推测试版本，`main` 推稳定版本。
+
+这比「PR 门禁」更根本 —— 分支不是「暂时放代码的地方」，是**测试版本的分发通道**：
+
+| 通道 | 写在哪 | 用户怎么装 | 谁拿得到 |
+|---|---|---|---|
+| **稳定版** | `main` | `magpie plugin add github:owner/repo` | 所有人（git 源会提示更新） |
+| **测试版** | 任意分支 | `magpie plugin add github:owner/repo#feat-x` | **只有显式写 `#ref` 的人** |
+
+官方契约（`#run`）：git 仓库按 `github:owner/repo[#ref]` 拉取；更新检测比「它的分支或标签
+（不写 `#ref` 时是默认分支）指向的提交」。⇒ **分支上怎么折腾都不会影响用 `main` 的人。**
+
+所以两件事分清了：
+
+- **「怕炸了别人」的解法是推分支**，不是「晚点推」—— 想试的人显式带 `#feat-x` 就能拿到
+- **PR 是 GitHub 对受保护分支的技术要求**（`GH006`），批准数 0、自己就能合，不是评审流程
+
+[UPDATING](./UPDATING.md) 新增「一之前 · 分支和 `main` 各管什么」一节，用户侧补了装测试分支的命令；
+[AGENTS](./AGENTS.md) 与 [README](./README.md) 同步了这个说法。
 ## 0.1.28 — 2026-10-30
 
 **issue #468 全部被接受：四条进了官方文档 v0.1.1934，其中两条是真 bug —— 但我们有两条把因果说错了**

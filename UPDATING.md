@@ -7,7 +7,10 @@
 ## 铁律：默认分支只接受通过门禁的 PR
 
 **不许直接 `git push origin main`，不许从没合并的功能分支打 tag / 发 npm。**
-唯一路径是：功能分支 → 本地检查 → PR → CI 全绿 → 合并 → 从已合并的默认分支发布。
+唯一路径是：功能分支 → 本地检查 → 推分支 → **提 PR** → `rules` 全绿 → 合并 → 从 `main` 发布。
+**为什么 PR 不能省**：受保护分支硬性要求走 PR 通道 —— 实测直推报
+`GH006: Protected branch update failed ... Changes must be made through a pull request`。
+能省的是 **required approvals**（保持 0，自己就能合并），不是 PR 本身。
 
 原因很直接：git 源用户会跟随默认分支 HEAD，npm 源用户会跟随 registry 新版本。
 绕过 PR 直接把坏提交推上去，等于把故障分发给所有正在用的人。
@@ -18,6 +21,37 @@
 本仓库保留现有 `release.mjs`，不引入另一套机器人，但采用同一道门：**先审一个可验证的 PR，再发布合并结果。**
 
 逐条勾 [CHECKLIST.md](./CHECKLIST.md) 的 B 表，别凭记忆。
+
+---
+
+## 一之前 · 分支和 `main` 各管什么（这条规矩的第一性理由）
+
+**分支不是「先放着的未验证代码」，是「测试版本的发布通道」。**
+
+这条规矩不是从「PR 流程」倒推出来的，是从一个很具体的问题来的：
+**怕把别人正在用的插件炸了。** git 源的用户跟随**默认分支 HEAD**，
+所以坏提交一旦进 `main`，所有人下一次检查更新就会拿到。
+
+解法不是「晚点推」，是**推分支**：
+
+| 通道 | 写在哪 | 用户怎么装 | 谁拿得到 |
+|---|---|---|---|
+| **稳定版** | 默认分支 `main` | `magpie plugin add github:owner/repo` | 所有人；git 源会提示更新 |
+| **测试版** | 任意分支 | `magpie plugin add github:owner/repo#feat-x` | **只有显式写 `#ref` 的人**；同样会提示该分支的新 commit |
+
+官方契约（`usemagpie.ai/docs/plugins#run`）：git 仓库按 `github:owner/repo[#ref]` 拉取；
+更新检测比的是「它的分支或标签（不写 `#ref` 时是默认分支）指向的提交和装的那个」。
+⇒ **分支是给愿意试的人用的，`main` 是给所有人用的**，两条通道互不影响。
+
+**PR 则是 GitHub 对受保护分支的技术要求** —— 实测直推会被拒：
+
+```
+remote: error: GH006: Protected branch update failed for refs/heads/main.
+remote: - Changes must be made through a pull request.
+```
+
+它不是这条规矩的目的，只是把「测试版」与「稳定版」隔开的那道闸。
+批准数保持 **0**，自己就能合，不需要找人看。
 
 ---
 
@@ -38,7 +72,7 @@
 
 ⇒ 两条硬推论：
 
-1. **git 源最终必须落到默认分支（`main`），但只能经 PR 合并。** 功能分支本身不会触发用户更新。
+1. **git 源最终必须落到默认分支（`main`），而且只能经 PR 合并。** 功能分支本身不会触发用户更新。
 2. **npm 源必须 bump `version` 再 `npm publish`。** 不 bump 就检测不到；发布输入必须是 PR 合并后的提交。
 
 > **只走 git 源也可以。** 不发 npm 的插件，就只有「PR 合进默认分支」这半条路 ——
@@ -104,7 +138,7 @@ gh pr checks --watch
 
 | 设置 | 值 |
 |---|---|
-| Require a pull request before merging | 开；单人仓库的 required approvals 可为 0，但 PR 本身不可省 |
+| Require a pull request before merging | **必须开**。API 里 `required_pull_request_reviews` 为 `null` = 不要求 PR；为对象（哪怕 `required_approving_review_count = 0`）= **要求 PR 但不需要批准**。实测（2026-10-30）：分支的 `rules` 已绿、直接 `git push origin <branch>:main` 仍被拒 —— `GH006: Changes must be made through a pull request` |
 | Require status checks to pass | 开，必需检查 = `rules` |
 | Require branches to be up to date | 开 |
 | Require conversation resolution | 开 |
@@ -246,6 +280,16 @@ magpie 只会**提示**，要用户手动更新：
 ```bash
 magpie plugin update
 ```
+
+**想试测试版本（分支）**：装的时候把分支写进去，之后就跟这个分支走：
+
+```bash
+magpie plugin add github:owner/repo#feat-x   # 只影响你这一个装法
+magpie plugin update                          # 分支有新 commit 时，这里会提示
+```
+
+分支和 `main` 是两条互不影响的通道 —— 分支上怎么折腾都不会影响用 `main` 的人。
+反过来说：**你在分支上推的东西，没写 `#ref` 的人永远拿不到**，所以别指望它「先让大家试试」。
 
 ⚠ 若版本没动，是 `bun.lock` 锁住了旧 commit —— 这时**单跑 `plugin add` 也没用**
 （实测：它会打印 `✓ added`，版本却不变）。先移除再装，才会重新解析：
@@ -462,7 +506,7 @@ README 里只留路标 —— 别把 changelog 抄一遍进 README，那是两�
 □ CHANGELOG 里这个版本那几条写好了（一条一行，说人话）
 □ version 已经 bump（npm 源检测就看它）
 □ 合规检查、语义测试、npm pack --dry-run 全过，没有用 || true 掩盖失败
-□ 推的是功能分支；PR 的 rules 检查全绿后才合并进默认分支
+□ 推的是功能分支，PR 的 `rules` 全绿后才合并进默认分支
 □ 本地 main 与 origin/main 完全一致，release.mjs 预演通过
 □ npm publish 成功（显示名与包名不同的插件：`npm run publish:npm`）
 □ GitHub Release 发了：tag `v<version>`，说明里一条条列了这次的更新
