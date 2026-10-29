@@ -167,8 +167,8 @@ node scripts/probe-vision.mjs <provider/model> …
 
 结论：**`index.mjs` 只做装配，实现全在 `src/`** —— 最成熟的那个（magicrew）index 只有 80 行。
 
-已经备好四块骨架（前三块四个插件里 4/4 都有；`store` 只有 magicrew 独立成文件，
-另两个各自实现了等价逻辑）：
+已经备好八块骨架（前三块四个插件里 4/4 都有；`store` 只有 magicrew 独立成文件，
+另两个各自实现了等价逻辑；后四块是 2026-10-29 从 magicrew 真机链路抽出来的通用协议）：
 
 | 文件 | 里面写什么 | 为什么单独拎出来 |
 |---|---|---|
@@ -180,6 +180,10 @@ node scripts/probe-vision.mjs <provider/model> …
 | [`src/invite.mjs`](./src/invite.mjs) | `createInviteStore` / `inviteHint` / `resolveInvite` / `makeInviteMethod` | 邀请码只能在登录 URL 上带、事后补不了；而 `prompts` 是静态数组，串不起「填码 → 主登录」—— 只有 `ask()` 能 |
 | [`src/desktop-import.mjs`](./src/desktop-import.mjs) | `hasDesktopLogin` / `decryptChromiumV10` / `importDesktopLogin` | 厂商有桌面客户端时，这是**唯一不弹浏览器**的登录路；DPAPI + AES-GCM 的边界（v11/v20 解不开）必须写在代码里 |
 | [`src/account-name.mjs`](./src/account-name.mjs) | `accountLabelOf` / `resolveAccountLabel` | 换码响应没有账号名 ⇒ 卡片只能显示「Signed in」；补一次 userinfo 就行，但**失败不能阻塞登录、不能编造** |
+| [`src/rotation-captcha.mjs`](./src/rotation-captcha.mjs) | `encodeAngle` / `createRotationCaptcha` / `solveRotationCaptcha` / `createCookieJar` | 「旋转图片对正」的验证码：角度编码是从前端反出来的（实测 4 组提交正向穷举唯一命中）；`acw_tc` WAF cookie 不带回去会回「客户端信息不匹配」；判角不可信要换图而不是硬撞 |
+| [`src/vision-clock.mjs`](./src/vision-clock.mjs) | `readVisionModel` / `decideDegFromImage` / `clockToDeg` / `clockSpread` | 用用户自己在 magpie 里选的识图模型判「主体朝几点」；两个判官并行 + 分歧阈值；`max_tokens` 是给推理留的（400 会饿死答案） |
+| [`src/local-browser.mjs`](./src/local-browser.mjs) | `readLocalCreds` / `credsNear` / `leveldbText` | 用户在自己浏览器里登录过时，直接读 localStorage 的 leveldb —— 不开窗、不弹浏览器；跨 origin 必须截断，否则 A 站 jwt 会配到 B 站 org |
+| [`src/tempmail-client.mjs`](./src/tempmail-client.mjs) | `createTempMailbox` / `waitTempCode` | 邮箱验证码自动登录的一次性地址；域名有黑名单（`maxxspace.com` 被 magicrew 拒），换厂商先用真实请求确认 |
 | [`tests/semantics.test.mjs`](./tests/semantics.test.mjs) | 22 条语义锁（含 6 条额度窗口） | `check.mjs` 查不到的那部分，只有它能拦 |
 
 **为什么 `src/quota.mjs` 值得单独一个文件**：额度窗口是 magpie **画卡片**和**智能路由排序**的同一个输入。
