@@ -3,6 +3,17 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.1.24 — 2026-10-29
+
+**把「登录」这一轮的真机经验抽成三个可复用模块 + 两处契约补漏。**
+
+- **新增 [`src/invite.mjs`](./src/invite.mjs)**：邀请码 / 推荐码的通用做法 —— 策略文件（`~/.cache/magpie/<前缀>-invite.json`）、数字框语义（0/空=沿用、1=保持、其它=新码）、`makeInviteMethod()` 生成「邀请码 → 主登录」的登录方式。含一条实测坑：**换码必须一起换与码成对的额外字段**（Accio 的 `sId`，拿旧 `sId` 配新 `ic` 就是「填了码但邀请不生效」）。
+- **新增 [`src/desktop-import.mjs`](./src/desktop-import.mjs)**：从本机 Electron 客户端导入登录态（Windows）—— Chromium OSCrypt `v10` + DPAPI，明确拒绝 `v11`/`v20`（App-Bound，解不开就报错而不是给乱码）。这条路**不弹浏览器**，前提是用户已登录过官方客户端。
+- **新增 [`src/account-name.mjs`](./src/account-name.mjs)**：卡片上的账号名从哪来 —— 换码响应没有账号名时，登录后调一次「当前账号」接口；优先级「手机号（去 +86）→ 邮箱 → id → 空串」，失败不阻塞登录、不编造。
+- **HOOKS 四·陷阱 5**：**多步问答必须用 `ask()`**，不是 `prompts` 数组。补上契约来源（`NextPrompt()` → 插件 `prompt` 钩子 → `method.ask`）、CLI/GUI 两处调用点、以及「只给 `ask` 不给 `prompts`，列表里那条看起来像什么都不问」。
+- **HOOKS 四之二**：登录的三种形态（浏览器 OAuth / 本机客户端导入 / 内置 headless），各自弹不弹窗口、前提、实测结论，以及选择顺序。**内置 headless 不建议默认提供** —— 同一出口 IP 连续发码会被静默拦下。
+- **新增 [`tests/invite-and-name.test.mjs`](./tests/invite-and-name.test.mjs)**：6 条语义锁（数字框三态、策略读写与额外字段继承、`ask` 三步序列、`authorize` 复用主登录、账号名优先级）。
+
 ## 0.1.23 — 2026-10-29
 
 **模型能力那一栏，「不写」不等于「不支持」—— 补上这个静默误判**

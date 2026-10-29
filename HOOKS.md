@@ -371,6 +371,51 @@ auth: {
 }
 ```
 
+### 陷阱 5：多步问答必须用 `ask()`，不是 `prompts` 数组
+
+`prompts` 是**静态**的：magpie 读它列问题，一次问完。要让「邀请码 → 主登录的问题」串起来，
+method 上还要再加一个 `ask(inputs)`，每次返回**下一个**问题，问完返回 `null`：
+
+```js
+{
+  type: "oauth",
+  label: "… 邀请码",
+  get prompts() { return [invitePrompt()] },        // 面板列表要靠它
+  async ask(inputs) {
+    if (!hasOwn(inputs, "invite")) return invitePrompt()
+    if (!hasOwn(inputs, "region")) return regionPrompt
+    return null                                      // 问完了
+  },
+  async authorize(inputs) {
+    saveInvite(inputs.invite)                        // 保存策略
+    return await mainMethod.authorize(inputs)        // 直接接主登录
+  },
+}
+```
+
+契约：`internal/plugin/providers.go` 的 `NextPrompt()` → 插件 `prompt` 钩子 → `method.ask(inputs)`。
+CLI 与 GUI 都走它（`internal/cli/plugins_cli.go:453`、`internal/gui/plugins.go:746`）。
+
+⚠ **同时保留 `get prompts()`**：只给 `ask` 不给 `prompts`，那条登录方式在列表里看起来像什么都不问。
+⚠ `authorize` 里**复用主登录的 authorize**，不要复制一份 callback —— 复制必然只改一边。
+⚠ 判断「问过没有」用 `Object.prototype.hasOwnProperty.call(inputs, key)`，
+   不要用 `inputs[key] !== undefined`：用户填了空字符串也是「问过了」。
+
+---
+
+## 四之二、登录的三种形态（决定弹不弹浏览器）
+
+| 形态 | 形状 | 弹窗口？ | 前提 | 实测结论 |
+|---|---|---|---|---|
+| **A 浏览器 OAuth** | `{ url, method: "auto", callback }`，callback 里等 loopback 回来 | **会** | 无 | 最通用；厂商的登录页、滑块、验证码都交给厂商自己 |
+| **B 本机客户端导入** | `{ url, opened: true, method: "auto" }` + callback 里读客户端文件 | **不会** | 用户已装并登录过官方客户端 | 最省事；见 [`src/desktop-import.mjs`](./src/desktop-import.mjs)（DPAPI + AES-GCM） |
+| **C 内置验证码（headless）** | 后台起 headless 浏览器走登录页，`method: "code"` 让用户只填验证码 | **不会** | 本机有 Chromium 内核浏览器 | **不建议默认提供**：滑块/风控/限流都要自己扛，实测同一出口 IP 连续发码会被静默拦下（页面停在发送页、不报错） |
+
+**选择顺序**：B（如果有客户端）→ A（默认）→ C（只在 B 不可用且厂商没风控时）。
+
+`auth.methods` 里可以同时给出 A 和 B：B 的 `opened: true` 让 magpie 不再开页面，
+整个登录就是「点一下 → 读文件 → 成功」。
+
 ---
 
 ## 五、`auth.refresh` 的语义
