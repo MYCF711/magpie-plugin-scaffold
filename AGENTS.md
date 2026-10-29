@@ -72,6 +72,7 @@
 | 24 | **卡片上额度正常，路由页里这个号却是「剩余额度未知」，还总排在别人后面** | 窗口标了 `aside: true`（或 `used` 缺省被判成 `Text`）⇒ `allowanceOf()` 整条跳过 ⇒ `routedAllowance` 不 ok ⇒ `weighed()` 不设 `Known`。**`aside` 不是「不参与排序」，是「这个号在路由里不存在」**。判据：`curl -s http://127.0.0.1:3425/v1/magpie/trace` 看这个 provider 的 `known` 是 `true` 还是**字段缺失**；`~/.config/magpie/quotas.json` 的 `spans` 是 `[{}]` 还是 `[{"aside":true}]` | HOOKS 三 · 规矩 ① |
 | 25 | **模型明明收不了图，却被当成能收图**：截图直发上游报 `The request model is not multimodal` / 400，或者模型回「图片无法查看」 | 模型条目的 `capabilities.input.image` **必须写成布尔值**：省略不等于 text，等于「厂商未表态」，magpie 会拿 models.dev 的裸模型 id 投票补 —— 同名模型在别家标过 `image`，这个模型就会被带成能收图。text-only 模板见 HOOKS 十一之三；反向的手动覆盖（厂商说 `false` 却勾了 `Accepts images`）在 magpie 侧暂无警告 | HOOKS 十一之三 · CHECKLIST A-14 |
 | 26 | 邀请码填了、主登录也过了，但上级没拿到奖励；或「邀请码」那条登录方式点开只有一个框、后面什么都没接 | 两个原因：① 与码成对的额外参数没带（Accio 的 `sId`）—— 换码时必须一起换，见 `src/invite.mjs` 的 `write()`；② 用 `prompts` 数组串「邀请码 → 主登录」是串不起来的，必须用 `ask()`（HOOKS 四·陷阱 5） | HOOKS 四·陷阱 5 · 四之二 · `src/invite.mjs` |
+| 27 | **卡片上的账号名是一串看不懂的 ID**（`iam::01a1642a…:user:hw0615…`、`urn:…`、uuid），用户以为是「显示乱码」 | `accountId` 是**名字**，不是身份：手机号（`maskPhone` 打码 `189****8051`）→ 昵称/邮箱 → **空串**（宿主回退供应商名）。内部 ID 只进 `uid`。**URN 写进 `accountId` 极难改回** —— 续期返回值是合并、插件落盘又多保留旧值，所以续期路径也要重算一遍 | HOOKS 八的「`accountId` 是名字，`uid` 是身份」· `src/account-name.mjs` 的 `resolveAccount` |
 
 ---
 
@@ -179,7 +180,7 @@ node scripts/probe-vision.mjs <provider/model> …
 | [`src/quota.mjs`](./src/quota.mjs) | `usageWindow` / `usage` / `toIso` / `QuotaShapeError` | **把「写错不报错、但 GUI 和智能路由会坏」的五类窗口写法变成运行时错误** —— 见下方的表 |
 | [`src/invite.mjs`](./src/invite.mjs) | `createInviteStore` / `inviteHint` / `resolveInvite` / `makeInviteMethod` | 邀请码只能在登录 URL 上带、事后补不了；而 `prompts` 是静态数组，串不起「填码 → 主登录」—— 只有 `ask()` 能 |
 | [`src/desktop-import.mjs`](./src/desktop-import.mjs) | `hasDesktopLogin` / `decryptChromiumV10` / `importDesktopLogin` | 厂商有桌面客户端时，这是**唯一不弹浏览器**的登录路；DPAPI + AES-GCM 的边界（v11/v20 解不开）必须写在代码里 |
-| [`src/account-name.mjs`](./src/account-name.mjs) | `accountLabelOf` / `resolveAccountLabel` | 换码响应没有账号名 ⇒ 卡片只能显示「Signed in」；补一次 userinfo 就行，但**失败不能阻塞登录、不能编造** |
+| [`src/account-name.mjs`](./src/account-name.mjs) | `maskPhone` / `looksLikeIdentifier` / `accountLabelOf` / `resolveAccountLabel` / `resolveAccount` | 换码响应没有账号名 ⇒ 卡片只能显示「Signed in」；补一次 userinfo 就行，但**失败不能阻塞登录、不能编造**。手机号一律打码；内部 ID（`iam::…` / URN / uuid / `hw…`）**不许当名字** —— 它们进 `uid`，名字取不到就是空串 |
 | [`src/rotation-captcha.mjs`](./src/rotation-captcha.mjs) | `encodeAngle` / `createRotationCaptcha` / `solveRotationCaptcha` / `createCookieJar` | 「旋转图片对正」的验证码：角度编码是从前端反出来的（实测 4 组提交正向穷举唯一命中）；`acw_tc` WAF cookie 不带回去会回「客户端信息不匹配」；判角不可信要换图而不是硬撞 |
 | [`src/vision-clock.mjs`](./src/vision-clock.mjs) | `readVisionModel` / `decideDegFromImage` / `clockToDeg` / `clockSpread` | 用用户自己在 magpie 里选的识图模型判「主体朝几点」；两个判官并行 + 分歧阈值；`max_tokens` 是给推理留的（400 会饿死答案） |
 | [`src/local-browser.mjs`](./src/local-browser.mjs) | `readLocalCreds` / `credsNear` / `leveldbText` | 用户在自己浏览器里登录过时，直接读 localStorage 的 leveldb —— 不开窗、不弹浏览器；跨 origin 必须截断，否则 A 站 jwt 会配到 B 站 org |

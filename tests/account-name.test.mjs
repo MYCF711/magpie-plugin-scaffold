@@ -1,0 +1,72 @@
+// 账号名的语义锁：打码、ID 识别、名字与身份分离。
+//
+// 这一块出事的样子是「卡片上三串看不懂的 ID」，不报错、不崩，用户只会以为插件坏了
+// （真实事故：CodeArts 0.2.4 拿 principal_urn 当账号名）。所以每条都要锁住。
+
+import { test } from "node:test"
+import assert from "node:assert/strict"
+
+const { maskPhone, looksLikeIdentifier, accountLabelOf, resolveAccount } = await import(
+  "../src/account-name.mjs"
+)
+
+test("maskPhone：0086- / +86 / 裸号 / 已打码，一律 3+4", () => {
+  // 华为云 IAM 的原始形状（实测 0086-18970098051）
+  assert.equal(maskPhone("0086-18970098051"), "189****8051")
+  assert.equal(maskPhone("+86 189 7009 8051"), "189****8051")
+  assert.equal(maskPhone("18970098051"), "189****8051")
+  // 厂商已经打过码的值：不能被二次破坏
+  assert.equal(maskPhone("189****8051"), "189****8051")
+  assert.equal(maskPhone("181****0632"), "181****0632")
+  // 不是号码形状 → 空串，让调用方回退，而不是显示半截
+  assert.equal(maskPhone(""), "")
+  assert.equal(maskPhone(undefined), "")
+  assert.equal(maskPhone("123"), "")
+  // 边界：86 开头的真号码不能被当成国家码砍掉头两位
+  assert.equal(maskPhone("86123456789"), "123****6789")
+  // 但带国家码的短号（后面只剩 7 位）仍要去掉前缀
+  assert.equal(maskPhone("0086-1898051"), "189****8051")
+})
+
+test("looksLikeIdentifier：这些都不许当名字", () => {
+  // IAM 的 URN（真实值）
+  assert.equal(looksLikeIdentifier("iam::01a1642ad2ae7f93bf6387ad2fc5f09e:user:hw061571365626786"), true)
+  assert.equal(looksLikeIdentifier("arn:aws:iam::123:user/x"), true)
+  assert.equal(looksLikeIdentifier("urn:ietf:params:oauth:jwt"), true)
+  // 华为 IAM 的账号名
+  assert.equal(looksLikeIdentifier("hw061571365626786"), true)
+  // uuid / 裸 hash
+  assert.equal(looksLikeIdentifier("0d1606bf-9a1c-4c2e-8b7d-1234567890ab"), true)
+  assert.equal(looksLikeIdentifier("01a1642ad2ae7f93bf6387ad2fc5f09e"), true)
+  // 真的名字 / 邮箱 / 短 id：都不该误判
+  assert.equal(looksLikeIdentifier("张三"), false)
+  assert.equal(looksLikeIdentifier("a@b.com"), false)
+  assert.equal(looksLikeIdentifier("1798171953"), false, "纯数字短 id 仍可当名字")
+  assert.equal(looksLikeIdentifier("hw"), false)
+  assert.equal(looksLikeIdentifier(""), false)
+})
+
+test("resolveAccount：accountId 是人看的名字，uid 是身份", () => {
+  const urn = "iam::01a1642ad2ae7f93bf6387ad2fc5f09e:user:hw061571365626786"
+  // 有手机号：打码当名字，URN 进 uid —— 这就是 CodeArts 0.2.5 的形状
+  assert.deepEqual(resolveAccount({ phone: "0086-18970098051", name: "hw061571365626786", urn }), {
+    accountId: "189****8051",
+    uid: urn,
+  })
+  // 没手机号：真人名可以当名字
+  assert.deepEqual(resolveAccount({ name: "张三", urn }), { accountId: "张三", uid: urn })
+  // 没手机号、名字又像 ID：不给 accountId（宿主回退供应商名），绝不拿 URN 顶上
+  assert.deepEqual(resolveAccount({ name: "hw061571365626786", urn }), { uid: urn })
+  // 什么都没有：空对象，不编造
+  assert.deepEqual(resolveAccount(), {})
+  assert.deepEqual(resolveAccount({}), {})
+})
+
+test("accountLabelOf：手机号优先于任何 id 字段", () => {
+  const info = { phone: "0086-18170806710", email: "x@y.com", accountId: "iam::d1:user:hw0406" }
+  assert.equal(accountLabelOf(info), "181****6710")
+  // 邮箱优先于「像 ID」的 id
+  assert.equal(accountLabelOf({ email: "x@y.com", accountId: "iam::d1:user:hw0406" }), "x@y.com")
+  // 只剩 ID：空串
+  assert.equal(accountLabelOf({ accountId: "iam::d1:user:hw0406" }), "")
+})

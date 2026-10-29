@@ -545,6 +545,38 @@ return {
 | `email` | 再次选 |
 | `uid` | 厂商自己的 id，区分同名账号（issue #413）|
 
+### `accountId` 是名字，`uid` 是身份 —— 别拿内部 ID 当名字
+
+`accountId` 只放**人扫一眼就能分辨**的东西：打码手机号（`189****8051`）、邮箱、昵称。
+厂商的内部 ID（`iam::<domain>:user:<name>`、`urn:…`、uuid、裸 hash、华为的 `hw0615…`）
+不是名字，它们进 `uid`。
+
+**写错的代价是永久性的**：`auth.refresh` 返回的字段会**合并**进旧记录，而插件自己的
+落盘（`persistCredential`）通常又会优先保留已有的 `accountId` —— URN 进去一次，卡片就再也
+变不回来。用户看到的是三行 `iam::01a1642a…:user:hw0615…`，只会以为「插件显示乱码」。
+
+```js
+import { resolveAccount } from "./src/account-name.mjs"
+
+// 登录成功：名字给人看，身份给宿主去重
+const { phone, name, urn } = await readWhoSignedIn(cred)   // 你的接口
+return { type: "success", refresh, access, expires, ...resolveAccount({ phone, name, urn }) }
+// → { accountId: "189****8051", uid: "iam::01a1642ad2ae7f93bf6387ad2fc5f09e:user:hw061571365626786" }
+```
+
+三条判据：
+
+1. 手机号一律**打码**（`maskPhone`：`0086-…` / `+86 …` / 裸号 / 已打码的值都认）。
+2. 像内部 ID 的值**不当名字**（`looksLikeIdentifier`：含 `::`、`urn:`、uuid、裸 hash、`hw…`）。
+   名字全取不到就**不给 `accountId`**，让宿主回退供应商名 —— **绝不拿 URN 顶上**。
+3. **老记录要能改**：续期时把 `accountId` 重新算一遍，并在 `refresh` 的返回值里带上；
+   magpie 会用它覆盖旧记录（`host.js`：`if ("refresh" in result) setAuth(key, { …, ...extra })`）。
+   只改登录路径的话，已登录的账号会永远停在旧名字上。
+
+> 真实事故：CodeArts 0.2.4 从 refresh token 的 `user_profile` 取 `principal_urn` 当 `accountId`，
+> 三个账号显示成三串 ID；0.2.5 改成登录后读一次华为云 IAM 的手机号（`GET /v3.0/OS-USER/users/
+> {principal_id}` → `user.phone`），打码成 `189****8051`，URN 改走 `uid`。
+
 ### 没有 accountId 时
 
 ```js

@@ -85,9 +85,10 @@ test("makeInviteMethod：ask 三步（邀请码 → 主问题 → null），auth
   assert.deepEqual(mainCalls, [{ invite: "IC1", region: "cn" }], "authorize 必须把完整 inputs 交给主登录")
 })
 
-test("accountLabelOf：手机号（去 +86）→ 邮箱 → id → 空串，且不编造", () => {
+test("accountLabelOf：手机号（打码）→ 邮箱 → id → 空串，且不编造", () => {
   assert.equal(accountLabelOf({ maskedMobile: "+86 189****8051", userId: "1" }), "189****8051")
-  assert.equal(accountLabelOf({ mobile: "13800138000" }), "13800138000")
+  // 完整号码也要打码：卡片是给人扫一眼的，不是通讯录（规矩 ②）
+  assert.equal(accountLabelOf({ mobile: "13800138000" }), "138****8000")
   assert.equal(accountLabelOf({ email: "a@b.com", userId: "1" }), "a@b.com")
   assert.equal(accountLabelOf({ desensitizedEmail: "a***@b.com" }), "a***@b.com")
   assert.equal(accountLabelOf({ userId: "1798171953" }), "1798171953")
@@ -95,4 +96,10 @@ test("accountLabelOf：手机号（去 +86）→ 邮箱 → id → 空串，且�
   assert.equal(accountLabelOf(null), "")
   // 自定义字段名
   assert.equal(accountLabelOf({ tel: "139****0000" }, { mobile: ["tel"] }), "139****0000")
+  // 像内部 ID 的值不当名字（规矩 ④）；要它就得显式 allowId
+  assert.equal(accountLabelOf({ userId: "iam::d1:user:hw061571365626786" }), "")
+  assert.equal(accountLabelOf({ username: "hw061571365626786" }), "")
+  assert.equal(accountLabelOf({ userId: "hw061571365626786" }, { allowId: true }), "hw061571365626786")
+  // 不打码的老行为仍然可选
+  assert.equal(accountLabelOf({ mobile: "13800138000" }, { mask: false }), "13800138000")
 })

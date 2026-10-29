@@ -3,6 +3,21 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.1.26 — 2026-10-29
+
+**账号名那条规矩补齐：`accountId` 是名字，`uid` 是身份 —— 内部 ID 不许当名字。**
+
+- **新增 [`maskPhone`](./src/account-name.mjs)**：`0086-18970098051` / `+86 189 7009 8051` / 裸号 / 厂商已打码的值，一律给出 `189****8051`。国家码只在后面还剩够长的号码时才砍（`86123456789` 这种 86 开头的真号不会被砍成 9 位）。
+- **新增 [`looksLikeIdentifier`](./src/account-name.mjs)**：`iam::<domain>:user:<name>`、`urn:…`、uuid、裸 hash、华为 IAM 的 `hw061571365626786` —— 一眼看出是 ID 的形状，不当名字。
+- **新增 [`resolveAccount`](./src/account-name.mjs)**：登录成功时直接拿到 `{ accountId: "189****8051", uid: "iam::…" }` —— 名字给人看，身份给宿主去重（HOOKS 八的 `settle`）。名字全取不到就**不给 `accountId`**，让宿主回退供应商名，**绝不拿 URN 顶上**。
+- **`accountLabelOf` 行为变了（默认打码 + 跳过像 ID 的值）**：`mask` 默认 `true`、`allowId` 默认 `false`；要旧行为显式传 `{ mask: false }` / `{ allowId: true }`。
+- **HOOKS 八** 新增「`accountId` 是名字，`uid` 是身份」：写错的代价是**永久性**的 —— `auth.refresh` 的返回值是合并，插件落盘又多保留旧值，URN 进去一次卡片就再也变不回来。所以**续期路径也要把 `accountId` 重算一遍**。
+- **CHECKLIST A-15**：卡片上不许出现 `iam::…` / `urn:…` / uuid / `hw…`；手机号是打码的；名字取不到 = 空串；多账号重复登录仍是替换。
+- **AGENTS 坑 27**：症状写的就是用户的原话 ——「一串看不懂的 ID，以为是乱码」。
+- **新增 [`tests/account-name.test.mjs`](./tests/account-name.test.mjs)**（4 组 20 条断言：打码边界、ID 形状、名字与身份分离、优先级）；`node --test` **48 通过**。
+
+> 起因：CodeArts 0.2.4 从 refresh token 的 `user_profile` 取 `principal_urn` 当账号名，三个账号在三张卡片上是三串 ID。0.2.5 改成登录后读一次华为云 IAM 的手机号（`GET /v3.0/OS-USER/users/{principal_id}` → `user.phone`），打码成 `189****8051`，URN 改走 `uid`，老记录在下次续期时改名 —— [magpie-community/plugins#483](https://github.com/magpie-community/plugins/pull/483)。
+
 ## 0.1.25 — 2026-10-29
 
 **把 magicrew 真机链路里四块通用的「登录协议」抽成模块 + 44 条测试。**
