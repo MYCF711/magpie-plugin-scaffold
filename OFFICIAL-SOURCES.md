@@ -67,7 +67,7 @@
 
 | # | 官方锚点 | 官方讲什么 | 本仓库对应 | 增量 |
 |---|---|---|---|---|
-| 12 | [`#usage` 用量](https://usemagpie.ai/docs/zh/plugins#usage) | `auth.usage` 全部字段：plan / balance / windows（used / resetsAt / span / amount / limit / aside / runsOutAt / runsOut / balance） | [HOOKS 三](./HOOKS.md) | **补充**：三条「写错不报错」的窗口规矩 —— `aside` 给了 amount/limit 会被整条丢掉；时间必须是 ISO；`aside` 不是「不参与排序」而是「路由里不存在」（坑 22/23/24） |
+| 12 | [`#usage` 用量](https://usemagpie.ai/docs/zh/plugins#usage) | `auth.usage` 全部字段：plan / balance / windows（used / resetsAt / span / amount / limit / aside / runsOutAt / runsOut / balance） | [HOOKS 三](./HOOKS.md) | **补充 → 已反向补进官方**（[#468](https://github.com/magpie-community/plugins/issues/468)，v0.1.1934）：窗口的占比**只看 `used`**（没有 `used` 的窗口是 text-only、路由不计入；≥ 0.1.1934 起有 amount/limit 时会推算）；时间必须是 ISO；`aside` 窗口**路由从不读**，只上卡片 |
 | 13 | [`#checkin` 签到](https://usemagpie.ai/docs/zh/plugins#checkin) | `auth.checkin`、六个 outcome、北京时间每天一次、失败重试 | [HOOKS 九](./HOOKS.md) | 官方已覆盖（2026-10-26 由 issue #392 补上，v0.1.1582，三语） |
 
 ### 6. 运行时输入
@@ -102,10 +102,10 @@
 
 | # | 结论 | 官方原文状态 | 证据 | 本仓库出处 |
 |---|---|---|---|---|
-| 1 | `free` 不能从 `rate === 0` 反推 | 未提 | `grep -c "rate === 0" provider-plugins.md` = **0** | [HOOKS 十一之二](./HOOKS.md) |
-| 2 | 模型级错误用 404，不用 401 | 未提 | `grep -c "404" provider-plugins.md` = **0** | [README 常见坑 2](./README.md) |
-| 3 | `aside: true` 的窗口给了 amount/limit 会被整条丢掉 | 只写了「省略 used」的情形，未写「显式 aside + amount」 | `provider-plugins.md` 的 §A usage window that says no share 只覆盖省略 `used` | [HOOKS 三 规矩 ①](./HOOKS.md) · [`src/quota.mjs`](./src/quota.mjs)（已变成运行时检查） |
-| 4 | LICENSE 文件必须是逐字 MIT 正文，否则 GitHub 返回 `NOASSERTION` | 官方只在 `#quick` 的 `package.json` 里出现过 `"license": "MIT"` 字段，**没有讲 LICENSE 文件本身** | 官方中文文档里「许可/license」只出现 1 次（就是那个字段）；`grep -c "NOASSERTION"` 官方文档 = 0、社区 README = 0 | [README 顶部四件](./README.md) |
+| 1 | `free` 只来自厂商声明；`rate: 0` 是「没给倍率」 | **已进官方文档**（#468，v0.1.1934） | 补之前 `grep -c "rate === 0" provider-plugins.md` = **0** | [HOOKS 十一之二](./HOOKS.md) |
+| 2 | 模型级错误用 403 / 404，不用 401 | **已进官方文档，且比我们报的更宽**（#468）：401 会 failover 到**每一个账号**，`3ec25523c` 起才按 body 判断 | 补之前 `grep -c "404" provider-plugins.md` = **0** | [README 常见坑 2](./README.md) |
+| 3 | 窗口「有没有占比」只看 `used`，与 `aside` 无关；`aside` 窗口路由从不读 | **已进官方文档**（#468，v0.1.1934） | 我们原来的因果说反了：曾以为 `aside` 让窗口变 text-only，实际是没有 `used`；`aside` 是路由**显式**跳过的另一个独立条件 | [HOOKS 三 规矩 ①](./HOOKS.md) · [`src/quota.mjs`](./src/quota.mjs) |
+| 4 | `LICENSE` 夹了归属说明 ⇒ GitHub 判 `NOASSERTION` | **已进官方文档，并加了回退**（#468，`5957d45ac`）：`NOASSERTION` 的 listing 改用 `package.json` 的 `license` | 补之前官方中文文档里「许可/license」只出现 1 次；`grep -c "NOASSERTION"` 官方文档 = 0 | [README 顶部四件](./README.md) |
 | 5 | 同版本重打包命中 bun 缓存，行为不变 | 未提 | 官方 `#run` 只讲「重启」，未讲缓存 | [AGENTS 坑 10](./AGENTS.md) |
 | 6 | `magpie plugin add xxx.tgz` 有 bug | 未提 | 官方 `#run` 只讲 npm / git / 文件夹三种来源 | [README 常见坑 1](./README.md) |
 | 7 | 只能推功能分支，PR 全绿合并后才发布 | 官方 `#publish` 讲「推到 main 就发」，但没给分支保护与检查门 | 官方 `#publish` = 叙事，无步骤门 | [UPDATING](./UPDATING.md) · [CHECKLIST B](./CHECKLIST.md) |

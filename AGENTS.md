@@ -32,14 +32,14 @@
 | # | 症状（出问题时你看到什么） | 判据 | 出处 |
 |---|---|---|---|
 | 1 | 额度条永远是 100%；空账号反而排到队首 | `usage.used` **必填**且是有限数字 —— 它也是路由排序输入，漏了按 0% 算 | HOOKS 九 |
-| 2 | 免费模型被反复派发；或收费模型被标成免费 | `free` 只认厂商自己的声明（价格字段为 0 / 展示名写免费），**不能从 `rate === 0` 反推**：实测 51 条 `rate=0` 里 38 条仍吃套餐额度 | HOOKS 十一之二 |
+| 2 | 免费模型被反复派发；或收费模型被标成免费 | `free` 只认厂商自己的声明：列表价 $0，或厂商自己的计费端点明确说 0。**`rate: 0` 的意思是「没给倍率」，不是免费** —— magpie 不会从 `rate` 推 `free`（#468 更正，2026-10-29）。反过来，把「套餐内不按次计费但吃额度」的模型标成 `free: true`，Free first 会一直派发它们 | HOOKS 十一之二 |
 | 3 | 点登录后界面转圈很久，或模型列表整个卡住 | `authorize()` 必须**立刻**返回；网络请求一律挪到 `loader` | README 铁律 2 |
 | 4 | 刷新一次 token 后某个字段变空，或用户被要求重登 | `refresh` 返回的是**合并**结果，只给新字段会覆盖掉旧的 | README 铁律 3 |
 | 5 | 插件装上了，但模型列表空、界面没反应 | `config.models` 必须有内容（可以是静态占位） | README 铁律 1 |
-| 6 | 某一个模型报错，**整个账号**被停用 | 模型级错误返回 **404**，不是 401 —— 401 会被当成登录失效 | README 常见坑 2 |
+| 6 | 某一个模型报错，**整个账号（甚至所有账号）**被停用 | 模型级错误返回 **403 / 404**，不是 401。401 可重试 ⇒ 会 failover 到**每一个账号**，每个都标登录失效。magpie ≥ 0.1.1934（`3ec25523c`）起，插件 401 的 body 只说模型不可用、不提 token/key/sign-in/session 时不标账号；但插件仍应回 403/404（#468） | README 常见坑 2 |
 | 7 | 登录偶尔「莫名失效」，多账号同时刷新时更常见 | 一次性 `refresh_token` 必须**串行**（同账号同时只允许一次刷新） | README 常见坑 4 |
 | 8 | 流式输出卡住 / 只有第一段就结束 | 不要在 `fetch` 里读流，把 `Response` 原样交回去 | README 常见坑 5 |
-| 9 | GitHub 把 license 标成 `NOASSERTION`，卡片上没有许可那一格 | `LICENSE` 必须是**逐字 MIT 正文**，归属说明另放 `NOTICE.md` | README 顶部四件 |
+| 9 | GitHub 把 license 标成 `NOASSERTION`，卡片上没有许可那一格 | `LICENSE` 最好写**逐字 MIT 正文**，归属说明另放 `NOTICE.md`。magpie ≥ 0.1.1934（`5957d45ac`）起，`NOASSERTION` 的 listing 回退到 `package.json` 的 `license` —— 夹归属说明不再必然没许可，但 GitHub 仍不认那份 LICENSE（#468） | README 顶部四件 |
 | 10 | 改了代码重装，行为一点没变 | 同版本号重打包会命中 bun 缓存（`no changes`）—— 必须 bump `version` | UPDATING 第 1 步 |
 | 11 | `magpie plugin add xxx.tgz` 跑完像成功，实际没装上 | 这个命令有 bug，改 `plugins.json` + `plugins/package.json` 两处 | README 常见坑 1 |
 | 12 | 想让卡片标题/文案对，去改了 magpie 的缓存文件 | 插件对 magpie 的目录**只有读的份**；唯一载体是 `registry-entry.json` | README「不要写 magpie 的缓存」 |
@@ -67,9 +67,9 @@
 | 19 | 某个能力「明明实现了却没生效」：模型不会联网、不能收图、没有思考档、折扣前的倍率不显示 | 模型 / provider 条目上有一批**不写就等于关掉**的字段：`searches`（模型级=这条自己会搜，provider 级=上游整体会搜）、`decides`（decision 模型，从 agent 列表隐藏）、`rateWas`（折扣前倍率）、`fast`、`serviceTiers`、`modalities`（图片 / 音频能力全靠它；其中 `image` 省略 **≠** 关掉，见坑 25） | HOOKS 十一之三 |
 | 20 | 厂商有画图模型，插件里当垃圾过滤掉了；或者反过来，列进去之后用户在 chat 里选中报 400 | magpie **0.1.1707 起**支持插件供图（`DrawsID` + `ImagesAPI` + npm 是 `@ai-sdk/openai-compatible`）。但它**同时**留在 chat 模型列表里 —— 列不列是取舍，判据见 [`src/models.mjs`](./src/models.mjs) 的 `LIST_IMAGE_MODELS` | HOOKS 十一之三的「插件供图」 |
 | 21 | 花一晚上追 magpie 的「每个版本」，改了一堆文档，用户那边一点变化都没有 | **判断要不要同步，看稳定渠道**（magpie 设置里那个「更新渠道：每个版本 / 稳定版」）。`curl -s "https://usemagpie.ai/api/latest?channel=stable"` 拿稳定版版本号；2026-10-28 实测：每版本 0.1.1763 / **稳定版 0.1.1327**，逐字段比对后插件相关字段**完全一致** —— 追每版本几乎全是白跑。一条命令判断：`node scripts/check-magpie-stable.mjs` | HOOKS 顶部 · UPDATING 一 |
-| 22 | 卡片上每个账号都显示「剩余额度未知」，而 `usage()` 明明返回了 plan / balance / windows、也没有 error | **窗口被 magpie 整条丢掉了**，两种写法都会导致：① `aside: true` 的窗口给了 `amount`/`limit`（假占比，magpie 算不出来）② `resetsAt`/`runsOutAt` 塞了厂商原样时间 `"2026-10-28 23:59:59"`（不是 ISO，解析失败）。判据：`curl -s http://127.0.0.1:3425/v1/magpie/quotas`，看 `windows[0]` 有没有 `text: true` 和 ISO 形式的 `runsOutAt` | HOOKS 三 · 三条「写错不报错」的窗口规矩 |
+| 22 | 卡片上每个账号都显示「剩余额度未知」，而 `usage()` 明明返回了 plan / balance / windows、也没有 error | **窗口变成 text-only 了**：**判断只看 `used`，与 `aside` 无关**（#468 更正，2026-10-29）。两种写法会丢占比：① 有 `amount`/`limit` 却没有 `used`（magpie < 0.1.1934 直接丢；≥ `1390aa458` 才用 amount/limit 推算）② `resetsAt`/`runsOutAt` 塞厂商原样时间 `"2026-10-28 23:59:59"`（解析失败 ⇒ 整条丢）。判据：`curl -s http://127.0.0.1:3425/v1/magpie/quotas`，看 `windows[0]` 有没有 `text: true` 和 ISO 形式的 `runsOutAt` | HOOKS 三 · 三条「写错不报错」的窗口规矩 |
 | 23 | 有一批额度快到期了，卡片上却完全看不出来 | 用官方字段 `runsOutAt` + `runsOut`（剩余额度何时作废、损失多少），**不要拼进 `display`** —— 拼进去只是普通文字，magpie 不会当失效提醒。厂商给的时间要先转 ISO | HOOKS 三 · 规矩 ③ |
-| 24 | **卡片上额度正常，路由页里这个号却是「剩余额度未知」，还总排在别人后面** | 窗口标了 `aside: true`（或 `used` 缺省被判成 `Text`）⇒ `allowanceOf()` 整条跳过 ⇒ `routedAllowance` 不 ok ⇒ `weighed()` 不设 `Known`。**`aside` 不是「不参与排序」，是「这个号在路由里不存在」**。判据：`curl -s http://127.0.0.1:3425/v1/magpie/trace` 看这个 provider 的 `known` 是 `true` 还是**字段缺失**；`~/.config/magpie/quotas.json` 的 `spans` 是 `[{}]` 还是 `[{"aside":true}]` | HOOKS 三 · 规矩 ① |
+| 24 | **卡片上额度正常，路由页里这个号却是「剩余额度未知」，还总排在别人后面** | 窗口没有被路由计入：**`used` 缺省的窗口判成 `Text`，`aside: true` 的窗口路由直接跳过** —— `w.Aside || w.Text` 两个条件都会跳过，与 amount/limit 无关（#468 更正）。一条不剩 ⇒ `allowanceOf()` 返回空 ⇒ `routedAllowance` 不 ok ⇒ `weighed()` 不设 `Known`。**「不参与排序」的实际后果是「这个号在路由里不存在」**。判据：`curl -s http://127.0.0.1:3425/v1/magpie/trace` 看这个 provider 的 `known` 是 `true` 还是**字段缺失**；`~/.config/magpie/quotas.json` 的 `spans` 是 `[{}]` 还是 `[{"aside":true}]` | HOOKS 三 · 规矩 ① |
 | 25 | **模型明明收不了图，却被当成能收图**：截图直发上游报 `The request model is not multimodal` / 400，或者模型回「图片无法查看」 | 模型条目的 `capabilities.input.image` **必须写成布尔值**：省略不等于 text，等于「厂商未表态」，magpie 会拿 models.dev 的裸模型 id 投票补 —— 同名模型在别家标过 `image`，这个模型就会被带成能收图。text-only 模板见 HOOKS 十一之三；反向的手动覆盖（厂商说 `false` 却勾了 `Accepts images`）在 magpie 侧暂无警告 | HOOKS 十一之三 · CHECKLIST A-14 |
 | 26 | 邀请码填了、主登录也过了，但上级没拿到奖励；或「邀请码」那条登录方式点开只有一个框、后面什么都没接 | 两个原因：① 与码成对的额外参数没带（Accio 的 `sId`）—— 换码时必须一起换，见 `src/invite.mjs` 的 `write()`；② 用 `prompts` 数组串「邀请码 → 主登录」是串不起来的，必须用 `ask()`（HOOKS 四·陷阱 5） | HOOKS 四·陷阱 5 · 四之二 · `src/invite.mjs` |
 | 27 | **卡片上的账号名是一串看不懂的 ID**（`iam::01a1642a…:user:hw0615…`、`urn:…`、uuid），用户以为是「显示乱码」 | `accountId` 是**名字**，不是身份：手机号（`maskPhone` 打码 `189****8051`）→ 昵称/邮箱 → **空串**（宿主回退供应商名）。内部 ID 只进 `uid`。**URN 写进 `accountId` 极难改回** —— 续期返回值是合并、插件落盘又多保留旧值，所以续期路径也要重算一遍 | HOOKS 八的「`accountId` 是名字，`uid` 是身份」· `src/account-name.mjs` 的 `resolveAccount` |
@@ -185,7 +185,7 @@ node scripts/probe-vision.mjs <provider/model> …
 | [`src/vision-clock.mjs`](./src/vision-clock.mjs) | `readVisionModel` / `decideDegFromImage` / `clockToDeg` / `clockSpread` | 用用户自己在 magpie 里选的识图模型判「主体朝几点」；两个判官并行 + 分歧阈值；`max_tokens` 是给推理留的（400 会饿死答案） |
 | [`src/local-browser.mjs`](./src/local-browser.mjs) | `readLocalCreds` / `credsNear` / `leveldbText` | 用户在自己浏览器里登录过时，直接读 localStorage 的 leveldb —— 不开窗、不弹浏览器；跨 origin 必须截断，否则 A 站 jwt 会配到 B 站 org |
 | [`src/tempmail-client.mjs`](./src/tempmail-client.mjs) | `createTempMailbox` / `waitTempCode` | 邮箱验证码自动登录的一次性地址；域名有黑名单（`maxxspace.com` 被 magicrew 拒），换厂商先用真实请求确认 |
-| [`tests/semantics.test.mjs`](./tests/semantics.test.mjs) | 22 条语义锁（含 6 条额度窗口） | `check.mjs` 查不到的那部分，只有它能拦 |
+| [`tests/semantics.test.mjs`](./tests/semantics.test.mjs) | 27 条语义锁（含 11 条额度窗口 / 4 条 accountId 规则） | `check.mjs` 查不到的那部分，只有它能拦 |
 
 **为什么 `src/quota.mjs` 值得单独一个文件**：额度窗口是 magpie **画卡片**和**智能路由排序**的同一个输入。
 写错不会崩，只会让卡片显示「剩余额度未知」、让这个号在路由里被当成不存在 —— 用户以为插件坏了，
@@ -193,10 +193,11 @@ node scripts/probe-vision.mjs <provider/model> …
 
 | 写法 | 不拦的后果 | 构造器的行为 |
 |---|---|---|
-| 缺 `used` | 按 0% = 满额算，空号排到路由队首（坑 1） | 抛 |
-| `aside: true` 又给 `amount`/`limit` | `allowanceOf()` 整条跳过 ⇒ `routedAllowance` 不 ok ⇒ 该号不进路由（坑 22 / 24） | 抛 |
+| 缺 `used`（且没有 amount/limit） | 窗口判成 `Text`，**路由不计入** ⇒ 一条不剩时该号在路由里不存在（坑 24） | 抛，要 text-only 必须显式 `textOnly: true` |
+| `aside: true` 又给 `amount`/`limit` | 分母就是余额本身，算出来永远「剩余 100%」—— 看着漂亮、含义是错的 | 抛 |
 | 钱包型（`balance`）又给 `used` | 被当占比读，余额显示错 | 抛 |
 | `resetsAt` 塞厂商原样时间 | 解析失败，整条窗口被丢掉（坑 22） | 抛 |
+| 所有窗口都是 `aside` / `textOnly` | 路由一条都不读 ⇒ 这个号在路由页「剩余额度未知」且排在已知账号之后 | `usage()` 抛 |
 | `span` 不是正整数 | 窗口长度算错，重置时间显示乱 | 抛 |
 
 **拆分示例**：[`examples/split/`](./examples/split/) 把「index 只装配」这件事摆了一遍

@@ -229,7 +229,12 @@ auth.checkin(getAuth, provider) {
 这三条都是**静默失败**：钩子不抛异常、magpie 也不报错，只是卡片悄悄变成
 「剩余额度未知」，或者算出一个没有意义的百分比。实测撞过，代价是整个额度区报废。
 
-#### ① `aside: true` 是「这条窗口不存在」—— 不是「不参与排序」
+#### ① `aside: true` 的窗口不进路由 —— 但「丢占比」的元凶是**没有 `used`**，不是 `aside`
+
+> ⚠ 2026-10-29 更正（issue [#468](https://github.com/magpie-community/plugins/issues/468)，magpie v0.1.1934）：
+> 判断一条窗口「有没有占比」**只看 `used`**。没有 `used` 的窗口是 `Text`，路由不计入 ——
+> 与 `aside` 无关；而且 magpie ≥ `1390aa458` 起，有 `amount` + `limit` 却没有 `used` 的窗口会用
+> `amount / limit` 推算占比。本文原来把两件事混成了一件，下面按更正后的机制重写。
 
 这条最贵，因为它有两个后果，而只有第一个显眼。
 
@@ -253,8 +258,8 @@ quotaCount(w){ if (!(w.limit > 0)) return w.display || ""; … }
 
 **再看路由层的坑（2026-10-28 真机踩中，代价是整个号在路由里消失）：**
 
-`aside: true`（以及 `used` 缺省后被判成的 `Text`）的窗口，会被 `allowanceOf()`
-**整条跳过**（`internal/provider/routing.go`）：
+`aside: true` 的窗口，和 `used` 缺省后被判成的 `Text` 窗口，**都会**被 `allowanceOf()`
+整条跳过（`internal/provider/routing.go`）—— 两个条件独立，与有没有 `amount`/`limit` 无关：
 
 ```go
 for _, w := range ws {
@@ -276,7 +281,7 @@ if len(a) == 0 { return nil, false }          // ← 一条不剩 ⇒ 这个号 
 
 | 目的 | 写法 |
 |---|---|
-| 一行文字要展示，**且这个号还有别的窗口参与路由** | `aside: true` + `display` ✅ |
+| 一行文字要展示，**且这个号还有别的窗口参与路由** | `aside: true` + `display` ✅（**别给 `amount`/`limit`**：分母是余额本身，永远「剩余 100%」） |
 | 这个号**只有**这一条额度信息 | **不要标 `aside`**：给 `used` + `limit`（哪怕百分比没有信息量），否则路由里没有这个号 |
 
 **判据：** `curl -s http://127.0.0.1:3425/v1/magpie/trace`，看这个 provider 的
