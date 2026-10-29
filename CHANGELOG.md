@@ -3,6 +3,16 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.1.25 — 2026-10-29
+
+**把 magicrew 真机链路里四块通用的「登录协议」抽成模块 + 44 条测试。**
+
+- **新增 [`src/rotation-captcha.mjs`](./src/rotation-captcha.mjs)**：旋转图片验证码 —— 角度编码（`52249517*(deg+n)+5976906165 & 0xFFFFFFFF`，从前端反出来、抓 4 组提交穷举唯一命中）、按 origin 的 WAF cookie 罐（`acw_tc` 不带回去就回 `2000 客户端信息不匹配`）、`solveRotationCaptcha` 的「取图 → 判角 → 提交 → 不可信换图」循环。
+- **新增 [`src/vision-clock.mjs`](./src/vision-clock.mjs)**：用 magpie 设置里那个识图模型判「主体上方向指向几点」—— 两个判官并行、分歧 >1.5 钟点判不可信、`max_tokens=6000` 是给推理留的（400 会把答案饿死）、`reasoning_effort:"low"` 被 400 时去掉重发。
+- **新增 [`src/local-browser.mjs`](./src/local-browser.mjs)**：从本机 Chromium 系浏览器的 LevelDB 读 localStorage 登录态 —— 不开窗、不弹浏览器；按 origin 截断，避免 A 站 jwt 配到 B 站 org。
+- **新增 [`src/tempmail-client.mjs`](./src/tempmail-client.mjs)**：temp-mail.io 一次性邮箱建址 + 轮询抽验证码；记录域名黑名单这一实测坑（`maxxspace.com` / `guerrillamailblock.com` / `mailinator.com` 会被部分上游拒）。
+- **新增四个测试文件**（`vision-clock` / `local-browser` / `tempmail` / `rotation-captcha`），`node --test` 44 通过。其中锁死了：角度编码与前端公式逐字一致、cookie 必须从 generate 带到 verify、判角不可信必须换图、跨 origin 不串号。
+
 ## 0.1.24 — 2026-10-29
 
 **把「登录」这一轮的真机经验抽成三个可复用模块 + 两处契约补漏。**

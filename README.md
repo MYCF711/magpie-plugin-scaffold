@@ -218,6 +218,21 @@ package.json    → 版本、许可证、repository 链接（卡片上自动显�
 
 ---
 
+## 已经趟过的通用协议（直接抄，别从零推）
+
+这几块是 `magpie-magicrew-auth` 真机跑通后抽出来的，跟厂商无关，派生仓库直接用：
+
+| 模块 | 解决什么 | 一个必须知道的实测 |
+|---|---|---|
+| [`src/rotation-captcha.mjs`](./src/rotation-captcha.mjs) | 旋转图片验证码：角度编码、WAF cookie、取图→判角→提交重试 | `/captcha/generate` 回的 `set-cookie: acw_tc=…` 必须带回 verify，否则 `2000 客户端信息不匹配`（Node fetch 默认没有 cookie 罐） |
+| [`src/vision-clock.mjs`](./src/vision-clock.mjs) | 让 magpie 设置里的识图模型判断「主体朝几点」 | `max_tokens=400` 会把推理答案饿死（`content:null`）；两个判官分歧 >1.5 钟点要换图，不能取平均 |
+| [`src/local-browser.mjs`](./src/local-browser.mjs) | 从本机浏览器 localStorage（LevelDB）读登录态 | 必须按 origin 截断：A 站的 jwt 配到 B 站的 org 就是「登录成功却拿错号」 |
+| [`src/tempmail-client.mjs`](./src/tempmail-client.mjs) | 一次性邮箱建址 + 收验证码 | 域名有黑名单：`maxxspace.com` 会被部分上游拒，`yzcalo.com` / 常见邮箱域可过 —— 换厂商先用真实请求确认 |
+
+四块都有 `tests/*.test.mjs` 语义锁（`node --test` 44 条），照着测就能改。
+
+---
+
 ## 三条铁律
 
 ### 1. `config.models` 必须有内容
