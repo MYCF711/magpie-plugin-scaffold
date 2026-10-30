@@ -217,6 +217,22 @@ test("quota: span 不是正整数 → 抛；正常窗口原样通过", () => {
   assert.deepEqual(w, { name: "5 小时", used: 37, span: 18000, resetsAt: new Date(1793000000 * 1000).toISOString() })
 })
 
+test("quota: 只有 balance 钱包窗口不抛（钱包窗口是路由可见的，不能被误杀）", () => {
+  const u = usage({
+    windows: [{ name: "积分余额", balance: 6291, unit: "积分", display: "6,291" }],
+  })
+  assert.equal(u.windows.length, 1)
+  assert.equal(u.windows[0].balance, 6291)
+  assert.equal(u.windows[0].used, undefined)
+})
+
+test("quota: textOnly 仍受约束 —— 全是 text-only 窗口照样抛（不能借 textOnly 绕过路由要求）", () => {
+  assert.throws(
+    () => usage({ windows: [{ name: "用量", textOnly: true, display: "1,234 剩余（上限未知）" }] }),
+    /所有窗口都不参与路由/,
+  )
+})
+
 test("quota: usage() 逐个过一遍窗口，并且不改动其余字段", () => {
   const u = usage({
     plan: "Pro",
