@@ -51,6 +51,7 @@
 // 见 src/quota.mjs：它把「写错不报错、但 GUI 和智能路由会坏」的五类写法变成运行时错误。
 // 派生仓库把 src/ 一起带走即可（GUIDE 第 1 步已写明）。
 import { usage as buildUsage, usageWindow } from "./src/quota.mjs"
+import { createRefreshLock } from "./src/refresh-lock.mjs"
 
 // ── 配置 ──────────────────────────────────────────────────────────────
 
@@ -100,12 +101,16 @@ function staticModels() {
       status: "active",
       cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
       limit: { context, output: 64_000 },
+      // config 钩子的静态模型走 modalities；capabilities.input 是 provider.models 路径的字段。
+      // 两个都写，避免「只写 capabilities 而 config 路径读不到模态」。
+      modalities: { input: ["text"], output: ["text"] },
       capabilities: {
         temperature: true,
         reasoning: Array.isArray(efforts) && efforts.length > 0,
         toolcall: true,
         attachment: false,
-        input: { text: true, image: false },
+        // HOOKS 十一之三：五个模态键必须显式写布尔（省略 image ≠ text）
+        input: { text: true, image: false, audio: false, video: false, pdf: false },
         output: { text: true },
       },
       ...(efforts?.length ? { variants: Object.fromEntries(efforts.map((e) => [e, {}])) } : {}),
@@ -117,6 +122,10 @@ function staticModels() {
 // ── 插件入口 ──────────────────────────────────────────────────────────
 
 export const XxxAuthPlugin = async (_ctx, _options) => {
+  // 同一 refresh_token 的并发续期合并成一次，成功后 60 秒内回放结果。
+  // 键必须是凭据身份（refresh_token），不能用 provider id —— 同渠道多账号会串结果。
+  const refreshLock = createRefreshLock({ replayMs: 60_000 })
+
   // _ctx 是宿主给的上下文：{ client, directory, … }。
   // 打日志用 _ctx?.client?.app?.log?.({ service, level, message })。
   //
@@ -231,8 +240,9 @@ export const XxxAuthPlugin = async (_ctx, _options) => {
      * 运行时机：OAuth 账号的 expires 距现在 < refreshLead 时，
      * 在 loader / models / usage / 请求之前。
      *
-     * 串行化：需要续期的请求会等同一轮续期（最多 15 秒），
-     * 所以一次性 refresh_token 不会被用两次。
+     * 串行化：同一 refresh_token 的并发续期会合并成一次（`src/refresh-lock.mjs`），
+     * 成功后 60 秒内回放结果 —— 一次性 refresh_token 不会被用两次，
+     * 宿主 `auth.refresh` 与请求链路同时触发也不会各花一次旧 token。
      *
      * expires 为 0 或不存在的账号永不续期。
      */
@@ -240,7 +250,8 @@ export const XxxAuthPlugin = async (_ctx, _options) => {
       if (!auth?.refresh) return undefined // 没有 refresh_token，不续期
 
       try {
-        const t = await exchangeRefresh(auth.refresh) // TODO
+        // 键 = 凭据身份；同 key 的并发调用共享同一个 in-flight promise
+        const t = await refreshLock.run(`${PROVIDER}\n${auth.refresh}`, () => exchangeRefresh(auth.refresh)) // TODO: exchangeRefresh 按厂商实现
         if (!t) return undefined
         return {
           access: t.access_token,

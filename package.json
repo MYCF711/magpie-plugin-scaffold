@@ -1,6 +1,6 @@
 {
   "name": "magpie-plugin-scaffold",
-  "version": "0.1.29",
+  "version": "0.1.30",
   "description": "A magpie / OpenCode provider plugin scaffold: all nine hooks implemented in one file, plus the enforceable rules a provider plugin must pass — icon in two places, MIT license, no helper functions exported, no secrets. Clone it, implement five functions, run the check.",
   "type": "module",
   "main": "./index.mjs",
@@ -16,6 +16,7 @@
     "UPDATING.md",
     "CHANGELOG.md",
     "MULTI-PROVIDER.md",
+    "NOTICE.md",
     "LICENSE",
     "extract-contract.py",
     "registry-entry.json",

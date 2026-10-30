@@ -4,6 +4,7 @@
 // 实际错」的钩子。下面每一条都是实测踩出来的，不是设计偏好。
 
 import { BASE, SDK } from "./context.mjs"
+import { contextOf as lookupContext } from "./model-context.mjs"
 
 /** 默认条目工厂：和 `context.mjs` 的 `staticModels()` 造出来的形状完全一致 */
 export function defaultEntry(id, name, vision, opts = {}) {
@@ -20,7 +21,9 @@ export function defaultEntry(id, name, vision, opts = {}) {
       reasoning: true,
       toolcall: true,
       attachment: !!vision,
-      input: { text: true, image: !!vision },
+      // HOOKS 十一之三：五个模态键必须显式写布尔。省略 image ≠ text ——
+      // 宿主会拿 models.dev 的裸 id 投票补，同名模型在别家标过 image 就会被当成能收图。
+      input: { text: true, image: !!vision, audio: false, video: false, pdf: false },
       output: { text: true },
     },
     // free 与 rate 不会同时出现：rate 只在 > 0 时写，free 只在确认为真时写
@@ -100,12 +103,14 @@ export function priceOf(pointEntry) {
  *   - 填大了：上游 400，而这个 400 会被当成「模型不可用」
  *   - 填小了：agent 认为「放不下」，长输入被拒 —— 用户以为是模型的锅
  *
- * 早前一律填 256K，实际是 1M。查库的写法见 context.mjs 的 contextOf()。
+ * 早前一律填 256K，实际是 1M。真实窗口去 magpie 自己的模型库查 —— 实现见
+ * `src/model-context.mjs` 的 `createModelContext()` / `contextOf()`。
+ *
+ * 查不到就返回 undefined：`defaultEntry` 不会写 `limit`，宿主用它自己的默认。
+ * **不猜**一个数字 —— 猜大了上游 400，猜小了 agent 提前压缩。
  */
-export function contextOf(_modelId) {
-  // TODO: 从 magpie 的模型库查这个 id 的真实窗口。查不到就**别乱填** ——
-  // 宁可留空让宿主用它自己的默认，也不要写一个猜的数字。
-  return undefined
+export function contextOf(modelId, opts = {}) {
+  return lookupContext(modelId, opts)
 }
 
 /**
