@@ -3,6 +3,18 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.1.31 — 2026-10-30
+
+**把「怎么用」从克隆仓库降到一条命令，并让已有插件只跑 check**
+
+- 新增 `magpie-plugin-create`：`npx github:MYCF711/magpie-plugin-scaffold#v0.1.31 create --dir ... --provider ...` 复制模板、自动改 `PROVIDER` / `PROVIDER_NAME` / `BASE` / 请求头 / registry 条目；拒绝覆盖非空目录，不联网、不装依赖
+- 新增 `magpie-plugin-create` 的 `package.json.bin` 与 `npm run create`
+- 新增可复用 GitHub Action `.github/actions/check`：`uses: MYCF711/magpie-plugin-scaffold/.github/actions/check@v1`，直接跑模板里的 `scripts/check.mjs`，不下载 npm 包、不写被检查目录
+- `package.json` 暴露 `magpie-plugin-check` bin，配合 `npx github:` 无需先克隆
+- `tests/mount.test.mjs` 不再硬编码 `xxx`：派生插件的 provider id 换掉后，挂载契约仍能跑
+- 新增 `tests/adoption.test.mjs`：check CLI、create CLI、非空目录保护、bin 与 Action 接线
+- CI 新增 `action-self-test` job，用本仓库的 Action 检查本仓库
+
 ## 0.1.30 — 2026-10-30
 
 **补上四个厂商无关原语，把「文档宣称有、代码没有」的洞填上**
