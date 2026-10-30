@@ -3,6 +3,14 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.1.34 — 2026-10-30
+
+**新增可选的工具 schema 适配器：超长工具名截断 + 上游工具 schema 兼容改写（默认关闭）**
+
+- 新增 `src/tool-schema.mjs`：`truncateToolName` / `truncateToolNames`（超长工具名截断、同前缀撞车自动加序号保唯一）、`loosenToolSchema` / `adaptToolList` / `rewriteToolSchema`（`additionalProperties` 非布尔换 `true`、删 `items:{}`、`items` 子树摊平 `anyOf` 且不留空 `{}`）、`createToolSchemaAdapter({ enabled: true })` 显式启用；不传 `enabled: true` 时原样返回入参
+- 新增 `tests/tool-schema.test.mjs`（17 条）：默认关闭 identity、工具名唯一性、`additionalProperties` 布尔边界、`items:{}` 删除、`items` 子树 union/空 schema、深冻结不可变
+- AGENTS / README 的模块表与计数同步（`src/` 20 文件 / 3,716 行，tests 16 个），README 的 `npx` / Action 示例 tag 指向 `v0.1.34`
+
 ## 0.1.33 — 2026-10-30
 
 **补上额度读取缓存与请求体改写管道，并把 usage 缓存真正接进入口**
