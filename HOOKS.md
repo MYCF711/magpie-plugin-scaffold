@@ -408,6 +408,30 @@ CLI 与 GUI 都走它（`internal/cli/plugins_cli.go:453`、`internal/gui/plugin
 
 ---
 
+### 陷阱 6：`authorize()` 的 `account` 恒为 `new` —— 插件拿不到是哪张卡
+
+宿主的 `authorize` 命令确实带 `account` 参数（`host.js` 的
+`authorize({ provider, method, inputs, account, proxy })`，由 `signInKey()` 决定写哪个
+key），但 **magpie 自己从不传账号键**：
+
+- GUI 的「Sign in again」/「Add account」→ `internal/provider/pluginsignin.go:121`
+  `plugin.Authorize(ctx, id, method, inputs, plugin.NewAccount)`
+- CLI `magpie plugin login` → `internal/cli/plugins_cli.go:492`，同样 `plugin.NewAccount`
+- 账号名只作为 `SignInOptions.User` 到 Go 侧，唯一用途是 `pluginUsing(saved, user)`
+  判断「登录的是不是正在用的那个账号」，**不会进插件**
+
+`signInKey(provider, "new")` 走 `freshKey(provider)`，`inScope(provider, 新 key)` 里调
+`m.authorize(...)`；插件客户端也没有 `auth.get`（只有 `set`/`remove`），`getAuth` 只传给
+`loader` / `models` / `usage` / `checkin`。
+
+⇒ **不要在 `authorize()` 里假设能知道用户点的是哪张卡**。要「按账号」的入口只能用
+`usage().signIn = "expired"` 借 magpie 自带的「Sign in again」按钮（它同样拿不到账号，
+只能按 provider 级状态判断），或在登录说明/落地页里放一个通用入口。
+
+（2026-10-30 核对：本地 v0.1.1775 源码与安装版 0.1.2188 内嵌 `host.js`/`app.js` 一致。）
+
+---
+
 ## 四之二、登录的三种形态（决定弹不弹浏览器）
 
 | 形态 | 形状 | 弹窗口？ | 前提 | 实测结论 |
