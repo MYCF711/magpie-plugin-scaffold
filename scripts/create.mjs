@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 从一个已验证的模板起一个新插件 —— 不可变部分照抄，身份三处自动改掉。
 //
-//   npx --yes github:MYCF711/magpie-plugin-scaffold#v0.1.31 create \
+//   npx --yes github:MYCF711/magpie-plugin-scaffold#v0.1.32 create \
 //     --dir my-plugin --provider acme --name "Acme" --base https://api.acme.example/v1
 //
 // 它做的事只有「复制 + 改身份」：
@@ -27,7 +27,7 @@ const SKIP_FILES = new Set([".DS_Store", "package-lock.json", "bun.lock", "bun.l
 function usage(stream = process.stdout) {
   stream.write(
     [
-      "用法：magpie-plugin-create --dir <目录> --provider <id> [--name <显示名>] [--base <URL>] [--package <包名>]",
+      "用法：magpie-plugin create --dir <目录> --provider <id> [--name <显示名>] [--base <URL>] [--package <包名>]",
       "",
       "  --dir      必填，新插件目录（不存在，或存在但为空）",
       "  --provider 必填，magpie provider id，小写字母/数字/连字符",

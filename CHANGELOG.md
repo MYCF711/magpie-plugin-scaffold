@@ -3,13 +3,22 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.1.32 — 2026-10-30
+
+**修 0.1.31 的 npx 入口：一个包两个 bin 时 npx 不知道跑哪个，`npx github:...` 直接报错**
+
+- `package.json.bin` 改为单一 `magpie-plugin`，子命令 `check` / `create`；这样 `npx --yes github:MYCF711/magpie-plugin-scaffold#v0.1.32 check .` 与 `... create ...` 都能直接跑
+- 新增 `scripts/cli.mjs` 只做分发，实际实现仍在 `scripts/check.mjs` / `scripts/create.mjs`
+- README、Action 注释、create 示例统一指向 `v0.1.32`
+- `tests/adoption.test.mjs` 增加 CLI 分发与「只能有一个 bin」的断言
+
 ## 0.1.31 — 2026-10-30
 
 **把「怎么用」从克隆仓库降到一条命令，并让已有插件只跑 check**
 
 - 新增 `magpie-plugin-create`：`npx github:MYCF711/magpie-plugin-scaffold#v0.1.31 create --dir ... --provider ...` 复制模板、自动改 `PROVIDER` / `PROVIDER_NAME` / `BASE` / 请求头 / registry 条目；拒绝覆盖非空目录，不联网、不装依赖
 - 新增 `magpie-plugin-create` 的 `package.json.bin` 与 `npm run create`
-- 新增可复用 GitHub Action `.github/actions/check`：`uses: MYCF711/magpie-plugin-scaffold/.github/actions/check@v1`，直接跑模板里的 `scripts/check.mjs`，不下载 npm 包、不写被检查目录
+- 新增可复用 GitHub Action `.github/actions/check`：`uses: MYCF711/magpie-plugin-scaffold/.github/actions/check@v0.1.31`，直接跑模板里的 `scripts/check.mjs`，不下载 npm 包、不写被检查目录
 - `package.json` 暴露 `magpie-plugin-check` bin，配合 `npx github:` 无需先克隆
 - `tests/mount.test.mjs` 不再硬编码 `xxx`：派生插件的 provider id 换掉后，挂载契约仍能跑
 - 新增 `tests/adoption.test.mjs`：check CLI、create CLI、非空目录保护、bin 与 Action 接线
