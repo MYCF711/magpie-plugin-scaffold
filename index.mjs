@@ -52,6 +52,7 @@
 // 派生仓库把 src/ 一起带走即可（GUIDE 第 1 步已写明）。
 import { usage as buildUsage, usageWindow } from "./src/quota.mjs"
 import { createRefreshLock } from "./src/refresh-lock.mjs"
+import { createUsageCache } from "./src/usage-cache.mjs"
 
 // ── 配置 ──────────────────────────────────────────────────────────────
 
@@ -125,6 +126,10 @@ export const XxxAuthPlugin = async (_ctx, _options) => {
   // 同一 refresh_token 的并发续期合并成一次，成功后 60 秒内回放结果。
   // 键必须是凭据身份（refresh_token），不能用 provider id —— 同渠道多账号会串结果。
   const refreshLock = createRefreshLock({ replayMs: 60_000 })
+
+  // 额度卡片会被频繁刷新：成功 60 秒、失败 5 秒，同 key 并发合并。
+  // key 用凭据身份，不能用 provider id —— 同渠道多账号会串额度。
+  const usageCache = createUsageCache({ ttlMs: 60_000, failTtlMs: 5_000 })
 
   // _ctx 是宿主给的上下文：{ client, directory, … }。
   // 打日志用 _ctx?.client?.app?.log?.({ service, level, message })。
@@ -360,9 +365,13 @@ export const XxxAuthPlugin = async (_ctx, _options) => {
       const auth = await getAuth()
       if (!auth) return { error: "未登录", windows: [] }
 
+      // 只缓存有凭据身份的账号；匿名调用本来就不会打到上游。
+      const usageKey = auth.uid ?? auth.accountId ?? auth.refresh ?? auth.access ?? auth.key
+      if (!usageKey) return { error: "未登录", windows: [] }
+
       let u
       try {
-        u = await fetchUsage(auth) // TODO
+        u = await usageCache.read(String(usageKey), () => fetchUsage(auth)) // TODO
       } catch (e) {
         // 上游失败 → 让卡片显示原因。抛出去 magpie 只会记成「读取失败」，用户看不到原因。
         return { error: String(e?.message ?? e), windows: [] }
