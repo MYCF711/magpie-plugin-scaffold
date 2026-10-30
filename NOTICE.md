@@ -7,11 +7,14 @@
 
 - 仓库：https://github.com/magpie-community/plugins
 - 许可：MIT
+- 版权：Copyright (c) 2026 magpie-community contributors；`packages/codearts` 包内 LICENSE 另列
+  Copyright (c) 2026 yuweihao17 / Sakura-Natsu，`packages/zen-free` 包内 LICENSE 另列
+  Copyright (c) 2026 xiaozhou26。
 - 吸收内容：
   - `packages/codearts`（https://github.com/magpie-community/plugins/tree/main/packages/codearts）：
     `parseSseEvents` / `completionFromChunks` / `foldAnswer` 的 SSE 折叠与 tool_calls 合并思路；
     `peekAnswer` 的 200 内嵌错误窥探与 replay 思路（`src/openai-sse.mjs`）；
-    `createConcurrencyGate` 的并发闸参考（未直接采用，审计记录见 `tmp/magpie-scaffold-upgrade/local-audit.md`）
+    `createConcurrencyGate` 的并发闸参考（未直接采用）
   - `packages/zen-free`（https://github.com/magpie-community/plugins/tree/main/packages/zen-free）：
     `stream.mjs` 的 Chat accumulator、`tool-response.mjs` 的 `framesFrom` 帧解析、
     `TextDecoder(fatal, ignoreBOM)` 与 32 MiB 上限（`src/openai-sse.mjs`）

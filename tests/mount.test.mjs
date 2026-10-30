@@ -14,6 +14,7 @@
 
 import test from "node:test"
 import assert from "node:assert/strict"
+import { readFileSync } from "node:fs"
 
 import * as entry from "../index.mjs"
 import { _internal } from "../index.mjs"
@@ -53,13 +54,16 @@ test("九项钩子齐全", async () => {
   assert.ok(Number.isInteger(plugin.auth.maxConcurrency) && plugin.auth.maxConcurrency >= 1)
 })
 
-test("config() 未登录也声明了模型，且模态字段是全布尔", async () => {
+test("config() 未登录也声明了模型，且 modalities / 五个 input 布尔都在", async () => {
   const plugin = await XxxAuthPlugin({ client: {} })
   const cfg = {}
   await plugin.config(cfg)
   const models = cfg.provider?.xxx?.models
   assert.ok(models && Object.keys(models).length > 0, "config.models 不能为空（铁律 1）")
   for (const [id, model] of Object.entries(models)) {
+    // config 路径读的是 modalities，不是 capabilities；只写后者等于没写。
+    assert.deepEqual(model.modalities.input, ["text"], `${id}.modalities.input 必须给`)
+    assert.deepEqual(model.modalities.output, ["text"], `${id}.modalities.output 必须给`)
     // HOOKS 十一之三只规定了 capabilities.input 的五个模态键；output 不发明字段
     for (const key of ["text", "image", "audio", "video", "pdf"]) {
       assert.equal(typeof model.capabilities.input[key], "boolean", `${id}.capabilities.input.${key} 必须是布尔`)
@@ -131,4 +135,12 @@ test("chat.headers 只给本 provider 的请求加头", async () => {
   const other = { headers: {} }
   await plugin["chat.headers"]({ model: { providerID: "other" }, sessionID: "sess-1" }, other)
   assert.deepEqual(other.headers, {})
+})
+
+test("auth.refresh 走 refresh lock，而不是裸调 exchangeRefresh", () => {
+  // 模板里的 exchangeRefresh 仍是 TODO，无法注入桩；用源码契约锁住接线本身。
+  // 模块行为由 tests/refresh-lock.test.mjs 锁，这里只防止未来重构把闸拆掉。
+  const source = readFileSync(new URL("../index.mjs", import.meta.url), "utf8")
+  assert.match(source, /import \{ createRefreshLock \} from "\.\/src\/refresh-lock\.mjs"/)
+  assert.match(source, /refreshLock\.run\(\s*`\$\{PROVIDER\}\\n\$\{auth\.refresh\}`/)
 })
