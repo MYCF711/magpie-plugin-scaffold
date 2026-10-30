@@ -321,6 +321,41 @@ cd my-provider
 rm -rf .git && git init    # 换掉历史
 ```
 
+### 方式三：一条命令生成（身份自动改对）
+
+```bash
+npx --yes github:MYCF711/magpie-plugin-scaffold#v0.1.31 create \
+  --dir my-provider \
+  --provider acme \
+  --name "Acme" \
+  --base https://api.acme.example/v1
+```
+
+它复制模板的源码、测试、文档和 CI，只改身份三处（`PROVIDER` / `PROVIDER_NAME` / `BASE`），
+不会覆盖非空目录，也不会联网或装依赖。生成后直接跑 `node scripts/check.mjs`。
+
+### 在已有仓库里只跑 check（GitHub Action）
+
+不想复制模板、只想让 PR 卡住不合规的插件：
+
+```yaml
+# .github/workflows/magpie-plugin.yml
+name: magpie plugin check
+on: [pull_request]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: MYCF711/magpie-plugin-scaffold/.github/actions/check@v0.1.31
+        with:
+          target: .
+```
+
+这个复合动作直接跑动作仓库里的 `scripts/check.mjs`，不下载 npm 包、不装依赖、不写你的目录。
+本地等价命令：`npx --yes github:MYCF711/magpie-plugin-scaffold#v0.1.31 check .`。
+
 ### 建好仓库后：四件 check 查不到的事
 
 `scripts/check.mjs` 只看**仓库里的文件**。下面这些在 GitHub 上一律查不到，
