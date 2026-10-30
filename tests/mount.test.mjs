@@ -31,7 +31,8 @@ test("入口只导出一个函数（插件工厂）", () => {
 
 test("_internal 是对象，helper 不暴露成顶层函数导出", () => {
   assert.equal(typeof _internal, "object")
-  assert.equal(_internal.PROVIDER, "xxx")
+  assert.equal(typeof _internal.PROVIDER, "string")
+  assert.ok(_internal.PROVIDER.length > 0)
   assert.equal(typeof _internal.staticModels, "function")
   assert.ok(Array.isArray(_internal.MODELS))
 })
@@ -40,7 +41,7 @@ test("九项钩子齐全", async () => {
   const plugin = await XxxAuthPlugin({ client: {}, directory: undefined })
   assert.equal(typeof plugin.config, "function")
   assert.ok(plugin.auth && typeof plugin.auth === "object")
-  assert.equal(plugin.auth.provider, "xxx")
+  assert.equal(plugin.auth.provider, _internal.PROVIDER)
   assert.equal(typeof plugin.auth.refresh, "function")
   assert.equal(typeof plugin.auth.loader, "function")
   assert.equal(typeof plugin.auth.usage, "function")
@@ -49,7 +50,7 @@ test("九项钩子齐全", async () => {
   assert.equal(typeof plugin.auth.methods[0].authorize, "function")
   assert.equal(typeof plugin.provider.models, "function")
   assert.equal(typeof plugin["chat.headers"], "function")
-  assert.equal(plugin.provider.id, "xxx")
+  assert.equal(plugin.provider.id, _internal.PROVIDER)
   assert.ok(plugin.auth.icon?.startsWith("data:image/"), "图标必须内嵌（外部 URL 在 git 源下不渲染）")
   assert.ok(Number.isInteger(plugin.auth.maxConcurrency) && plugin.auth.maxConcurrency >= 1)
 })
@@ -58,7 +59,7 @@ test("config() 未登录也声明了模型，且 modalities / 五个 input 布�
   const plugin = await XxxAuthPlugin({ client: {} })
   const cfg = {}
   await plugin.config(cfg)
-  const models = cfg.provider?.xxx?.models
+  const models = cfg.provider?.[_internal.PROVIDER]?.models
   assert.ok(models && Object.keys(models).length > 0, "config.models 不能为空（铁律 1）")
   for (const [id, model] of Object.entries(models)) {
     // config 路径读的是 modalities，不是 capabilities；只写后者等于没写。
@@ -128,9 +129,10 @@ test("usage() 未登录 / TODO 未实现时给出 error 而不是伪造 0", asyn
 
 test("chat.headers 只给本 provider 的请求加头", async () => {
   const plugin = await XxxAuthPlugin({ client: {} })
+  const header = `x-${_internal.PROVIDER}-session`
   const mine = { headers: {} }
-  await plugin["chat.headers"]({ model: { providerID: "xxx" }, sessionID: "sess-1" }, mine)
-  assert.equal(mine.headers["x-xxx-session"], "sess-1")
+  await plugin["chat.headers"]({ model: { providerID: _internal.PROVIDER }, sessionID: "sess-1" }, mine)
+  assert.equal(mine.headers[header], "sess-1")
 
   const other = { headers: {} }
   await plugin["chat.headers"]({ model: { providerID: "other" }, sessionID: "sess-1" }, other)
