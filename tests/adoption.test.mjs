@@ -100,10 +100,20 @@ test("create.mjs 拒绝非空目录，不覆盖已有代码", () => {
   }
 })
 
-test("package.json 暴露 check / create 两个 bin，CI 自测 Action", () => {
+test("cli.mjs 把 check 子命令转发给 check.mjs，未知子命令退出 1", () => {
+  const check = runNode(join(ROOT, "scripts", "cli.mjs"), ["check", ROOT])
+  assert.equal(check.status, 0, check.stdout + check.stderr)
+  assert.match(check.stdout, /通过 \d+ · 警告 \d+ · 失败 \d+/)
+
+  const unknown = runNode(join(ROOT, "scripts", "cli.mjs"), ["nope"])
+  assert.equal(unknown.status, 1)
+  assert.match(unknown.stderr, /不认识的子命令/)
+})
+
+test("package.json 只暴露一个 magpie-plugin bin，CI 自测 Action", () => {
   const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"))
-  assert.equal(pkg.bin["magpie-plugin-check"], "./scripts/check.mjs")
-  assert.equal(pkg.bin["magpie-plugin-create"], "./scripts/create.mjs")
+  assert.equal(pkg.bin["magpie-plugin"], "./scripts/cli.mjs")
+  assert.equal(Object.keys(pkg.bin).length, 1, "多个 bin 会让 npx 无法判断该跑哪个")
 
   const action = readFileSync(join(ROOT, ".github", "actions", "check", "action.yml"), "utf8")
   assert.match(action, /using: composite/)
