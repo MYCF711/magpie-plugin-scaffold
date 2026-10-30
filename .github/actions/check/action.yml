@@ -14,11 +14,11 @@ author: MYCF711
 
 inputs:
   target:
-    description: 被检查的插件目录，相对工作区的路径
+    description: "被检查的插件目录，相对工作区的路径"
     required: false
     default: "."
   node-version:
-    description: Node 版本；检查脚本只用 node: 内置模块，22 或 24 都可
+    description: "Node 版本；检查脚本只用 node: 内置模块，22 或 24 都可"
     required: false
     default: "22"
 
