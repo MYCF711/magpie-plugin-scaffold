@@ -22,10 +22,12 @@ test("maskPhone：0086- / +86 / 裸号 / 已打码，一律 3+4", () => {
   assert.equal(maskPhone(""), "")
   assert.equal(maskPhone(undefined), "")
   assert.equal(maskPhone("123"), "")
-  // 边界：86 开头的真号码不能被当成国家码砍掉头两位
-  assert.equal(maskPhone("86123456789"), "123****6789")
-  // 但带国家码的短号（后面只剩 7 位）仍要去掉前缀
-  assert.equal(maskPhone("0086-1898051"), "189****8051")
+  // 短号没有「前3后4」可打：原号码的全部数字都会出现在结果里 → 必须返回空串
+  assert.equal(maskPhone("1234567"), "", "7 位短号打码会泄露全部数字")
+  assert.equal(maskPhone("12345678"), "", "8 位短号打码会泄露全部数字")
+  assert.equal(maskPhone("8612345678"), "", "去掉 86 后只有 8 位，不是手机号")
+  assert.equal(maskPhone("0086-1898051"), "", "去掉国家码后只有 7 位，不是手机号")
+  assert.equal(maskPhone("86123456789"), "", "去掉 86 后只有 9 位，不是手机号")
 })
 
 test("looksLikeIdentifier：这些都不许当名字", () => {
@@ -62,9 +64,11 @@ test("resolveAccount：accountId 是人看的名字，uid 是身份", () => {
   assert.deepEqual(resolveAccount({}), {})
 })
 
-test("accountLabelOf：手机号优先于任何 id 字段", () => {
+test("accountLabelOf：手机号优先于任何 id 字段，短号不当作手机号显示", () => {
   const info = { phone: "0086-18170806710", email: "x@y.com", accountId: "iam::d1:user:hw0406" }
   assert.equal(accountLabelOf(info), "181****6710")
+  // 短号不是手机号：跳过它，回退到邮箱（不能把 1234567 原样显示）
+  assert.equal(accountLabelOf({ phone: "1234567", email: "x@y.com" }), "x@y.com")
   // 邮箱优先于「像 ID」的 id
   assert.equal(accountLabelOf({ email: "x@y.com", accountId: "iam::d1:user:hw0406" }), "x@y.com")
   // 只剩 ID：空串

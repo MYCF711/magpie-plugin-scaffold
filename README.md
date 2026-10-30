@@ -221,16 +221,30 @@ package.json    → 版本、许可证、repository 链接（卡片上自动显�
 
 ## 已经趟过的通用协议（直接抄，别从零推）
 
-这几块是 `magpie-magicrew-auth` 真机跑通后抽出来的，跟厂商无关，派生仓库直接用：
+这几块都是厂商无关的通用协议 / 原语，派生仓库直接用（来源与 MIT 归属见 [`NOTICE.md`](./NOTICE.md)）：
 
 | 模块 | 解决什么 | 一个必须知道的实测 |
 |---|---|---|
+| [`src/refresh-lock.mjs`](./src/refresh-lock.mjs) | 一次性 refresh_token 的并发闸：同 key 合并 in-flight、成功回放 60 秒、失败不缓存 | 键必须是**凭据身份**（refresh_token / account），不能用 provider id —— 否则同渠道多账号会共享一次刷新结果 |
+| [`src/oauth-pkce.mjs`](./src/oauth-pkce.mjs) | OAuth 2.0 PKCE（S256）+ 本机 127.0.0.1 loopback 回调 | state 必须恰好出现一次且匹配；错误 path 404、错误 state 400 都**不结束**等待；超时 / abort / close 必须 reject |
+| [`src/model-context.mjs`](./src/model-context.mjs) | 查 magpie 自己的 `~/.cache/magpie/models.json` 拿真实上下文窗口 | 查不到返回调用方 fallback，否则 `undefined` —— **不猜**；填 256K 而实际 1M 会让 agent 提前压缩 |
+| [`src/openai-sse.mjs`](./src/openai-sse.mjs) | OpenAI 兼容 SSE 解析 / 非流折叠：CRLF、多行 data、BOM、`[DONE]`、UTF-8 跨块、32 MiB 上限 | 只解析与折叠，不默认改写请求；`foldOpenAI` 合并 tool_calls 分片并保留 `choices: []` 的 usage 帧 |
 | [`src/rotation-captcha.mjs`](./src/rotation-captcha.mjs) | 旋转图片验证码：角度编码、WAF cookie、取图→判角→提交重试 | `/captcha/generate` 回的 `set-cookie: acw_tc=…` 必须带回 verify，否则 `2000 客户端信息不匹配`（Node fetch 默认没有 cookie 罐） |
 | [`src/vision-clock.mjs`](./src/vision-clock.mjs) | 让 magpie 设置里的识图模型判断「主体朝几点」 | `max_tokens=400` 会把推理答案饿死（`content:null`）；两个判官分歧 >1.5 钟点要换图，不能取平均 |
 | [`src/local-browser.mjs`](./src/local-browser.mjs) | 从本机浏览器 localStorage（LevelDB）读登录态 | 必须按 origin 截断：A 站的 jwt 配到 B 站的 org 就是「登录成功却拿错号」 |
 | [`src/tempmail-client.mjs`](./src/tempmail-client.mjs) | 一次性邮箱建址 + 收验证码 | 域名有黑名单：`maxxspace.com` 会被部分上游拒，`yzcalo.com` / 常见邮箱域可过 —— 换厂商先用真实请求确认 |
 
-四块都有 `tests/*.test.mjs` 语义锁（`node --test` 44 条），照着测就能改。
+表里的模块都有 `tests/*.test.mjs` 语义锁，`node --test` 全跑，照着测就能改。
+
+**上游只回 SSE、客户端要非流式 JSON 时**，别把流读干再拼字符串 —— 显式调用解析/折叠原语：
+
+```js
+import { openAIEvents, foldOpenAI } from "./src/openai-sse.mjs"
+
+// res 是上游返回的 Response；只在「上游是 SSE、调用方要 JSON」这条路径上调用
+const completion = await foldOpenAI(openAIEvents(res.body), { model: requestModel })
+return Response.json(completion)
+```
 
 ---
 
@@ -404,8 +418,10 @@ return { url: "https://acme.example/login?...", result: promiseOfToken }
 return { access_token, refresh_token, expires_in }   // expires_in 是秒
 ```
 
-⚠ refresh_token **一次性**的厂商额外注意：模板已经带了并发去重闸，
-但要把 `refresh` 钩子接到那个闸上，别直接调 `exchangeRefresh`。
+⚠ refresh_token **一次性**的厂商额外注意：模板的 `auth.refresh` 已经用
+`src/refresh-lock.mjs` 的 `createRefreshLock` 包住了 `exchangeRefresh` ——
+同一 `refresh_token` 的并发续期会合并成一次，成功后回放 60 秒。
+派生仓库不要绕过它直接调 `exchangeRefresh`。
 
 **③ `fetchUsage(auth)`**
 

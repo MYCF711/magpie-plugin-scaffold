@@ -17,7 +17,8 @@
 //    `accountId` 留空串 → magpie 回退到供应商名（HOOKS 八的三级回退），不编造。
 // ② **优先级固定**：手机号 → 邮箱 → 用户 id → 空串。手机号要**打码**
 //    （`0086-18970098051` / `+86 189 7009 8051` / `18970098051` 一律 `189****8051`），
-//    和别的供应商一致。
+//    和别的供应商一致。**只有去掉国家码后 ≥11 位的才算手机号**；7–10 位短号返回空串，
+//    让调用方回退到邮箱/空名 —— 否则 `1234567` 会被打成 `123****4567`，原号码全部数字都在里面。
 // ③ **别把 `accountId` 当唯一键**：它是给人看的；区分同名账号靠 `uid`（HOOKS 八）。
 // ④ **内部 ID 不是名字**：`iam::<domain>:user:<name>`、`urn:…`、uuid、裸 hash、
 //    华为 IAM 的 `hw061571365626786` —— 这些都是**身份**，写进 `accountId` 就永久留在
@@ -29,12 +30,19 @@
 
 /** 手机号打码成 `189****8051`：厂商给 `0086-1…`、`+86 1…`、已打码的，都认。 */
 export function maskPhone(raw) {
-  let digits = String(raw ?? "").replace(/\D/g, "")
-  // 国家码去掉：`0086…` / `86…`，但要给后面留够一个号码的长度 ——
-  // 否则 "86123456789" 这种 86 开头的真号码会被砍掉头两位。
-  if (digits.startsWith("0086") && digits.length - 4 >= 7) digits = digits.slice(4)
-  else if (digits.startsWith("86") && digits.length - 2 >= 7) digits = digits.slice(2)
-  if (digits.length < 7) return ""
+  const text = String(raw ?? "").trim()
+  // 已经是 `189****8051` 这种形状：不能再按数字串处理（去掉 * 后只剩 7 位）。
+  // 允许带国家码/空格前缀（厂商的 maskedMobile 常给 `+86 189****8051`）。
+  const compact = text.replace(/\s+/g, "")
+  const stripped = compact.replace(/^(?:\+?86|0086)/, "")
+  if (/^\d{3}\*{4}\d{4}$/.test(stripped)) return stripped
+
+  let digits = text.replace(/\D/g, "")
+  // 国家码去掉：`0086…` / `86…`。去掉后仍必须是 11 位手机号；短号返回空串，
+  // 让调用方回退到邮箱/空名 —— 7–10 位数字打码会把原号码全部暴露。
+  if (digits.startsWith("0086")) digits = digits.slice(4)
+  else if (digits.startsWith("86")) digits = digits.slice(2)
+  if (digits.length < 11) return ""
   return `${digits.slice(0, 3)}****${digits.slice(-4)}`
 }
 
@@ -78,9 +86,13 @@ export function accountLabelOf(info, o = {}) {
   for (const k of mobileKeys) {
     const v = String(info[k] ?? "").trim()
     if (!v) continue
-    const masked = mask ? maskPhone(v) : ""
-    // 打码失败（不是号码形状）就退回原值：宁可显示，也不要空着
-    return masked || v.replace(strip, "")
+    if (mask) {
+      const masked = maskPhone(v)
+      // 不是 11 位手机号 → 跳过这个字段（**不能**退回原值，否则短号会原样上卡片）
+      if (masked) return masked
+      continue
+    }
+    return v.replace(strip, "")
   }
   for (const k of emailKeys) {
     const v = String(info[k] ?? "").trim()

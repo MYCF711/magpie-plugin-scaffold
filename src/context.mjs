@@ -65,7 +65,8 @@ export function staticModels() {
         reasoning: Array.isArray(efforts) && efforts.length > 0,
         toolcall: true,
         attachment: false,
-        input: { text: true, image: false },
+        // HOOKS 十一之三：五个模态键必须显式写布尔（省略 image ≠ text）
+        input: { text: true, image: false, audio: false, video: false, pdf: false },
         output: { text: true },
       },
       ...(efforts?.length ? { variants: Object.fromEntries(efforts.map((e) => [e, {}])) } : {}),

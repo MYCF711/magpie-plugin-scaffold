@@ -1,0 +1,134 @@
+// tests/mount.test.mjs —— 入口 / 九钩子挂载契约
+//
+// 结构参照 magpie-loomy-auth/tests/mount.test.mjs（MIT），针对本模板自身：
+//   ① 入口只导出一个函数（magpie 会把每个函数导出都当插件工厂调用）
+//   ② _internal 是对象（helper 不暴露成插件）
+//   ③ 九项钩子齐全
+//   ④ config() 未登录也有模型（否则卡片显示 "0 models"）
+//   ⑤ authorize() 立刻返回 Promise（当前实现还是 TODO，不把 TODO 的结果当契约）
+//   ⑥ loader() 给 baseURL / apiKey / fetch
+//   ⑦ usage 构造器可用，窗口形状符合契约
+//
+// 全部离线；不需要 magpie 进程、不需要凭据。
+// 跑法：node --test tests/mount.test.mjs
+
+import test from "node:test"
+import assert from "node:assert/strict"
+
+import * as entry from "../index.mjs"
+import { _internal } from "../index.mjs"
+import { usage, usageWindow } from "../src/quota.mjs"
+
+const { XxxAuthPlugin } = entry
+
+test("入口只导出一个函数（插件工厂）", () => {
+  const functions = Object.entries(entry)
+    .filter(([, value]) => typeof value === "function")
+    .map(([key]) => key)
+  assert.deepEqual(functions, ["XxxAuthPlugin"])
+})
+
+test("_internal 是对象，helper 不暴露成顶层函数导出", () => {
+  assert.equal(typeof _internal, "object")
+  assert.equal(_internal.PROVIDER, "xxx")
+  assert.equal(typeof _internal.staticModels, "function")
+  assert.ok(Array.isArray(_internal.MODELS))
+})
+
+test("九项钩子齐全", async () => {
+  const plugin = await XxxAuthPlugin({ client: {}, directory: undefined })
+  assert.equal(typeof plugin.config, "function")
+  assert.ok(plugin.auth && typeof plugin.auth === "object")
+  assert.equal(plugin.auth.provider, "xxx")
+  assert.equal(typeof plugin.auth.refresh, "function")
+  assert.equal(typeof plugin.auth.loader, "function")
+  assert.equal(typeof plugin.auth.usage, "function")
+  assert.equal(typeof plugin.auth.checkin, "function")
+  assert.ok(Array.isArray(plugin.auth.methods) && plugin.auth.methods.length >= 1)
+  assert.equal(typeof plugin.auth.methods[0].authorize, "function")
+  assert.equal(typeof plugin.provider.models, "function")
+  assert.equal(typeof plugin["chat.headers"], "function")
+  assert.equal(plugin.provider.id, "xxx")
+  assert.ok(plugin.auth.icon?.startsWith("data:image/"), "图标必须内嵌（外部 URL 在 git 源下不渲染）")
+  assert.ok(Number.isInteger(plugin.auth.maxConcurrency) && plugin.auth.maxConcurrency >= 1)
+})
+
+test("config() 未登录也声明了模型，且模态字段是全布尔", async () => {
+  const plugin = await XxxAuthPlugin({ client: {} })
+  const cfg = {}
+  await plugin.config(cfg)
+  const models = cfg.provider?.xxx?.models
+  assert.ok(models && Object.keys(models).length > 0, "config.models 不能为空（铁律 1）")
+  for (const [id, model] of Object.entries(models)) {
+    // HOOKS 十一之三只规定了 capabilities.input 的五个模态键；output 不发明字段
+    for (const key of ["text", "image", "audio", "video", "pdf"]) {
+      assert.equal(typeof model.capabilities.input[key], "boolean", `${id}.capabilities.input.${key} 必须是布尔`)
+    }
+    assert.equal(typeof model.capabilities.output.text, "boolean", `${id}.capabilities.output.text 必须是布尔`)
+  }
+})
+
+test("authorize 是 async 函数（不在测试里调用 TODO 实现）", async () => {
+  const plugin = await XxxAuthPlugin({ client: {} })
+  const method = plugin.auth.methods[0]
+  assert.equal(typeof method.authorize, "function")
+  // 当前 startLoginFlow 仍是 TODO（调用会 reject）。这里只锁「存在 + async 形状」，
+  // 不把 TODO 的实现结果当契约；实现后由派生仓库的 live 测试覆盖真实返回。
+  assert.equal(method.authorize.constructor.name, "AsyncFunction")
+})
+
+test("loader() 给 baseURL / apiKey / fetch；未登录返回空对象", async () => {
+  const plugin = await XxxAuthPlugin({ client: {} })
+  const out = await plugin.auth.loader(async () => ({ type: "oauth", access: "access-token" }), { id: "xxx" })
+  assert.equal(typeof out.fetch, "function")
+  assert.equal(typeof out.baseURL, "string")
+  assert.ok(out.baseURL.startsWith("http"))
+  assert.equal(out.apiKey, "access-token")
+
+  const empty = await plugin.auth.loader(async () => null, { id: "xxx" })
+  assert.deepEqual(empty, {})
+})
+
+test("provider.models：未登录返回静态模型表；条目 API 字段完整", async () => {
+  const plugin = await XxxAuthPlugin({ client: {} })
+  const models = await plugin.provider.models({}, { auth: null })
+  assert.ok(models && Object.keys(models).length > 0)
+  for (const [id, model] of Object.entries(models)) {
+    assert.equal(model.id, id)
+    assert.equal(model.api.url, _internal.BASE)
+    assert.equal(model.api.npm, "@ai-sdk/openai-compatible")
+  }
+})
+
+test("usage 构造器可用：至少造一条参与路由的窗口", () => {
+  const value = usage({
+    plan: "Test",
+    windows: [usageWindow({ name: "5 小时", used: 37, span: 18_000, resetsAt: "2026-10-30T12:00:00Z" })],
+  })
+  assert.equal(typeof value.plan, "string")
+  assert.equal(value.windows.length, 1)
+  assert.equal(Number.isFinite(value.windows[0].used), true)
+  assert.equal(typeof value.windows[0].aside === "boolean" || value.windows[0].aside === undefined, true)
+})
+
+test("usage() 未登录 / TODO 未实现时给出 error 而不是伪造 0", async () => {
+  const plugin = await XxxAuthPlugin({ client: {} })
+  const anonymous = await plugin.auth.usage(async () => null, { id: "xxx" })
+  assert.equal(anonymous.error, "未登录")
+  assert.deepEqual(anonymous.windows, [])
+
+  const withAuth = await plugin.auth.usage(async () => ({ type: "oauth", access: "x" }), { id: "xxx" })
+  assert.equal(typeof withAuth.error, "string", "TODO 抛错时必须把原因交给卡片")
+  assert.deepEqual(withAuth.windows, [])
+})
+
+test("chat.headers 只给本 provider 的请求加头", async () => {
+  const plugin = await XxxAuthPlugin({ client: {} })
+  const mine = { headers: {} }
+  await plugin["chat.headers"]({ model: { providerID: "xxx" }, sessionID: "sess-1" }, mine)
+  assert.equal(mine.headers["x-xxx-session"], "sess-1")
+
+  const other = { headers: {} }
+  await plugin["chat.headers"]({ model: { providerID: "other" }, sessionID: "sess-1" }, other)
+  assert.deepEqual(other.headers, {})
+})

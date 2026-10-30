@@ -191,7 +191,11 @@ export function usage(u = {}) {
 
     // 官方 #468 结论：路由跳过 aside 窗口和没有 used 的窗口。一条都不剩 ⇒ 这个号在路由里
     // 等于不存在（路由页「剩余额度未知」，且永远排在已知账号之后）。
-    const routable = out.windows.filter((w) => w.aside !== true && w.used !== undefined)
+    // 例外：钱包型窗口（只有 balance）没有 used，但宿主会按余额读它 —— 它是可路由的。
+    // 判据与 Magicrew 实际写法（src/hooks/usage.mjs:53-59）一致，否则只有钱包窗口的账号会被误杀。
+    const routable = out.windows.filter(
+      (w) => w.aside !== true && (w.used !== undefined || w.balance !== undefined),
+    )
     if (out.windows.length > 0 && routable.length === 0) {
       throw new QuotaShapeError(
         "所有窗口都不参与路由（全是 aside: true 或 textOnly）—— " +

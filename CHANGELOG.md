@@ -3,6 +3,20 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.1.30 — 2026-10-30
+
+**补上四个厂商无关原语，把「文档宣称有、代码没有」的洞填上**
+
+- 新增 `src/refresh-lock.mjs`：`createRefreshLock({replayMs})` 同 key 合并 in-flight、成功回放 60 秒、失败不缓存、`clear()` / `sweep()`；`index.mjs` 的 `auth.refresh` 已真实接入（键 = `PROVIDER + "\n" + refresh_token`），README 宣称的「并发去重闸」不再是空话
+- 新增 `src/oauth-pkce.mjs`：`generatePkce()`（S256）/ `randomState()` / `startLoopback()`（127.0.0.1 随机端口、state/Host 校验、错误 path 404 不结束、错误 state 400 可重试、超时/abort/close reject）——只提供原语，不接默认登录流程
+- 新增 `src/model-context.mjs`：`createModelContext()` 查 `~/.cache/magpie/models.json`（精确 id / 尾段 / 多厂商前缀取最大、大小写不敏感、TTL 缓存、坏 JSON 与文件缺失不抛）；`src/models.mjs` 的 `contextOf()` 改为调用它，查不到返回 `undefined`（不猜）
+- 新增 `src/openai-sse.mjs`：`parseSse` / `readSseEvents` / `openAIEvents` / `foldOpenAI`（CRLF、多行 data、注释、BOM、`[DONE]`、UTF-8 跨块、32 MiB 上限、usage 帧、tool_calls 分片）——只解析/折叠，不默认改写请求
+- 修复 `src/quota.mjs`：`usage()` 的 routable 判据改为 `w.aside !== true && (w.used !== undefined || w.balance !== undefined)` —— 只有 `balance` 的钱包窗口不再被误杀
+- 修复 `src/models.mjs` / `src/context.mjs` / `index.mjs`：`capabilities.input` 补全 `audio` / `video` / `pdf` 布尔（`output` 保持 `{ text: true }`，不发明契约外字段）
+- 修复 `src/account-name.mjs`：`maskPhone` 只在去掉国家码后 ≥11 位时打码；7–10 位短号返回空串，不再把原号码全部数字打在卡片上；已打码值保持原样
+- 新增 `tests/mount.test.mjs`（入口唯一函数导出 / 九钩子 / config 模型 / loader 形状 / usage 构造器）与四个模块的独立离线测试；`node --test` 113 条全绿
+- 新增 `NOTICE.md` 并在 `package.json.files` 收录；版本 0.1.30
+
 ## 0.1.29 — 2026-10-30
 
 **「自己给自己提 PR 有必要吗」—— 实测答案：是必须的。我上一版的推断错了，实测把它推翻了**

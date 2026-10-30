@@ -62,7 +62,7 @@ PR 是 GitHub 对受保护分支的技术要求（直推报 `GH006`），批准�
 |---|---|---|---|
 | 16 | 加了第二个账号，第一个账号的数据变了 / 串号 | 一切按账号落盘的东西，文件名必须带账号（`<plugin>-<siteId>__<account>.json`）；**不要用模块级变量存 per-account 状态** —— 宿主是同一个进程跑所有账号 | [`src/hooks/models.mjs`](HOOKS.md) 的 `inScope` |
 | 17 | 接口抖一下，列表整个空掉；或某个模型缺价格，用户选了报错 | **部分成功有三态**，方向要各自选对：① 整个接口失败 → 退回上次快照（不要返回空表）② 接口成功但单条缺字段 → **不列**（不猜）③ 登录失效 → 抛 `signIn: "expired"` | [`src/models.mjs`](./src/models.mjs) 的 `buildModels` |
-| 18 | 越改越乱，`index.mjs` 涨到几百行，改一个钩子要读全篇 | 成熟形态是**`index.mjs` 只做九项钩子的装配，实现全在 `src/`**。实测四个真实插件的 `index.mjs` 是 80~715 行，而 `src/` 是 1.4k~3.7k 行 —— 而本模板现在是反过来的（index 535 行 / src 78 行） | 本文件「五、长大之后」 |
+| 18 | 越改越乱，`index.mjs` 涨到几百行，改一个钩子要读全篇 | 成熟形态是**`index.mjs` 只做九项钩子的装配，实现全在 `src/`**。实测四个真实插件的 `index.mjs` 是 80~715 行，而 `src/` 是 1.4k~3.7k 行 —— 本模板现在是 index 546 行 / `src/` 17 文件 2,868 行（已不是「单文件 78 行」） | 本文件「五、长大之后」 |
 
 还有两条是 **magpie 0.1.1763 重新提取契约后才发现**的（2026-10-28）：
 
@@ -76,7 +76,7 @@ PR 是 GitHub 对受保护分支的技术要求（直推报 `GH006`），批准�
 | 24 | **卡片上额度正常，路由页里这个号却是「剩余额度未知」，还总排在别人后面** | 窗口没有被路由计入：**`used` 缺省的窗口判成 `Text`，`aside: true` 的窗口路由直接跳过** —— `w.Aside || w.Text` 两个条件都会跳过，与 amount/limit 无关（#468 更正）。一条不剩 ⇒ `allowanceOf()` 返回空 ⇒ `routedAllowance` 不 ok ⇒ `weighed()` 不设 `Known`。**「不参与排序」的实际后果是「这个号在路由里不存在」**。判据：`curl -s http://127.0.0.1:3425/v1/magpie/trace` 看这个 provider 的 `known` 是 `true` 还是**字段缺失**；`~/.config/magpie/quotas.json` 的 `spans` 是 `[{}]` 还是 `[{"aside":true}]` | HOOKS 三 · 规矩 ① |
 | 25 | **模型明明收不了图，却被当成能收图**：截图直发上游报 `The request model is not multimodal` / 400，或者模型回「图片无法查看」 | 模型条目的 `capabilities.input.image` **必须写成布尔值**：省略不等于 text，等于「厂商未表态」，magpie 会拿 models.dev 的裸模型 id 投票补 —— 同名模型在别家标过 `image`，这个模型就会被带成能收图。text-only 模板见 HOOKS 十一之三；反向的手动覆盖（厂商说 `false` 却勾了 `Accepts images`）在 magpie 侧暂无警告 | HOOKS 十一之三 · CHECKLIST A-14 |
 | 26 | 邀请码填了、主登录也过了，但上级没拿到奖励；或「邀请码」那条登录方式点开只有一个框、后面什么都没接 | 两个原因：① 与码成对的额外参数没带（Accio 的 `sId`）—— 换码时必须一起换，见 `src/invite.mjs` 的 `write()`；② 用 `prompts` 数组串「邀请码 → 主登录」是串不起来的，必须用 `ask()`（HOOKS 四·陷阱 5） | HOOKS 四·陷阱 5 · 四之二 · `src/invite.mjs` |
-| 27 | **卡片上的账号名是一串看不懂的 ID**（`iam::01a1642a…:user:hw0615…`、`urn:…`、uuid），用户以为是「显示乱码」 | `accountId` 是**名字**，不是身份：手机号（`maskPhone` 打码 `189****8051`）→ 昵称/邮箱 → **空串**（宿主回退供应商名）。内部 ID 只进 `uid`。**URN 写进 `accountId` 极难改回** —— 续期返回值是合并、插件落盘又多保留旧值，所以续期路径也要重算一遍 | HOOKS 八的「`accountId` 是名字，`uid` 是身份」· `src/account-name.mjs` 的 `resolveAccount` |
+| 27 | **卡片上的账号名是一串看不懂的 ID**（`iam::01a1642a…:user:hw0615…`、`urn:…`、uuid），用户以为是「显示乱码」 | `accountId` 是**名字**，不是身份：手机号（`maskPhone` 对去掉国家码后 ≥11 位的号码打码 `189****8051`；短号返回空串不显示）→ 昵称/邮箱 → **空串**（宿主回退供应商名）。内部 ID 只进 `uid`。**URN 写进 `accountId` 极难改回** —— 续期返回值是合并、插件落盘又多保留旧值，所以续期路径也要重算一遍 | HOOKS 八的「`accountId` 是名字，`uid` 是身份」· `src/account-name.mjs` 的 `resolveAccount` |
 
 ---
 
@@ -164,19 +164,23 @@ node scripts/probe-vision.mjs <provider/model> …
 
 | 仓库 | `index.mjs` | `src/` | `tests/` |
 |---|---|---|---|
-| 本模板 | 535 行 | 1 文件 / 78 行 | 0 |
-| `magpie-magicrew-auth` | **80** | 21 文件 / 3,683 行 | 6 |
-| `magpie-officeace` | 347 | 7 文件 / 1,397 行 | 0 |
+| 本模板 | 546 行 | 17 文件 / 2,868 行 | 12 |
+| `magpie-magicrew-auth` | **86** | 27 文件 / 7,773 行 | 17 |
+| `magpie-officeace` | 383 | 8 文件 / 1,566 行 | 2 |
 | `magpie-loomy-auth` | 611 | 9 文件 / 1,905 行 | 4 |
 | `magpie-today` | 715 | 18 文件 / 2,812 行 | 7 |
 
-结论：**`index.mjs` 只做装配，实现全在 `src/`** —— 最成熟的那个（magicrew）index 只有 80 行。
+结论：**`index.mjs` 只做装配，实现全在 `src/`** —— 最成熟的那个（magicrew）index 只有 86 行。
 
-已经备好八块骨架（前三块四个插件里 4/4 都有；`store` 只有 magicrew 独立成文件，
-另两个各自实现了等价逻辑；后四块是 2026-10-29 从 magicrew 真机链路抽出来的通用协议）：
+已经备好 17 个 `src/` 模块（前四块四个插件里 4/4 都有；`store` 只有 magicrew 独立成文件，
+另两个各自实现了等价逻辑；其余是 2026-10-29～30 从 magicrew / 社区 MIT 包抽出的通用协议）：
 
 | 文件 | 里面写什么 | 为什么单独拎出来 |
 |---|---|---|
+| [`src/refresh-lock.mjs`](./src/refresh-lock.mjs) | `createRefreshLock` / `run` / `clear` / `sweep` | 一次性 refresh_token 的并发闸：同 key 合并、成功回放 60 秒、失败可重试；键必须是凭据身份 |
+| [`src/oauth-pkce.mjs`](./src/oauth-pkce.mjs) | `generatePkce` / `randomState` / `startLoopback` | OAuth PKCE S256 + 127.0.0.1 loopback：state/Host 校验、错误 path 404 不结束、错误 state 400 可重试、超时/abort/close |
+| [`src/model-context.mjs`](./src/model-context.mjs) | `createModelContext` / `contextOf` / `clear` / `size` | 查 `~/.cache/magpie/models.json` 的真实上下文；查不到返回 fallback / undefined，不猜 |
+| [`src/openai-sse.mjs`](./src/openai-sse.mjs) | `parseSse` / `readSseEvents` / `openAIEvents` / `foldOpenAI` | SSE 帧解析 + 非流折叠；CRLF / 多行 data / BOM / UTF-8 跨块 / 32 MiB / tool_calls 分片 / usage 帧 |
 | [`src/api.mjs`](./src/api.mjs) | `headersFor` / `read` / `get` / `asModelError` / `asSignInExpired` | 错误语义只在一处定义 —— 401 与 404 混用会打死整个账号 |
 | [`src/models.mjs`](./src/models.mjs) | `isUsable` / `priceOf` / `buildModels` / `defaultEntry` | 三态降级 + `free` 三分支，错法都长得像「正常」 |
 | [`src/chat.mjs`](./src/chat.mjs) | `passThrough` / `withUsage` / `singleShotToSSE` / `normalizeUsage` | 流式三坑：读干流、漏 `include_usage`、`stream:false` 不被接受 |
@@ -184,12 +188,13 @@ node scripts/probe-vision.mjs <provider/model> …
 | [`src/quota.mjs`](./src/quota.mjs) | `usageWindow` / `usage` / `toIso` / `QuotaShapeError` | **把「写错不报错、但 GUI 和智能路由会坏」的五类窗口写法变成运行时错误** —— 见下方的表 |
 | [`src/invite.mjs`](./src/invite.mjs) | `createInviteStore` / `inviteHint` / `resolveInvite` / `makeInviteMethod` | 邀请码只能在登录 URL 上带、事后补不了；而 `prompts` 是静态数组，串不起「填码 → 主登录」—— 只有 `ask()` 能 |
 | [`src/desktop-import.mjs`](./src/desktop-import.mjs) | `hasDesktopLogin` / `decryptChromiumV10` / `importDesktopLogin` | 厂商有桌面客户端时，这是**唯一不弹浏览器**的登录路；DPAPI + AES-GCM 的边界（v11/v20 解不开）必须写在代码里 |
-| [`src/account-name.mjs`](./src/account-name.mjs) | `maskPhone` / `looksLikeIdentifier` / `accountLabelOf` / `resolveAccountLabel` / `resolveAccount` | 换码响应没有账号名 ⇒ 卡片只能显示「Signed in」；补一次 userinfo 就行，但**失败不能阻塞登录、不能编造**。手机号一律打码；内部 ID（`iam::…` / URN / uuid / `hw…`）**不许当名字** —— 它们进 `uid`，名字取不到就是空串 |
+| [`src/account-name.mjs`](./src/account-name.mjs) | `maskPhone` / `looksLikeIdentifier` / `accountLabelOf` / `resolveAccountLabel` / `resolveAccount` | 换码响应没有账号名 ⇒ 卡片只能显示「Signed in」；补一次 userinfo 就行，但**失败不能阻塞登录、不能编造**。手机号（去掉国家码后 ≥11 位）一律打码，短号返回空串；内部 ID（`iam::…` / URN / uuid / `hw…`）**不许当名字** —— 它们进 `uid`，名字取不到就是空串 |
 | [`src/rotation-captcha.mjs`](./src/rotation-captcha.mjs) | `encodeAngle` / `createRotationCaptcha` / `solveRotationCaptcha` / `createCookieJar` | 「旋转图片对正」的验证码：角度编码是从前端反出来的（实测 4 组提交正向穷举唯一命中）；`acw_tc` WAF cookie 不带回去会回「客户端信息不匹配」；判角不可信要换图而不是硬撞 |
 | [`src/vision-clock.mjs`](./src/vision-clock.mjs) | `readVisionModel` / `decideDegFromImage` / `clockToDeg` / `clockSpread` | 用用户自己在 magpie 里选的识图模型判「主体朝几点」；两个判官并行 + 分歧阈值；`max_tokens` 是给推理留的（400 会饿死答案） |
 | [`src/local-browser.mjs`](./src/local-browser.mjs) | `readLocalCreds` / `credsNear` / `leveldbText` | 用户在自己浏览器里登录过时，直接读 localStorage 的 leveldb —— 不开窗、不弹浏览器；跨 origin 必须截断，否则 A 站 jwt 会配到 B 站 org |
 | [`src/tempmail-client.mjs`](./src/tempmail-client.mjs) | `createTempMailbox` / `waitTempCode` | 邮箱验证码自动登录的一次性地址；域名有黑名单（`maxxspace.com` 被 magicrew 拒），换厂商先用真实请求确认 |
-| [`tests/semantics.test.mjs`](./tests/semantics.test.mjs) | 27 条语义锁（含 11 条额度窗口 / 4 条 accountId 规则） | `check.mjs` 查不到的那部分，只有它能拦 |
+| [`tests/semantics.test.mjs`](./tests/semantics.test.mjs) | 语义锁（含额度窗口 / accountId 规则） | `check.mjs` 查不到的那部分，只有它能拦 |
+| [`tests/mount.test.mjs`](./tests/mount.test.mjs) | 入口唯一函数导出 / 九钩子 / config 模型 / loader / usage 形状 | 模块测试全绿也拦不住「index 改坏了」 |
 
 **为什么 `src/quota.mjs` 值得单独一个文件**：额度窗口是 magpie **画卡片**和**智能路由排序**的同一个输入。
 写错不会崩，只会让卡片显示「剩余额度未知」、让这个号在路由里被当成不存在 —— 用户以为插件坏了，
