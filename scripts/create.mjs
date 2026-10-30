@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 从一个已验证的模板起一个新插件 —— 不可变部分照抄，身份三处自动改掉。
 //
-//   npx --yes github:MYCF711/magpie-plugin-scaffold#v0.1.32 create \
+//   npx --yes github:MYCF711/magpie-plugin-scaffold#v0.1.34 create \
 //     --dir my-plugin --provider acme --name "Acme" --base https://api.acme.example/v1
 //
 // 它做的事只有「复制 + 改身份」：

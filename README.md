@@ -231,6 +231,7 @@ package.json    → 版本、许可证、repository 链接（卡片上自动显�
 | [`src/openai-sse.mjs`](./src/openai-sse.mjs) | OpenAI 兼容 SSE 解析 / 非流折叠：CRLF、多行 data、BOM、`[DONE]`、UTF-8 跨块、32 MiB 上限 | 只解析与折叠，不默认改写请求；`foldOpenAI` 合并 tool_calls 分片并保留 `choices: []` 的 usage 帧 |
 | [`src/usage-cache.mjs`](./src/usage-cache.mjs) | 按凭据 key 缓存 `usage()`：成功 60 秒 / 失败 5 秒、同 key 并发合并；`publicUsage` / `exhausted` | 失败缓存 60 秒会让用户点重试也没反应；无窗口/无余额读数时 `exhausted` 必须放行，不能把好号挡住 |
 | [`src/request-rewrite.mjs`](./src/request-rewrite.mjs) | JSON 请求体改写管道：identity 快路径、`ensureStreamUsage`、`clampMaxTokens`、`stripModelPrefix`、`stripHopHeaders` | 改 body 后不去掉 `content-length` / `content-encoding` 会截断/解码失败；工具 schema 的 `additionalProperties:false` 绝不能碰 |
+| [`src/tool-schema.mjs`](./src/tool-schema.mjs) | 工具名超长截断（保持唯一）+ 工具 schema 兼容改写（`additionalProperties` 非布尔→`true`、删 `items:{}`、`items` 子树摊平且不留空 `{}`） | **默认关闭、只作显式 adapter**：会放宽模型看到的工具约束；`request-rewrite.mjs` 的「工具 schema 不动」铁律不变，两者不要同时挂 |
 | [`src/rotation-captcha.mjs`](./src/rotation-captcha.mjs) | 旋转图片验证码：角度编码、WAF cookie、取图→判角→提交重试 | `/captcha/generate` 回的 `set-cookie: acw_tc=…` 必须带回 verify，否则 `2000 客户端信息不匹配`（Node fetch 默认没有 cookie 罐） |
 | [`src/vision-clock.mjs`](./src/vision-clock.mjs) | 让 magpie 设置里的识图模型判断「主体朝几点」 | `max_tokens=400` 会把推理答案饿死（`content:null`）；两个判官分歧 >1.5 钟点要换图，不能取平均 |
 | [`src/local-browser.mjs`](./src/local-browser.mjs) | 从本机浏览器 localStorage（LevelDB）读登录态 | 必须按 origin 截断：A 站的 jwt 配到 B 站的 org 就是「登录成功却拿错号」 |
@@ -326,7 +327,7 @@ rm -rf .git && git init    # 换掉历史
 ### 方式三：一条命令生成（身份自动改对）
 
 ```bash
-npx --yes github:MYCF711/magpie-plugin-scaffold#v0.1.33 create \
+npx --yes github:MYCF711/magpie-plugin-scaffold#v0.1.34 create \
   --dir my-provider \
   --provider acme \
   --name "Acme" \
@@ -350,14 +351,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: MYCF711/magpie-plugin-scaffold/.github/actions/check@v0.1.33
+      - uses: MYCF711/magpie-plugin-scaffold/.github/actions/check@v0.1.34
         with:
           target: .
 ```
 
 这个复合动作直接跑动作仓库里的 `scripts/check.mjs`，不下载 npm 包、不装依赖、不写你的目录。
-本地等价命令：`npx --yes github:MYCF711/magpie-plugin-scaffold#v0.1.33 check .`。
-上面的 `#v0.1.33` / `@v0.1.33` 是写这份文档时的最新 Release；固定 tag 能让行为可复现，
+本地等价命令：`npx --yes github:MYCF711/magpie-plugin-scaffold#v0.1.34 check .`。
+上面的 `#v0.1.34` / `@v0.1.34` 是写这份文档时的最新 Release；固定 tag 能让行为可复现，
 想跟随最新可以换成 `#main`（Action 的 `@main` 同理，但固定 tag 更安全）。
 
 ### 建好仓库后：四件 check 查不到的事

@@ -62,7 +62,7 @@ PR 是 GitHub 对受保护分支的技术要求（直推报 `GH006`），批准�
 |---|---|---|---|
 | 16 | 加了第二个账号，第一个账号的数据变了 / 串号 | 一切按账号落盘的东西，文件名必须带账号（`<plugin>-<siteId>__<account>.json`）；**不要用模块级变量存 per-account 状态** —— 宿主是同一个进程跑所有账号 | [`src/hooks/models.mjs`](HOOKS.md) 的 `inScope` |
 | 17 | 接口抖一下，列表整个空掉；或某个模型缺价格，用户选了报错 | **部分成功有三态**，方向要各自选对：① 整个接口失败 → 退回上次快照（不要返回空表）② 接口成功但单条缺字段 → **不列**（不猜）③ 登录失效 → 抛 `signIn: "expired"` | [`src/models.mjs`](./src/models.mjs) 的 `buildModels` |
-| 18 | 越改越乱，`index.mjs` 涨到几百行，改一个钩子要读全篇 | 成熟形态是**`index.mjs` 只做九项钩子的装配，实现全在 `src/`**。实测四个真实插件的 `index.mjs` 是 80~715 行，而 `src/` 是 1.4k~3.7k 行 —— 本模板现在是 index 558 行 / `src/` 19 文件 3,168 行（已不是「单文件 78 行」） | 本文件「五、长大之后」 |
+| 18 | 越改越乱，`index.mjs` 涨到几百行，改一个钩子要读全篇 | 成熟形态是**`index.mjs` 只做九项钩子的装配，实现全在 `src/`**。实测四个真实插件的 `index.mjs` 是 80~715 行，而 `src/` 是 1.4k~3.7k 行 —— 本模板现在是 index 558 行 / `src/` 20 文件 3,716 行（已不是「单文件 78 行」） | 本文件「五、长大之后」 |
 
 还有两条是 **magpie 0.1.1763 重新提取契约后才发现**的（2026-10-28）：
 
@@ -164,7 +164,7 @@ node scripts/probe-vision.mjs <provider/model> …
 
 | 仓库 | `index.mjs` | `src/` | `tests/` |
 |---|---|---|---|
-| 本模板 | 558 行 | 19 文件 / 3,168 行 | 15 |
+| 本模板 | 558 行 | 20 文件 / 3,716 行 | 16 |
 | `magpie-magicrew-auth` | **86** | 27 文件 / 7,773 行 | 17 |
 | `magpie-officeace` | 383 | 8 文件 / 1,566 行 | 2 |
 | `magpie-loomy-auth` | 611 | 9 文件 / 1,905 行 | 4 |
@@ -172,7 +172,7 @@ node scripts/probe-vision.mjs <provider/model> …
 
 结论：**`index.mjs` 只做装配，实现全在 `src/`** —— 最成熟的那个（magicrew）index 只有 86 行。
 
-已经备好 19 个 `src/` 模块（前四块四个插件里 4/4 都有；`store` 只有 magicrew 独立成文件，
+已经备好 20 个 `src/` 模块（前四块四个插件里 4/4 都有；`store` 只有 magicrew 独立成文件，
 另两个各自实现了等价逻辑；其余是 2026-10-29～30 从 magicrew / 社区 MIT 包抽出的通用协议）：
 
 | 文件 | 里面写什么 | 为什么单独拎出来 |
@@ -183,6 +183,7 @@ node scripts/probe-vision.mjs <provider/model> …
 | [`src/openai-sse.mjs`](./src/openai-sse.mjs) | `parseSse` / `readSseEvents` / `openAIEvents` / `foldOpenAI` | SSE 帧解析 + 非流折叠；CRLF / 多行 data / BOM / UTF-8 跨块 / 32 MiB / tool_calls 分片 / usage 帧 |
 | [`src/usage-cache.mjs`](./src/usage-cache.mjs) | `createUsageCache` / `read` / `clear` / `publicUsage` / `exhausted` | 额度卡片频繁刷新：成功 60 秒 / 失败 5 秒、同 key 并发合并；无读数时 `exhausted` 必须放行 |
 | [`src/request-rewrite.mjs`](./src/request-rewrite.mjs) | `rewriteJsonBody` / `ensureStreamUsage` / `clampMaxTokens` / `stripModelPrefix` / `stripHopHeaders` | identity 快路径；改 body 后必须去掉 `content-length` / `content-encoding`；工具 schema 不动 |
+| [`src/tool-schema.mjs`](./src/tool-schema.mjs) | `truncateToolName` / `truncateToolNames` / `loosenToolSchema` / `adaptToolList` / `rewriteToolSchema` / `createToolSchemaAdapter` | 工具名超长截断（保持唯一）+ 工具 schema 兼容改写（`additionalProperties` 非布尔→`true`、删 `items:{}`、`items` 子树摊平且不留空 `{}`）；**默认关闭、只作显式 adapter** —— 会放宽用户 schema，与 `request-rewrite.mjs` 的「工具 schema 绝不改」是两套取舍，别同时挂 |
 | [`src/api.mjs`](./src/api.mjs) | `headersFor` / `read` / `get` / `asModelError` / `asSignInExpired` | 错误语义只在一处定义 —— 401 与 404 混用会打死整个账号 |
 | [`src/models.mjs`](./src/models.mjs) | `isUsable` / `priceOf` / `buildModels` / `defaultEntry` | 三态降级 + `free` 三分支，错法都长得像「正常」 |
 | [`src/chat.mjs`](./src/chat.mjs) | `passThrough` / `withUsage` / `singleShotToSSE` / `normalizeUsage` | 流式三坑：读干流、漏 `include_usage`、`stream:false` 不被接受 |
