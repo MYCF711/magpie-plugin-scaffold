@@ -3,6 +3,15 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.1.33 — 2026-10-30
+
+**补上额度读取缓存与请求体改写管道，并把 usage 缓存真正接进入口**
+
+- 新增 `src/usage-cache.mjs`：按凭据 key 缓存 `usage()`（成功 60 秒 / 失败 5 秒）、同 key 并发合并、`publicUsage` 去内部字段、`exhausted` 无读数时放行；`index.mjs` 的 `auth.usage` 已接入（key = uid/accountId/refresh/access）
+- 新增 `src/request-rewrite.mjs`：`rewriteJsonBody` identity 快路径 + `ensureStreamUsage` / `clampMaxTokens` / `stripModelPrefix` / `stripHopHeaders`；工具 schema 与 `additionalProperties:false` 绝不改
+- 新增 `tests/usage-cache.test.mjs`（9 条）与 `tests/request-rewrite.test.mjs`（9 条）
+- README / AGENTS 的模块表与计数同步
+
 ## 0.1.32 — 2026-10-30
 
 **修 0.1.31 的 npx 入口：一个包两个 bin 时 npx 不知道跑哪个，`npx github:...` 直接报错**
