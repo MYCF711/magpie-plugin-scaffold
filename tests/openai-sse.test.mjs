@@ -115,6 +115,16 @@ test("readSseEvents：AbortSignal 在开始前/开始后都抛 AbortError", asyn
   )
 })
 
+test("readSseEvents：pending read 期间 abort，cancel() 正常返回也必须抛 AbortError", async () => {
+  const controller = new AbortController()
+  // 没有 enqueue、没有 close：reader.read() 一直 pending，cancel() 会让它以 done 结束。
+  const stream = new ReadableStream({ start() {} })
+  const iterator = readSseEvents(stream, { signal: controller.signal })
+  const pending = iterator.next()
+  controller.abort()
+  await assert.rejects(pending, (error) => error?.name === "AbortError")
+})
+
 test("readSseEvents：显式支持 string chunk（不交给 TextDecoder）", async () => {
   const stream = new ReadableStream({
     start(controller) {

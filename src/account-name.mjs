@@ -38,10 +38,15 @@ export function maskPhone(raw) {
   if (/^\d{3}\*{4}\d{4}$/.test(stripped)) return stripped
 
   let digits = text.replace(/\D/g, "")
-  // 国家码去掉：`0086…` / `86…`。去掉后仍必须是 11 位手机号；短号返回空串，
-  // 让调用方回退到邮箱/空名 —— 7–10 位数字打码会把原号码全部暴露。
-  if (digits.startsWith("0086")) digits = digits.slice(4)
-  else if (digits.startsWith("86")) digits = digits.slice(2)
+  // 国家码只有「0086 + 11 位」或「86 + 11 位」时才剥。不能无条件剥：
+  // 11 位、本身以 86 开头的号码（86123456789）会被误砍成 9 位，卡片就没名字了。
+  if (digits.startsWith("0086")) {
+    if (digits.length !== 15) return ""
+    digits = digits.slice(4)
+  } else if (digits.startsWith("86") && digits.length === 13) {
+    digits = digits.slice(2)
+  }
+  // 短号打码会把原号码全部暴露（7 位 → 前 3 + 后 4 就是全部），返回空串让调用方回退。
   if (digits.length < 11) return ""
   return `${digits.slice(0, 3)}****${digits.slice(-4)}`
 }

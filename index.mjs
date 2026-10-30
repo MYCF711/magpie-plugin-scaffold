@@ -101,6 +101,9 @@ function staticModels() {
       status: "active",
       cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
       limit: { context, output: 64_000 },
+      // config 钩子的静态模型走 modalities；capabilities.input 是 provider.models 路径的字段。
+      // 两个都写，避免「只写 capabilities 而 config 路径读不到模态」。
+      modalities: { input: ["text"], output: ["text"] },
       capabilities: {
         temperature: true,
         reasoning: Array.isArray(efforts) && efforts.length > 0,

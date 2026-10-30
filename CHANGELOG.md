@@ -12,9 +12,9 @@
 - 新增 `src/model-context.mjs`：`createModelContext()` 查 `~/.cache/magpie/models.json`（精确 id / 尾段 / 多厂商前缀取最大、大小写不敏感、TTL 缓存、坏 JSON 与文件缺失不抛）；`src/models.mjs` 的 `contextOf()` 改为调用它，查不到返回 `undefined`（不猜）
 - 新增 `src/openai-sse.mjs`：`parseSse` / `readSseEvents` / `openAIEvents` / `foldOpenAI`（CRLF、多行 data、注释、BOM、`[DONE]`、UTF-8 跨块、32 MiB 上限、usage 帧、tool_calls 分片）——只解析/折叠，不默认改写请求
 - 修复 `src/quota.mjs`：`usage()` 的 routable 判据改为 `w.aside !== true && (w.used !== undefined || w.balance !== undefined)` —— 只有 `balance` 的钱包窗口不再被误杀
-- 修复 `src/models.mjs` / `src/context.mjs` / `index.mjs`：`capabilities.input` 补全 `audio` / `video` / `pdf` 布尔（`output` 保持 `{ text: true }`，不发明契约外字段）
-- 修复 `src/account-name.mjs`：`maskPhone` 只在去掉国家码后 ≥11 位时打码；7–10 位短号返回空串，不再把原号码全部数字打在卡片上；已打码值保持原样
-- 新增 `tests/mount.test.mjs`（入口唯一函数导出 / 九钩子 / config 模型 / loader 形状 / usage 构造器）与四个模块的独立离线测试；`node --test` 113 条全绿
+- 修复 `src/models.mjs` / `src/context.mjs` / `index.mjs`：`provider.models` 路径的 `capabilities.input` 补全 `audio` / `video` / `pdf` 布尔（`output` 保持 `{ text: true }`，不发明契约外字段）；`config` 静态模型补 `modalities: { input: ["text"], output: ["text"] }`（宿主 config 路径读 modalities，不读 capabilities）
+- 修复 `src/account-name.mjs`：`maskPhone` 只在「0086 + 11 位」或「86 + 11 位」时剥国家码；7–10 位短号返回空串，不再把原号码全部数字打在卡片上；11 位、本身以 86 开头的号码不再被误剥；已打码值保持原样
+- 新增 `tests/mount.test.mjs`（入口唯一函数导出 / 九钩子 / config 模型 / modalities / loader 形状 / usage 构造器 / refresh-lock 接线）与四个模块的独立离线测试；`node --test` 全绿
 - 新增 `NOTICE.md` 并在 `package.json.files` 收录；版本 0.1.30
 
 ## 0.1.29 — 2026-10-30

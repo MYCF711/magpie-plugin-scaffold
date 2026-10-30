@@ -25,9 +25,9 @@ test("maskPhone：0086- / +86 / 裸号 / 已打码，一律 3+4", () => {
   // 短号没有「前3后4」可打：原号码的全部数字都会出现在结果里 → 必须返回空串
   assert.equal(maskPhone("1234567"), "", "7 位短号打码会泄露全部数字")
   assert.equal(maskPhone("12345678"), "", "8 位短号打码会泄露全部数字")
-  assert.equal(maskPhone("8612345678"), "", "去掉 86 后只有 8 位，不是手机号")
-  assert.equal(maskPhone("0086-1898051"), "", "去掉国家码后只有 7 位，不是手机号")
-  assert.equal(maskPhone("86123456789"), "", "去掉 86 后只有 9 位，不是手机号")
+  assert.equal(maskPhone("8612345678"), "", "8 位短号，不是手机号")
+  assert.equal(maskPhone("0086-1898051"), "", "0086 后面只有 7 位，不是手机号")
+  assert.equal(maskPhone("86123456789"), "861****6789", "11 位、本身以 86 开头的号码不能被误剥国家码")
 })
 
 test("looksLikeIdentifier：这些都不许当名字", () => {

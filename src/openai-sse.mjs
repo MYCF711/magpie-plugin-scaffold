@@ -205,6 +205,9 @@ export async function* readSseEvents(body, { signal, maxBytes } = {}) {
         }
       }
     }
+    // Abort 发生在 pending read 时，cancel() 可能让 read() 以 done 结束而不是抛错。
+    // 这里必须再检查一次，否则调用方会把「已取消」当成正常结束、拿到半截 completion。
+    if (signal?.aborted) throw abortError(signal)
     const tail = decoder.decode()
     parser.count(chunkByteLength(tail)) // 解码器尾部残留的字节也要计入上限
     for (const event of parser.push(tail)) yield event
