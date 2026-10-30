@@ -324,7 +324,7 @@ rm -rf .git && git init    # 换掉历史
 ### 方式三：一条命令生成（身份自动改对）
 
 ```bash
-npx --yes github:MYCF711/magpie-plugin-scaffold#v0.1.31 create \
+npx --yes github:MYCF711/magpie-plugin-scaffold#v0.1.32 create \
   --dir my-provider \
   --provider acme \
   --name "Acme" \
@@ -348,13 +348,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: MYCF711/magpie-plugin-scaffold/.github/actions/check@v0.1.31
+      - uses: MYCF711/magpie-plugin-scaffold/.github/actions/check@v0.1.32
         with:
           target: .
 ```
 
 这个复合动作直接跑动作仓库里的 `scripts/check.mjs`，不下载 npm 包、不装依赖、不写你的目录。
-本地等价命令：`npx --yes github:MYCF711/magpie-plugin-scaffold#v0.1.31 check .`。
+本地等价命令：`npx --yes github:MYCF711/magpie-plugin-scaffold#v0.1.32 check .`。
 
 ### 建好仓库后：四件 check 查不到的事
 
