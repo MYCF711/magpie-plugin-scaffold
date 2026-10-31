@@ -3,6 +3,16 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.3.3 — 2026-10-31
+
+**npm 发布全链路幂等：本地发过、tag 触发的 workflow 重跑不再 409 变红**
+
+- `release.mjs --npm`：发布前 `npm view <pkg>@<version>`；已存在则跳过 npm 并继续 tag/Release，不中断流程
+- `release.yml`：npm 步骤先 `npm view`，已存在则 `already published, skipping` + `exit 0`（保持绿）
+- `scripts/npm-name.mjs`：从 `publish:npm` 的 `PUBLISH_AS` 解析真正的 npm 名，派生项目也能用
+- `check.mjs`：检查 `release.yml` 有版本守卫；`NPM_TOKEN` 缺失仍然显式失败（不假绿）
+- README / UPDATING：写清「手工发过后重跑 workflow 是安全的」
+
 ## 0.3.2 — 2026-10-31
 
 **包名回到 slug，显示名写 `magpie.name`；`plugin update` 不再被空格依赖键打挂，npm 发布能力标准化**

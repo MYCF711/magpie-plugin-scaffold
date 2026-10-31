@@ -196,10 +196,15 @@ if (pkg) {
      "从脚手架复制 scripts/publish-npm.mjs，改 PUBLISH_AS 为 npm 包名")
   const releaseYml = join(ROOT, ".github", "workflows", "release.yml")
   if (existsSync(releaseYml)) {
-    ok(/NPM_TOKEN/.test(readFileSync(releaseYml, "utf8")),
+    const releaseSrc = readFileSync(releaseYml, "utf8")
+    ok(/NPM_TOKEN/.test(releaseSrc),
        "release.yml 引用 NPM_TOKEN",
        "没有 secret 门，CI 的 npm 步骤会静默跳过（假绿），用户以为已发布",
        "在 release.yml 的 npm 步骤加 env: NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}")
+    ok(/npm view/.test(releaseSrc) && /(版本已存在|already published|skipping)/i.test(releaseSrc),
+       "release.yml 有「npm 版本已存在则跳过」守卫",
+       "本地 release.mjs 先发过、tag 触发 workflow 再发会 E409 变红；守卫要查 npm view 后 exit 0",
+       "在 npm 步骤前加：npm view \"$NPM_NAME@$VERSION\" version && exit 0")
   } else {
     ok(false,
        "release.yml 存在",
