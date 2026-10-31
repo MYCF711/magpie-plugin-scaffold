@@ -3,6 +3,17 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.2.0 — 2026-10-31
+
+**显示名约定：插件标题与 provider 名都改成「中文 + English」，模板默认放显眼占位符，没改就过不了 check**
+
+- 约定：`package.json.name`（卡片标题）与 provider `name` 都写成 `<中文> <English>`，英文部分按厂商官方品牌字样的大小写照抄；npm 包名另由 `publish:npm` 注入，不能拿包名当显示名
+- 模板默认值改成 `⚠ 未命名插件 Unnamed Plugin` / `⚠ 未命名供应商 Unnamed Provider`；看到占位符就说明身份还没改
+- `scripts/check.mjs` 新增：显示名 / provider name 含 `未命名`、`Unnamed`、`TODO` 时失败；必须同时含中文、English、空格；显示名不得等于 npm 包名；registry 一致性改为核对 npm 包名
+- `scripts/create.mjs` 强制 `--name`（格式校验），`package.json.name` 写显示名，并生成 `scripts/publish-npm.mjs`（`PUBLISH_AS` = npm 包名）；派生项目不再继承 `check:template`
+- 脚手架自身用 `--template` 才允许占位符；CI 与自测 Action 走这个开关，派生项目默认严格
+- 新增 `scripts/publish-npm.mjs`（脚手架自己的 npm 名仍是 `magpie-plugin-scaffold`）；README / UPDATING / GUIDE / CHECKLIST / README-TEMPLATE / AGENTS 同步约定与占位符机制
+
 ## 0.1.34 — 2026-10-30
 
 **新增可选的工具 schema 适配器：超长工具名截断 + 上游工具 schema 兼容改写（默认关闭）**

@@ -60,16 +60,35 @@ npm 用户又可能停在旧版或拿到未验包。发版前逐条过 [CHECKLIS
 | 事 | 判据 |
 |---|---|
 | `LICENSE` 必须是标准 MIT 正文 | 归属说明插在正文里，GitHub 返回 `NOASSERTION`，插件卡片就没有许可那一格 |
+| 卡片标题是「中文 + English」 | 直接写 npm 包名、或只写一种语言，用户搜另一种语言就找不到；英文照抄厂商官方大小写 |
 | 包名先 `npm view <名> version` | 撞名 = magpie 的「更新」会装成别人的包 |
 | `keywords` 含 `opencode` + `plugin`/`auth`/`provider` | 否则 npm 搜索找不到 |
 | 改代码要 bump `version` 再打包 | 同版本重打，bun 命中缓存（`no changes`），装了个寂寞 |
 
 细节见 [README-TEMPLATE.md](./README-TEMPLATE.md) 的「仓库里还该有什么」一节。
 
+### 卡片标题 = 中文 + English，不是 npm 包名
+
+`package.json.name` 是**卡片标题**，不是 npm 包名。格式固定为 `<中文> <English>`，中间一个空格：
+
+| 正确 | 错误 |
+|---|---|
+| `华为云 HUAWEI` | `huawei-auth`（npm 包名） |
+| `码道 CodeArts` | `CodeArts`（只有英文） |
+| `果办 OfficeAce` | `果办`（只有中文） |
+
+英文部分以**厂商官方品牌字样的写法**为准，大小写照抄 —— 华为云官方是全大写 `HUAWEI`，不要改写成 `Huawei`。
+provider 的 `name` 适用同一条约定、同一套写法（`码道 CodeArts`、`果办 OfficeAce`）。
+
+npm 包名不是它：`publish:npm` 在发布那一刻才把 `name` 换成 npm 包名。
+模板默认放的是 `⚠ 未命名插件 Unnamed Plugin` / `⚠ 未命名供应商 Unnamed Provider`；
+看到占位符就说明身份还没改，`check.mjs` 会直接失败，不用靠肉眼记。
+
 ## 先跑一遍再动手
 
 ```bash
-node scripts/check.mjs          # 或 bun scripts/check.mjs
+node scripts/check.mjs          # 派生项目：显示名/provider name 还是占位符就失败
+npm run check:template          # 仅脚手架自身：允许「未命名」占位符
 ```
 
 规定逐条过（脚本末尾自己报「通过 N · 警告 M · 失败 K」），退出码非 0 就是不合规。它查的是**能查的那部分**：
@@ -77,11 +96,12 @@ node scripts/check.mjs          # 或 bun scripts/check.mjs
 | 组 | 查什么 |
 |---|---|
 | 身份 | name / version 语义化 / description / 入口声明 / files 白名单 |
+| 显示名 | `package.json.name` 与 provider `name` 是「中文 + English」，不是 npm 包名/占位符 |
 | 能被搜到 | keywords 含 `opencode` + `plugin|auth|provider` + `magpie` |
 | 许可 | `license: MIT` 且 `LICENSE` 是逐字 MIT 正文（归属说明不能夹在里面） |
 | 图标 | `magpie.icon` 是 `https://` 或 `data:image/`、≤1MB —— **插件卡片只认它** |
 | 导出形状 | 入口能 import、每个导出函数都真的返回钩子（官方：导出的每个函数都会被当插件） |
-| 一致性 | `registry-entry.json` 的 `package` 与 package.json 的 `name` 一字不差 |
+| 一致性 | `registry-entry.json` 的 `package` 与 **npm 包名**一致（不是显示名） |
 | 卫生 | CHANGELOG 有当前版本、没有真 JWT、没有硬编码本机路径 |
 
 CI 在功能分支与 PR 上跑合规、语义测试和 `npm pack --dry-run`（`ci.yml`）。
@@ -258,8 +278,8 @@ return Response.json(completion)
 ```js
 config: async (cfg) => {
   cfg.provider ??= {}
-  cfg.provider["acme"] ??= {
-    name: "Acme",
+  cfg.provider["huawei"] ??= {
+    name: "华为云 HUAWEI",      // 中文 + English，英文照抄官方大小写
     npm: "@ai-sdk/openai-compatible",
     api: BASE,
     models: staticModels(),   // ⚠ 没有它，未登录时显示 "0 models"
@@ -327,15 +347,17 @@ rm -rf .git && git init    # 换掉历史
 ### 方式三：一条命令生成（身份自动改对）
 
 ```bash
-npx --yes github:MYCF711/magpie-plugin-scaffold#v0.1.34 create \
+npx --yes github:MYCF711/magpie-plugin-scaffold#v0.2.0 create \
   --dir my-provider \
-  --provider acme \
-  --name "Acme" \
-  --base https://api.acme.example/v1
+  --provider huawei \
+  --name "华为云 HUAWEI" \
+  --package huawei-auth \
+  --base https://api.huawei.example/v1
 ```
 
-它复制模板的源码、测试、文档和 CI，只改身份三处（`PROVIDER` / `PROVIDER_NAME` / `BASE`），
-不会覆盖非空目录，也不会联网或装依赖。生成后直接跑 `node scripts/check.mjs`。
+它复制模板的源码、测试、文档和 CI，把 `package.json.name` 写成 `--name` 的显示名，
+并生成 `scripts/publish-npm.mjs`（`PUBLISH_AS` = `--package` 的 npm 包名）；不会覆盖非空目录，
+也不会联网或装依赖。生成后直接跑 `node scripts/check.mjs`。
 
 ### 在已有仓库里只跑 check（GitHub Action）
 
@@ -351,14 +373,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: MYCF711/magpie-plugin-scaffold/.github/actions/check@v0.1.34
+      - uses: MYCF711/magpie-plugin-scaffold/.github/actions/check@v0.2.0
         with:
           target: .
 ```
 
 这个复合动作直接跑动作仓库里的 `scripts/check.mjs`，不下载 npm 包、不装依赖、不写你的目录。
-本地等价命令：`npx --yes github:MYCF711/magpie-plugin-scaffold#v0.1.34 check .`。
-上面的 `#v0.1.34` / `@v0.1.34` 是写这份文档时的最新 Release；固定 tag 能让行为可复现，
+本地等价命令：`npx --yes github:MYCF711/magpie-plugin-scaffold#v0.2.0 check .`。
+上面的 `#v0.2.0` / `@v0.2.0` 是写这份文档时的最新 Release；固定 tag 能让行为可复现，
 想跟随最新可以换成 `#main`（Action 的 `@main` 同理，但固定 tag 更安全）。
 
 ### 建好仓库后：四件 check 查不到的事
@@ -390,16 +412,21 @@ git tag v0.1.0 && git push origin v0.1.0
 
 ```json
 {
-  "name": "opencode-acme-auth",           ← 改成你的包名
+  "name": "华为云 HUAWEI",                 ← 显示名：中文 + English，英文照抄官方写法
   "description": "…",                      ← 一句话说清楚签入什么
   "repository": { "url": "…" },            ← 改成你的仓库
-  "keywords": ["opencode", "opencode-plugin", "acme"],
+  "keywords": ["opencode", "opencode-plugin", "huawei"],
+  "scripts": { "publish:npm": "node scripts/publish-npm.mjs" },  ← npm 包名在脚本里
   "magpie": {
-    "icon": "https://acme.example/icon.svg",
+    "icon": "https://huawei.example/icon.svg",
     "maxConcurrency": 4
   }
 }
 ```
+
+⚠ **`name` 不是 npm 包名。** npm 包名写在 `scripts/publish-npm.mjs` 的 `PUBLISH_AS`
+（例如 `huawei-auth`）；发布脚本会临时替换 `name`，发完再恢复。模板默认的
+`⚠ 未命名插件 Unnamed Plugin` 不改，`check.mjs` 会失败。
 
 ⚠ **`keywords` 决定 magpie 市场能不能搜到你。**
 搜索会问 npm `<query> opencode`，只显示名字或 keywords **含 `opencode`**
@@ -408,9 +435,9 @@ git tag v0.1.0 && git push origin v0.1.0
 **② `index.mjs` 顶部的配置**
 
 ```js
-const PROVIDER = "acme"                    // provider id
-const PROVIDER_NAME = "Acme"
-const BASE = "https://api.acme.example/v1"
+const PROVIDER = "huawei"                  // provider id
+const PROVIDER_NAME = "华为云 HUAWEI"       // 中文 + English，英文照抄官方写法
+const BASE = "https://api.huawei.example/v1"
 const SDK = "@ai-sdk/openai-compatible"    // 决定 API 形状
 const MODELS = [["acme-coder", "Acme Coder", 200_000], ...]
 ```
@@ -539,7 +566,7 @@ magpie 从**社区 registry** 读这几个字段：
 ```json
 {
   "package": "your-package-name",
-  "name": "Your Provider",
+  "name": "⚠ 未命名插件 Unnamed Plugin",
   "providers": ["your-provider-id"],
   "summary": { "en": "...", "zh": "..." }
 }
@@ -713,7 +740,7 @@ python extract-contract.py /path/to/magpie
 
 ⚠ Windows 上**没有 `strings` 命令**（Git for Windows 不带），必须用 Python。
 
-### 7. 插件在卡片上叫什么，改不了（除非动三处）
+### 7. 卡片标题 = `package.json.name`：中文 + English，不是 npm 包名
 
 **magpie 没有 `displayName`。** 卡片标题由 `plugin.Name()` 决定：
 
@@ -734,8 +761,22 @@ cd ~/.config/magpie/plugins
 
 漏掉第 3 步会报 `no such plugin: ...\node_modules\<新名>`。
 
-⚠ **`magpie plugin add` / `update` 会把键名改回包自己的 `name`。** 手改不是永久的。
-要永久改名只能改包内 `package.json` 的 `name`（会影响 npm 发布名）。
+⚠ 新约定（2026-10-31）：包内 `name` 是**显示名**，必须写成 `<中文> <English>`，中间一个空格；
+英文部分以厂商官方品牌字样的写法为准（大小写照抄）。正确 / 错误：
+
+| 正确 | 错误 |
+|---|---|
+| `华为云 HUAWEI` | `huawei-auth`（npm 包名） |
+| `码道 CodeArts` | `CodeArts`（只有英文） |
+| `果办 OfficeAce` | `果办`（只有中文） |
+
+provider 的 `name` 同样适用（`码道 CodeArts`、`果办 OfficeAce`）。
+npm 包名不是它 —— 由 `publish:npm` 注入；`registry-entry.json.package` 跟的是 npm 名。
+模板默认是 `⚠ 未命名插件 Unnamed Plugin` / `⚠ 未命名供应商 Unnamed Provider`，
+不改就会在 `check.mjs` 里失败。
+
+⚠ **`magpie plugin add` / `update` 会把键名改回包自己的 `name`（显示名）。** 手改不是永久的。
+要永久改名只能改包内 `package.json` 的 `name`；npm 包名走发布脚本，不动显示名。
 
 完整说明见 [HOOKS.md](./HOOKS.md) 的「九之二、插件名」。
 
@@ -758,11 +799,11 @@ publisher、周下载量、license、stars **只在「发现」面板显示**，
 npm publish
 ```
 
-用户就能 `magpie plugin add opencode-acme-auth` 了。
+用户就能 `magpie plugin add huawei-auth` 了。
 
-⚠ 若**卡片标题与 npm 包名不一样**（包内 `name` 是 `OfficeAce`，npm 上是 `officeace-auth`），
-别裸跑 —— 那会拿 `OfficeAce` 去发，registry 拒绝含大写的新包名。那种插件用发布脚本，
-见 [UPDATING.md](./UPDATING.md) 的「git 源想要大写标题、npm 又要能发」。
+⚠ 若**卡片标题与 npm 包名不一样**（包内 `name` 是 `华为云 HUAWEI`，npm 上是 `huawei-auth`），
+别裸跑 —— 那会拿含中文/大写的显示名去发，registry 直接拒绝。那种插件用发布脚本，
+见 [UPDATING.md](./UPDATING.md) 的「包名与卡片标题不同怎么办」。
 
 ### 收录进 magpie 的市场
 
@@ -822,10 +863,10 @@ agent       @magpie-community/agent-<name>
 - magpie 怎么发现新版本（npm 源比 `version`、git 源比默认分支 HEAD 的 commit，
   **两条路都不看 GitHub Release / tag**）
 - **分支 + PR + `rules` 门禁，一步不能少**：起功能分支 → CHANGELOG + bump → 合规 / 测试 / pack →
-  推功能分支 → 提 PR 等 `rules` 绿 → 合并 → `npm publish`（显示名与包名不同的插件用 `npm run publish:npm`）→
+  推功能分支 → 提 PR 等 `rules` 绿 → 合并 → `npm run publish:npm`（显示名不是 npm 包名）→
   tag + GitHub Release → 五条验证
 - 用户侧怎么拿到更新（npm 源自动、git 源要手动点「更新」；`rm` + `add` 会把卡片显示名
-  重置成包名）
+  重置成包内 `name`，所以显示名必须写在仓库里）
 
 > ⚠ 直接推默认分支会把未验证代码交给 git 源用户；只推代码不打 tag / 不发 npm，
 > 又会让版本状态彼此错位。逐条过 [CHECKLIST.md](./CHECKLIST.md) 的 B 表，

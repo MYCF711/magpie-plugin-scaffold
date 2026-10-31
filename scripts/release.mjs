@@ -175,7 +175,8 @@ if (gh) {
 // ── ⑧ 发布前真实检查：测试不是「可选」，失败就不产生任何远端副作用 ─────
 
 const preflight = []
-if (existsSync(join(ROOT, "scripts", "check.mjs"))) preflight.push("node scripts/check.mjs")
+const checkCommand = pkg.scripts?.["check:template"] ? "npm run check:template" : "node scripts/check.mjs"
+if (existsSync(join(ROOT, "scripts", "check.mjs"))) preflight.push(checkCommand)
 if (pkg.scripts?.test) {
   preflight.push("npm test")
 } else if (existsSync(join(ROOT, "tests"))) {
@@ -388,8 +389,20 @@ if (ALSO_NPM) {
 
 // ── 第 7 步留给人看的清单 ─────────────────────────────────────────────
 
+/** npm 上的包名：显示名 ≠ 包名时藏在 publish 脚本的 PUBLISH_AS 里。 */
+function publishAsName(manifest) {
+  for (const rel of ["scripts/publish-npm.mjs", "publish-npm.mjs"]) {
+    const file = join(ROOT, rel)
+    if (!existsSync(file)) continue
+    const src = readFileSync(file, "utf8")
+    const m = src.match(/(?:PUBLISH_AS|NPM_NAME)\s*=\s*["']([^"']+)["']/)
+    if (m) return m[1]
+  }
+  return manifest.name
+}
+
 console.log(C.bold("\n第 7 步 · 五条验证（逐条跑，别只看版本号）：\n"))
-const name = pkg.name
+const name = publishAsName(pkg)
 console.log("  ⓪ node scripts/check-maintenance.mjs      # 维护状态一致？")
 console.log(`  ① npm view ${name} version                 # 已是 ${version}？`)
 console.log(`  ② curl -s $(npm view ${name}@${version} dist.tarball) | tar -xzOf - package/CHANGELOG.md | head -5`)

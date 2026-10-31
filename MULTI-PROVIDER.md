@@ -55,7 +55,7 @@ export const FooIntlAuthPlugin = makePlugin(SITES.foo_intl)
 const SITES = {
   foo: {
     id: "foo",                    // ← 供应商 id，全局唯一，装过就不能改
-    name: "Foo",                  // ← 供应商名（供应商列表里那一行），不是插件卡片标题
+    name: "示例 Foo",             // ← 供应商名：<中文> <English>，英文照抄官方写法
     host: "https://api.foo.cn",
     web: "https://www.foo.cn",
     icon: ICON_CN,                // ← 各站各的图
@@ -63,7 +63,7 @@ const SITES = {
   },
   foo_intl: {
     id: "foo-intl",
-    name: "Foo International",
+    name: "示例 Foo International",
     host: "https://api.foo.ai",
     web: "https://www.foo.ai",
     icon: ICON_INTL,
@@ -222,7 +222,7 @@ export const FooIntlAuthPlugin = makePlugin(SITES.intl)
 
 ```js
 icon: SITE.icon,        // 各站各自的品牌图（base64 内嵌，见 HOOKS.md §九）
-name: SITE.name,        // "超级麦吉" / "MagiCrew"，不要写成 "MagiCrew (国内)"
+name: SITE.name,        // "超级麦吉 MagiCrew"，不要写成 "MagiCrew (国内)"
 ```
 
 ⚠ 名字里别塞站点后缀。卡片已经用图标区分了；塞后缀只会让列表窄得放不下。
@@ -394,7 +394,7 @@ magpie plugin list
 ```js
 const COMMUNITY_ENTRY = {
   package: "magpie-foo-auth",
-  name: "Foo / Foo International",
+  name: "示例 Foo / 示例 Foo International",
   providers: ["foo", "foo-intl"],   // ← 全部，按发布顺序
   community: true,
   summary: { en: "...", zh: "..." },

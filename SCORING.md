@@ -17,9 +17,9 @@ node scripts/score.mjs ../my-plugin
 
 | 判据 | 全中才算过 |
 |---|---|
-| `package.json` 的 `name` 不是 `magpie-plugin-scaffold` / `magpie-plugin-template` | ☐ |
+| `package.json` 的 `name` 是「中文 + English」，不是占位符 / npm 包名 | ☐ |
 | `package.json` 的 `repository` 不是 `github.com/MYCF711/magpie-plugin-scaffold` | ☐ |
-| `registry-entry.json` 的 `package` 与 `package.json` 的 `name` 一字不差 | ☐ |
+| `registry-entry.json` 的 `package` 与 **npm 包名**（`publish-npm.mjs` 的 `PUBLISH_AS`）一致 | ☐ |
 | 入口文件或 `src/**` 里的 `const PROVIDER` 不是 `xxx` / `acme` / `your-provider` | ☐ |
 | 入口文件或 `src/**` 里的 `const BASE` 不是模板默认值 `https://api.xxx.example/v1`，也不含 `xxx` | ☐ |
 | 入口文件里没有 `throw new Error("TODO…")`（模板的五个 TODO 函数都已实现） | ☐ |
@@ -87,7 +87,7 @@ node scripts/score.mjs ../my-plugin
 |---|---|---|
 | D1 | `README.md` 按 [README-TEMPLATE.md](./README-TEMPLATE.md) 的九段结构（开头给数字、功能一条一条、安装放最后、参考源段必填） | 6 |
 | D2 | `CHANGELOG.md` 顶部一节有实质内容（≥240 字符；「有没有当前版本」已由 `check.mjs` 查，这里不重复扣分） | 4 |
-| D3 | `registry-entry.json` 的 `package` 与 `package.json` 的 `name` 一字不差，`summary` 中英双语 | 3 |
+| D3 | `registry-entry.json` 的 `package` 与 npm 包名一致（显示名 ≠ npm 包名），`summary` 中英双语 | 3 |
 | D4 | `README` 里写清「签入什么服务、怎么签、登录态存在哪、有哪些模型」 | 2 |
 
 ### E · 发布（10 分）

@@ -49,7 +49,7 @@
 ## 骨架（复制这段改）
 
 ```markdown
-# <Provider> for magpie
+# <中文 English> for magpie
 
 **<最硬的一句回报，带数字>**
 
@@ -99,9 +99,11 @@
 
 <必须提醒的冲突，比如先卸掉同类插件>
 
-> 卡片标题来自包内的 `name` —— 所以**发布前先把 `package.json` 的 `name` 定成
-> 你希望用户看到的那个名字**（供应商自己的写法），装的人什么都不用做。
-> 为什么是 `name`、以及 npm 那边怎么处理大小写，见 [UPDATING.md](./UPDATING.md)。
+> 卡片标题来自包内的 `name`，必须是 `<中文> <English>`，中间一个空格；英文部分按厂商官方
+> 品牌字样的大小写照抄（例如 `华为云 HUAWEI`）。它**不是 npm 包名**：npm 名由
+> `scripts/publish-npm.mjs` 的 `PUBLISH_AS` 注入，发布时临时替换。模板默认是
+> `⚠ 未命名插件 Unnamed Plugin`，看到占位符就说明身份还没改，`check.mjs` 会失败。
+> 完整机制见 [UPDATING.md](./UPDATING.md) 的「包名与卡片标题不同怎么办」。
 
 ### 命令行
 
@@ -215,9 +217,19 @@ magpie 的「有新版本」按**包名**查 npm，跟仓库属主无关。撞�
 npm view <包名> version     # 有输出 = 被占了，换个名
 ```
 
-改名的三处必须同步（缺一个就静默错位）：
-`package.json` 的 `name`、`registry-entry.json` 的 `package`（**一字不差**，那是提交给
-registry 的那份）、magpie 侧 `plugins.json` 的 spec 与 `plugins/package.json` 的依赖键。
+显示名、npm 包名、依赖键**不是同一个东西**，改名时分别改对：
+
+| 位置 | 填什么 |
+|---|---|
+| `package.json` 的 `name` | 显示名：`<中文> <English>`（英文照抄官方写法） |
+| `scripts/publish-npm.mjs` 的 `PUBLISH_AS` | npm 包名（小写 ASCII） |
+| `registry-entry.json` 的 `package` | npm 包名 |
+| `registry-entry.json` 的 `name` | 显示名（市场卡片标题） |
+| magpie 侧 `plugins.json` 的 `spec` | npm 包名（npm 安装）或 `github:owner/repo`（git 安装） |
+| `plugins/package.json` 的 `dependencies` 键 | 显示名（git 安装时由 bun 按包内 `name` 写入） |
+
+`create.mjs` 会把这几处一起填好；手工克隆时照这张表逐项改。只改一处会在市场、git 安装或
+npm 更新里静默错位。
 
 ### keywords 决定能不能被搜到
 
