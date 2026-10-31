@@ -25,6 +25,23 @@ magpie 会把它当登录入口，用户点开发现没有登录方式。
 
 ## 1 · 拿模板（1 分钟）
 
+**方式 A（推荐）：GitHub「Use this template」**
+
+在仓库页点 **Use this template → Create a new repository**。它复制目录结构与文件，
+**不带 git 历史**；新仓库第一次跑 `node scripts/check.mjs` 就会因占位符失败 ——
+这正是提醒你改身份，不是模板坏了。
+
+**方式 B：本地 `create.mjs`**
+
+```bash
+node scripts/create.mjs --dir ../my-provider --provider huawei   --name "华为云 HUAWEI" --package huawei-auth --base https://api.huawei.example/v1
+```
+
+它会改好身份、删掉 `check:template`，让新仓库直接走严格模式；CI 的 action 自测也会
+从 `template: "true"` 改成 `"false"`，不会替派生仓库放行占位符。
+
+**方式 C：手动 clone**
+
 ```bash
 git clone https://github.com/MYCF711/magpie-plugin-scaffold.git my-provider
 cd my-provider && rm -rf .git && git init
