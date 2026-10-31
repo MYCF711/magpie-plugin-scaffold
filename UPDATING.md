@@ -593,7 +593,7 @@ README 里只留路标 —— 别把 changelog 抄一遍进 README，那是两�
 □ 合规检查、语义测试、npm pack --dry-run 全过，没有用 || true 掩盖失败
 □ 推的是功能分支，PR 的 `rules` 全绿后才合并进默认分支
 □ 本地 main 与 origin/main 完全一致，release.mjs 预演通过
-□ npm publish 成功（显示名不是 npm 包名时用 `npm run publish:npm`）
+□ npm publish 成功（npm 名与 `package.json.name` 不同时用 `npm run publish:npm`）
 □ GitHub Release 发了：tag `v<version>`，说明里一条条列了这次的更新
 □ npm view <包名> version 已是新版本
 □ 线上 tarball 抓下来看过（不只是版本号）

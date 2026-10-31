@@ -118,7 +118,7 @@
 □ 第 5 步 · 从已合并的默认分支发 npm
       命令：git switch main && git pull --ff-only origin main
             node scripts/release.mjs --yes --npm
-           （显示名不是 npm 包名时自动用 npm run publish:npm）
+           （npm 名与 package.json.name 不同时自动用 npm run publish:npm）
       判据：HEAD == origin/main；发布脚本没有推 main；返回 `+ <包名>@<版本>`；
             `npm run publish:npm` 发完 package.json.name 仍是 slug（不是 npm 名）；magpie.name 仍是显示名；
             release.yml 引用 `NPM_TOKEN`；未配 secret 时 workflow **失败**，不能 exit 0 假绿
