@@ -10,6 +10,7 @@
 - `publish-npm.mjs`：捕获 npm 输出；`CI=true` 且报 E409 / previously staged 时 warning + exit 0；本地仍报错提示 bump
 - `create.mjs`：派生项目复用脚手架这份 `publish-npm.mjs`（只替换 `PUBLISH_AS`），不再各自维护一份
 - 保留 release.mjs / release.yml 的发布前守卫与 `NPM_TOKEN` 缺失显式失败
+- 支持 GitHub Template：README/GUIDE 写明「Use this template」与本地 create.mjs 的区别；create.mjs 把派生项目 ci.yml 的 action 自测从 `template: "true"` 改为 `"false"`，不再替占位符放行
 
 ## 0.3.4 — 2026-10-31
 

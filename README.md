@@ -7,6 +7,11 @@
 > **分支 = 测试版通道**（`owner/repo#feat-x`），**`main` = 稳定版通道**（所有人）。
 > 测试版走分支，稳定版才进 `main` —— 这样分支上怎么折腾都不会把正在用的人炸了。
 
+> **生成新仓库的两种方式**：GitHub 的 **Use this template** 按钮，或本地
+> `node scripts/create.mjs`（`npx github:MYCF711/magpie-plugin-scaffold create`）。
+> 前者复制目录与文件、**不带 git 历史**，`check.mjs` 的占位符检查会立刻提醒你改显示名；
+> 后者会同时改身份、删掉 `check:template`、切到严格模式（CI 的自测也走 `template: "false"`）。
+
 ---
 
 ## ⚠ 动手前先读这五份
