@@ -152,8 +152,21 @@ jobs:
             echo "::warning title=npm 版本已存在::$NPM_NAME@$VERSION 已在 npm；跳过重复发布"
             exit 0
           fi
+          set +e
           if [ -f scripts/publish-npm.mjs ]; then
             node scripts/publish-npm.mjs
           else
             npm publish --access public
+          fi
+          code=$?
+          set -e
+          if [ "$code" -ne 0 ]; then
+            # 发布刚完成时 npm view 可能还看不到（staged），publish 会 E409；
+            # 等 5 秒再确认，同版本已在 npm 就当成功，不把 workflow 弄红。
+            sleep 5
+            if npm view "$NPM_NAME@$VERSION" version >/dev/null 2>&1; then
+              echo "::warning title=npm 版本已存在::$NPM_NAME@$VERSION 已发布；按成功处理"
+              exit 0
+            fi
+            exit "$code"
           fi

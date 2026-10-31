@@ -3,6 +3,13 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.3.4 — 2026-10-31
+
+**发布刚完成时 npm view 还没刷新，workflow 仍会 E409；现在发布失败后再查一次，同版本已存在就按成功处理**
+
+- `release.yml`：publish 非 0 后 sleep 5 再 `npm view`；同版本已在 npm 则 `::warning` + exit 0，避免 staged 窗口误红
+- 保留「发布前先查、已存在直接跳过」与「NPM_TOKEN 缺失显式失败」
+
 ## 0.3.3 — 2026-10-31
 
 **npm 发布全链路幂等：本地发过、tag 触发的 workflow 重跑不再 409 变红**
