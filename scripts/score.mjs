@@ -225,11 +225,14 @@ const allSrc = entrySrc + "\n" + readTree(join(ROOT, "src"))
 const providerOf = allSrc.match(/const\s+PROVIDER\s*=\s*["'`]([^"'`]+)["'`]/)?.[1] ?? ""
 const baseOf = allSrc.match(/const\s+BASE\s*=\s*["'`]([^"'`]+)["'`]/)?.[1] ?? ""
 const idNpmName = publishAsName(idPkg)
-const idDisplay = String(idPkg?.name ?? "")
+const idName = String(idPkg?.name ?? "")
+const idDisplay = String(idPkg?.magpie?.name ?? "")
+const idNameOk = /^(@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/.test(idName) &&
+  !PLACEHOLDER_MARKERS.some((marker) => idName.includes(marker)) && idName !== "unnamed-plugin"
 const idDisplayOk = /[\u3400-\u9fff]/.test(idDisplay) && /[A-Za-z]/.test(idDisplay) && /\s/.test(idDisplay) &&
   !PLACEHOLDER_MARKERS.some((marker) => idDisplay.includes(marker))
 const gate = {
-  "显示名是 中文 + English，不是占位符/npm 包名": idDisplayOk && idDisplay !== idNpmName,
+  "包名是 slug，magpie.name 是 中文 + English 显示名": idNameOk && idDisplayOk && idDisplay !== idNpmName,
   "repository 不是模板地址": !!idPkg?.repository?.url && !String(idPkg.repository.url).includes("MYCF711/magpie-plugin-scaffold"),
   "registry-entry 的 package 与 npm 包名一致": !!idRe?.package && idRe.package === idNpmName,
   "PROVIDER 不是模板占位": !!providerOf && !["xxx", "acme", "your-provider", "your_provider"].includes(providerOf),

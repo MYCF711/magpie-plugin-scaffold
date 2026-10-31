@@ -3,6 +3,19 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.3.0 — 2026-10-31
+
+**包名回到 slug，显示名写 `magpie.name`；`plugin update` 不再被空格依赖键打挂，npm 发布能力标准化**
+
+- `package.json.name` 必须是 slug（小写 ASCII，无空格/中文/大写）；显示名写 `package.json.magpie.name`（`shownName()` 优先取它），provider 与 registry 的 `name` 同步
+- 修复：旧版把 `华为云 HUAWEI` 写进 `name`，bun 依赖键带空格，`magpie plugin update` 报 `unrecognised dependency format`；迁移步骤见 UPDATING「旧版带空格依赖键」
+- `scripts/check.mjs`：新增 slug / `magpie.name` / registry 显示名检查；要求 `publish:npm` 脚本、`publish-npm.mjs` 文件、`release.yml` 引用 `NPM_TOKEN`
+- `scripts/publish-npm.mjs`：发布失败也在 `finally` 还原 `package.json.name`；同版本已存在时打印可读错误并提示 bump
+- `release.yml`：没配 `NPM_TOKEN` 时**显式失败**（不再 `exit 0` 假绿），并给 `::error` 提示
+- `scripts/create.mjs`：`--name` 写 `magpie.name`，`--package` 写 slug；自动生成 `publish-npm.mjs` / `publish:npm`，派生项目默认严格检查
+- 新增 `src/browser-login.mjs`：受控 Chromium 登录（Windows 注册表优先、覆盖 360/QQ/搜狗等国产浏览器，CDP 取 Cookie），从 WPS 灵犀 0.4.11（MIT）的实测实现抽取；带纯函数单测
+- README / UPDATING / CHECKLIST / GUIDE / README-TEMPLATE / AGENTS / SCORING 同步新口径；删除「显示名写 `package.json.name`」的旧说法
+
 ## 0.2.0 — 2026-10-31
 
 **显示名约定：插件标题与 provider 名都改成「中文 + English」，模板默认放显眼占位符，没改就过不了 check**

@@ -1,6 +1,6 @@
 {
-  "name": "⚠ 未命名插件 Unnamed Plugin",
-  "version": "0.2.0",
+  "name": "unnamed-plugin",
+  "version": "0.3.0",
   "description": "A magpie / OpenCode provider plugin scaffold: all nine hooks implemented in one file, plus the enforceable rules a provider plugin must pass — icon in two places, MIT license, no helper functions exported, no secrets. Clone it, implement five functions, run the check.",
   "type": "module",
   "main": "./index.mjs",
@@ -56,7 +56,8 @@
   },
   "magpie": {
     "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjggMTI4Ij48cmVjdCB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCIgcng9IjI4IiBmaWxsPSIjMWYyOTM3Ii8+PHRleHQgeD0iNjQiIHk9Ijg0IiBmb250LXNpemU9IjYwIiBmb250LWZhbWlseT0ic3lzdGVtLXVpLHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiM2MGE1ZmEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkE8L3RleHQ+PC9zdmc+",
-    "maxConcurrency": 4
+    "maxConcurrency": 4,
+    "name": "⚠ 未命名插件 Unnamed Plugin"
   },
   "scripts": {
     "test": "node --test",

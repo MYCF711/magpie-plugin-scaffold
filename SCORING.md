@@ -17,7 +17,7 @@ node scripts/score.mjs ../my-plugin
 
 | 判据 | 全中才算过 |
 |---|---|
-| `package.json` 的 `name` 是「中文 + English」，不是占位符 / npm 包名 | ☐ |
+| `package.json.name` 是 slug（无空格），`magpie.name` 是「中文 + English」显示名，不是占位符 / npm 包名 | ☐ |
 | `package.json` 的 `repository` 不是 `github.com/MYCF711/magpie-plugin-scaffold` | ☐ |
 | `registry-entry.json` 的 `package` 与 **npm 包名**（`publish-npm.mjs` 的 `PUBLISH_AS`）一致 | ☐ |
 | 入口文件或 `src/**` 里的 `const PROVIDER` 不是 `xxx` / `acme` / `your-provider` | ☐ |
