@@ -140,12 +140,13 @@ const dDetail = []
   else {
     try {
       const re = JSON.parse(readFileSync(p, "utf8"))
-      const nameOk = re.package === pkg.name
+      const npmName = publishAsName(pkg)
+      const nameOk = re.package === npmName
       const zhOk = typeof re.summary?.zh === "string" && re.summary.zh.length > 4
       const enOk = typeof re.summary?.en === "string" && re.summary.en.length > 4
       const got = (nameOk ? 1 : 0) + (zhOk ? 1 : 0) + (enOk ? 1 : 0)
       d += got
-      dDetail.push(`D3 ${got}/3：${nameOk ? "" : "package 名不一致 "}${zhOk ? "" : "缺中文 summary "}${enOk ? "" : "缺英文 summary"}`.trim() || `D3 3/3`)
+      dDetail.push(`D3 ${got}/3：${nameOk ? "" : `package 与 npm 包名 ${npmName} 不一致 `}${zhOk ? "" : "缺中文 summary "}${enOk ? "" : "缺英文 summary"}`.trim() || `D3 3/3`)
     } catch {
       dDetail.push("D3 0/3：registry-entry.json 解析失败")
     }
@@ -184,6 +185,20 @@ function readPkg() {
   }
 }
 
+/** npm 上的包名：显示名 ≠ 包名时藏在 publish 脚本的 PUBLISH_AS 里。 */
+function publishAsName(pkg) {
+  for (const rel of ["scripts/publish-npm.mjs", "publish-npm.mjs"]) {
+    const file = join(ROOT, rel)
+    if (!existsSync(file)) continue
+    const src = readFileSync(file, "utf8")
+    const m = src.match(/(?:PUBLISH_AS|NPM_NAME)\s*=\s*["']([^"']+)["']/)
+    if (m) return m[1]
+  }
+  return pkg?.name
+}
+
+const PLACEHOLDER_MARKERS = ["未命名", "Unnamed", "TODO"]
+
 // ── 身份门：模板原样不算分 ────────────────────────────────────────────
 
 const idPkg = readPkg()
@@ -209,10 +224,14 @@ try {
 const allSrc = entrySrc + "\n" + readTree(join(ROOT, "src"))
 const providerOf = allSrc.match(/const\s+PROVIDER\s*=\s*["'`]([^"'`]+)["'`]/)?.[1] ?? ""
 const baseOf = allSrc.match(/const\s+BASE\s*=\s*["'`]([^"'`]+)["'`]/)?.[1] ?? ""
+const idNpmName = publishAsName(idPkg)
+const idDisplay = String(idPkg?.name ?? "")
+const idDisplayOk = /[\u3400-\u9fff]/.test(idDisplay) && /[A-Za-z]/.test(idDisplay) && /\s/.test(idDisplay) &&
+  !PLACEHOLDER_MARKERS.some((marker) => idDisplay.includes(marker))
 const gate = {
-  "name 不是脚手架默认值": !!idPkg?.name && !["magpie-plugin-scaffold", "magpie-plugin-template"].includes(idPkg.name),
+  "显示名是 中文 + English，不是占位符/npm 包名": idDisplayOk && idDisplay !== idNpmName,
   "repository 不是模板地址": !!idPkg?.repository?.url && !String(idPkg.repository.url).includes("MYCF711/magpie-plugin-scaffold"),
-  "registry-entry 的 package 与 name 一致": !!idRe?.package && idRe.package === idPkg?.name,
+  "registry-entry 的 package 与 npm 包名一致": !!idRe?.package && idRe.package === idNpmName,
   "PROVIDER 不是模板占位": !!providerOf && !["xxx", "acme", "your-provider", "your_provider"].includes(providerOf),
   "BASE 不是模板占位": !!baseOf && baseOf !== "https://api.xxx.example/v1" && !/xxx/i.test(baseOf),
   "TODO 函数已实现（不再 throw TODO）": !/throw\s+new\s+Error\(\s*["'`]TODO/.test(entrySrc),

@@ -9,7 +9,7 @@
 
 import test from "node:test"
 import assert from "node:assert/strict"
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { spawnSync } from "node:child_process"
@@ -22,7 +22,7 @@ function runNode(script, args, cwd = ROOT) {
 }
 
 test("check.mjs 可以检查传入的目标目录，退出码 0", () => {
-  const result = runNode(join(ROOT, "scripts", "check.mjs"), [ROOT])
+  const result = runNode(join(ROOT, "scripts", "check.mjs"), ["--template", ROOT])
   assert.equal(result.status, 0, result.stdout + result.stderr)
   assert.match(result.stdout, /通过 \d+ · 警告 \d+ · 失败 \d+/)
 })
@@ -37,7 +37,7 @@ test("create.mjs 生成的新插件身份正确，且 check 直接通过", () =>
       "--provider",
       "demo",
       "--name",
-      "Demo Provider",
+      "示例 Example",
       "--base",
       "https://api.demo.example/v1",
       "--package",
@@ -47,16 +47,22 @@ test("create.mjs 生成的新插件身份正确，且 check 直接通过", () =>
     assert.ok(existsSync(join(target, "index.mjs")))
     assert.ok(existsSync(join(target, "src", "refresh-lock.mjs")))
     assert.ok(existsSync(join(target, ".github", "workflows", "ci.yml")))
+    assert.ok(existsSync(join(target, "scripts", "publish-npm.mjs")))
 
     const pkg = JSON.parse(readFileSync(join(target, "package.json"), "utf8"))
-    assert.equal(pkg.name, "demo-auth")
+    assert.equal(pkg.name, "示例 Example")
     assert.equal(pkg.version, "0.1.0")
+    assert.equal(pkg.scripts["publish:npm"], "node scripts/publish-npm.mjs")
+    assert.equal(pkg.scripts["check:template"], undefined, "派生插件不能继承模板跳过占位符的检查")
     assert.equal(pkg.repository, undefined, "不能把模板仓库当成派生插件的仓库")
     assert.equal(pkg.bin, undefined, "派生插件不带 CLI bin")
 
+    const publishScript = readFileSync(join(target, "scripts", "publish-npm.mjs"), "utf8")
+    assert.match(publishScript, /const PUBLISH_AS = "demo-auth"/)
+
     const index = readFileSync(join(target, "index.mjs"), "utf8")
     assert.match(index, /const PROVIDER = "demo"/)
-    assert.match(index, /const PROVIDER_NAME = "Demo Provider"/)
+    assert.match(index, /const PROVIDER_NAME = "示例 Example"/)
     assert.match(index, /const BASE = "https:\/\/api\.demo\.example\/v1"/)
     assert.match(index, /x-demo-session/, "请求头占位名要跟着 provider 改")
 
@@ -66,10 +72,58 @@ test("create.mjs 生成的新插件身份正确，且 check 直接通过", () =>
 
     const registry = JSON.parse(readFileSync(join(target, "registry-entry.json"), "utf8"))
     assert.equal(registry.package, "demo-auth")
+    assert.equal(registry.name, "示例 Example")
     assert.deepEqual(registry.providers, ["demo"])
 
     const checked = runNode(join(target, "scripts", "check.mjs"), [target])
     assert.equal(checked.status, 0, checked.stdout + checked.stderr)
+  } finally {
+    rmSync(parent, { recursive: true, force: true })
+  }
+})
+
+test("create.mjs 强制显示名是 中文 + English，且拒绝占位符", () => {
+  const parent = mkdtempSync(join(tmpdir(), "magpie-create-"))
+  try {
+    const missing = runNode(join(ROOT, "scripts", "create.mjs"), [
+      "--dir", join(parent, "missing"), "--provider", "demo",
+    ])
+    assert.equal(missing.status, 1)
+    assert.match(missing.stderr, /缺少 --name/)
+
+    const englishOnly = runNode(join(ROOT, "scripts", "create.mjs"), [
+      "--dir", join(parent, "english"), "--provider", "demo", "--name", "Demo",
+    ])
+    assert.equal(englishOnly.status, 1)
+    assert.match(englishOnly.stderr, /必须是 <中文> <English>/)
+
+    const placeholder = runNode(join(ROOT, "scripts", "create.mjs"), [
+      "--dir", join(parent, "placeholder"), "--provider", "demo", "--name", "⚠ 未命名插件 Unnamed Plugin",
+    ])
+    assert.equal(placeholder.status, 1)
+    assert.match(placeholder.stderr, /占位符/)
+  } finally {
+    rmSync(parent, { recursive: true, force: true })
+  }
+})
+
+test("派生项目里仍留占位符时，check.mjs 退出 1", () => {
+  const parent = mkdtempSync(join(tmpdir(), "magpie-create-"))
+  const target = join(parent, "placeholder-check")
+  try {
+    const created = runNode(join(ROOT, "scripts", "create.mjs"), [
+      "--dir", target, "--provider", "demo", "--name", "示例 Example", "--package", "demo-auth",
+    ])
+    assert.equal(created.status, 0, created.stdout + created.stderr)
+
+    const pkgPath = join(target, "package.json")
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf8"))
+    pkg.name = "⚠ 未命名插件 Unnamed Plugin"
+    writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n")
+
+    const checked = runNode(join(target, "scripts", "check.mjs"), [target])
+    assert.equal(checked.status, 1, checked.stdout + checked.stderr)
+    assert.match(checked.stdout, /显示名不是占位符/)
   } finally {
     rmSync(parent, { recursive: true, force: true })
   }
@@ -84,6 +138,8 @@ test("create.mjs 拒绝非空目录，不覆盖已有代码", () => {
       target,
       "--provider",
       "demo",
+      "--name",
+      "示例 Demo",
     ])
     assert.equal(first.status, 0, first.stdout + first.stderr)
 
@@ -92,6 +148,8 @@ test("create.mjs 拒绝非空目录，不覆盖已有代码", () => {
       target,
       "--provider",
       "other",
+      "--name",
+      "示例 Other",
     ])
     assert.equal(second.status, 1)
     assert.match(second.stderr, /目标目录非空/)
@@ -101,7 +159,7 @@ test("create.mjs 拒绝非空目录，不覆盖已有代码", () => {
 })
 
 test("cli.mjs 把 check 子命令转发给 check.mjs，未知子命令退出 1", () => {
-  const check = runNode(join(ROOT, "scripts", "cli.mjs"), ["check", ROOT])
+  const check = runNode(join(ROOT, "scripts", "cli.mjs"), ["check", "--template", ROOT])
   assert.equal(check.status, 0, check.stdout + check.stderr)
   assert.match(check.stdout, /通过 \d+ · 警告 \d+ · 失败 \d+/)
 

@@ -30,7 +30,8 @@ git clone https://github.com/MYCF711/magpie-plugin-scaffold.git my-provider
 cd my-provider && rm -rf .git && git init
 ```
 
-判据：`node scripts/check.mjs` 能跑（此时 2 条警告是正常的：name 还叫脚手架、registry 还是占位）。
+判据：脚手架自身跑 `npm run check:template` 能过（1 条警告：registry 还是占位）；
+改完身份后跑 `node scripts/check.mjs`，显示名/provider name 还是「未命名」占位符就会失败。
 
 ⚠ **`scripts/` 和 `src/` 要一起带走，不能只留 `index.mjs`。**
 `scripts/check.mjs` 是你自己仓库的检查器，`scripts/score.mjs` 打分时读的正是**你自己仓库里的**
@@ -40,15 +41,19 @@ cd my-provider && rm -rf .git && git init
 
 ## 2 · 改身份（5 分钟）
 
-要改的只有三处，全部在 `package.json`：
+要改的身份项（模板默认全是占位符 / 脚手架值）：
 
 | 字段 | 改成什么 | 官方锚点 | 错了会怎样 |
 |---|---|---|---|
-| `name` | 你的 npm 包名（`opencode-<name>-auth`） | [`#publish`](https://usemagpie.ai/docs/zh/plugins#publish) | 和已有包撞名 → magpie 的「更新」会装成别人的包 |
+| `name` | **显示名**：`<中文> <English>`，如 `华为云 HUAWEI`；英文照抄官方大小写。**不是 npm 包名** | [`#publish`](https://usemagpie.ai/docs/zh/plugins#publish) | 占位符不改 → `check.mjs` 失败；只写一种语言 → 搜不到 |
+| `scripts["publish:npm"]` | 发布时注入 npm 包名；`PUBLISH_AS` 在 `scripts/publish-npm.mjs` | 同上 | npm 名不对 / 裸 publish 被 registry 拒 |
 | `description` | 一句话：签入什么服务、用户得到什么 | 同上 | 发现页只显示这一行 |
 | `keywords` | 必须含 `opencode` + `plugin`/`auth`/`provider` 之一 + `magpie` | [`#publish`](https://usemagpie.ai/docs/zh/plugins#publish) | 市场搜不到你 |
 | `magpie.icon` | `https://` 或 `data:image/`，≤1MB | [`#package`](https://usemagpie.ai/docs/zh/plugins#package) | 卡片上没有图标 |
 | `repository` | 你自己的仓库地址 | [`#package`](https://usemagpie.ai/docs/zh/plugins#package) | 卡片上没有「源码」按钮 |
+
+⚠ **`name` 不是 npm 包名**：npm 名写在 `scripts/publish-npm.mjs` 的 `PUBLISH_AS`，发布时临时替换。
+provider 的 `name` 用同一条约定（`码道 CodeArts`、`果办 OfficeAce`），英文部分同样照抄官方写法。
 
 **provider id 怎么定**：取官方 `#ids` 里已有的 id（如 `grok`、`zcode`）—— 插件会显示成
 `<id>-plugin`，等 magpie 内置订阅退役后接管同一个 id。**不要自创一个和内置重复的 id。**
@@ -57,7 +62,7 @@ cd my-provider && rm -rf .git && git init
 （说清这个版本给用户什么）。`version` 改成 `0.1.0`，`package.json` 的 `name` 换掉之后，
 如果 CHANGELOG 里找不到当前版本，`check.mjs` 会直接失败。
 
-判据：`node scripts/check.mjs` 里「keywords 含 opencode」「icon」「registry 一致性」「CHANGELOG 有当前版本」四项变绿。
+判据：`node scripts/check.mjs` 里「显示名不是占位符」「provider name 不是占位符」「registry 一致性」「CHANGELOG 有当前版本」四项变绿；显示名和 provider name 同时含中文与 English。
 
 ---
 
@@ -66,12 +71,12 @@ cd my-provider && rm -rf .git && git init
 打开 `index.mjs`，改顶部常量：
 
 ```js
-const PROVIDER = "acme"                       // = auth.provider，也是模型前缀
-const PROVIDER_NAME = "Acme"
-const BASE = "https://api.acme.example/v1"
+const PROVIDER = "huawei"                     // = auth.provider，也是模型前缀
+const PROVIDER_NAME = "华为云 HUAWEI"          // 中文 + English，英文照抄官方大小写
+const BASE = "https://api.huawei.example/v1"
 const SDK = "@ai-sdk/openai-compatible"       // 决定 API 形状，见官方 #apis
 const MODELS = [
-  ["acme-coder", "Acme Coder", 200_000],
+  ["huawei-coder", "Huawei Coder", 200_000],
 ]
 ```
 
