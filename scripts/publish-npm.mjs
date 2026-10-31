@@ -3,9 +3,8 @@
 // npm 上必须是合法的 ASCII 包名。发布后无论成败都恢复原文件。
 // 用法：npm run publish:npm
 //
-// 为什么不能直接 npm publish：package.json.name 是「⚠未命名插件UnnamedPlugin」
-// 这类显示名（含中文），npm 会拒绝含中文/大写的新包名。发布前临时换成
-// PUBLISH_AS，发布完（包括失败）都恢复。
+// 为什么不能直接 npm publish：package.json.name 是 bun 依赖键（slug），
+// npm 名可能不同；发布前临时换成 PUBLISH_AS，发布完（包括失败）都恢复。
 
 import { execSync } from "node:child_process"
 import { readFileSync, writeFileSync } from "node:fs"
