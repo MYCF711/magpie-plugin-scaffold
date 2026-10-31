@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 从一个已验证的模板起一个新插件 —— 不可变部分照抄，身份三处自动改掉。
 //
-//   npx --yes github:MYCF711/magpie-plugin-scaffold#v0.2.0 create \
+//   npx --yes github:MYCF711/magpie-plugin-scaffold#v0.3.1 create \
 //     --dir my-plugin --provider huawei --name "华为云 HUAWEI" --package huawei-auth \
 //     --base https://api.huawei.example/v1
 //
@@ -33,10 +33,10 @@ function usage(stream = process.stdout) {
       "",
       "  --dir      必填，新插件目录（不存在，或存在但为空）",
       "  --provider 必填，magpie provider id，小写字母/数字/连字符",
-      "  --name     必填，显示名，格式 <中文> <English>（英文照抄厂商官方写法）",
+      "  --name     必填，显示名 = <中文> <English>（magpie.name / provider / registry）",
       "             例：\"华为云 HUAWEI\"、\"码道 CodeArts\"、\"果办 OfficeAce\"",
       "  --base     上游 API 基址，默认 https://api.<provider>.example/v1",
-      "  --package  npm 包名，默认 <provider>-auth",
+      "  --package  npm 包名（小写 ASCII，不能带空格），默认 <provider>-auth",
       "",
     ].join("\n"),
   )
@@ -155,9 +155,12 @@ function main() {
   if (["未命名", "Unnamed", "TODO"].some((marker) => name.includes(marker))) {
     fail(`--name 不能保留占位符（未命名 / Unnamed / TODO）：${name}`)
   }
+  const providerName = name
   const base = String(args.base ?? `https://api.${provider}.example/v1`).trim()
   const packageName = String(args.package ?? `${provider}-auth`).trim()
-  if (!/^[a-z0-9][a-z0-9._-]*$/.test(packageName)) fail(`包名不像 npm 包名：${packageName}`)
+  if (!/^[a-z0-9][a-z0-9._-]*$/.test(packageName)) {
+    fail(`--package 必须是合法 npm 包名 / bun 依赖键（小写 ASCII，不能带空格）：${packageName}`)
+  }
 
   const target = resolve(args.dir)
   if (target === resolve("/") || target === TEMPLATE_ROOT) fail(`目标目录不安全：${target}`)
@@ -167,12 +170,13 @@ function main() {
   mkdirSync(target, { recursive: true })
   copyTemplate(target)
 
-  // ① package.json —— name 是卡片显示名；npm 包名交给 publish:npm 注入
+  // ① package.json —— name 是 slug（bun 依赖键）；显示名进 magpie.name
   const pkgPath = join(target, "package.json")
   const pkg = readJson(pkgPath)
-  pkg.name = name
+  pkg.name = packageName
+  pkg.magpie = { ...(pkg.magpie ?? {}), name }
   pkg.version = "0.1.0"
-  pkg.description = `A magpie / OpenCode provider plugin for ${name}.`
+  pkg.description = `A magpie / OpenCode provider plugin for ${providerName}.`
   delete pkg.repository
   delete pkg.bugs
   delete pkg.homepage
@@ -182,12 +186,13 @@ function main() {
   delete pkg.scripts["check:template"]
   writeJson(pkgPath, pkg)
 
-  // ①b 发布脚本：仓库里 name 是显示名，npm 上必须是合法的 ASCII 包名
+  // ①b 发布脚本：npm 名是 ASCII，package.json.name 保持 slug
   writeFileSync(
     join(target, "scripts", "publish-npm.mjs"),
     [
       "#!/usr/bin/env node",
-      "// 发布时临时换 name：仓库里的 name 是卡片显示名，npm 上必须是另一个合法的包名。",
+      "// 发布时临时换 name：仓库里的 name 是 slug（bun 依赖键），",
+      "// npm 上必须使用真正的 npm 包名。发布后无论成败都还原。",
       "// 用法：npm run publish:npm",
       "",
       "import { execSync } from \"node:child_process\"",
@@ -209,9 +214,9 @@ function main() {
     ].join("\n"),
   )
 
-  // ② 三处身份常量
-  replaceConst(join(target, "index.mjs"), "", provider, name, base)
-  replaceConst(join(target, "src", "context.mjs"), "export ", provider, name, base)
+  // ② 三处身份常量（provider 显示名）
+  replaceConst(join(target, "index.mjs"), "", provider, providerName, base)
+  replaceConst(join(target, "src", "context.mjs"), "export ", provider, providerName, base)
 
   // ③ 请求头里那个模板占位名
   const indexPath = join(target, "index.mjs")
@@ -246,11 +251,11 @@ function main() {
   if (existsSync(registryPath)) {
     writeJson(registryPath, {
       package: packageName,
-      name,
+      name: providerName,
       providers: [provider],
       summary: {
-        en: `One sentence: what ${name} signs in to, and what the user gets.`,
-        zh: `一句话：签入 ${name} 的什么服务，用户得到什么。`,
+        en: `One sentence: what ${providerName} signs in to, and what the user gets.`,
+        zh: `一句话：签入 ${providerName} 的什么服务，用户得到什么。`,
       },
     })
   }
@@ -260,8 +265,8 @@ function main() {
       "",
       `✓ 已生成 ${target}`,
       `  provider   ${provider}`,
-      `  显示名     ${name}`,
-      `  npm 包名   ${packageName}`,
+      `  显示名     ${name}（magpie.name / provider / registry）`,
+      `  包名       ${packageName}（bun 依赖键 / npm 名）`,
       `  基址       ${base}`,
       "",
       "接下来五件事（都在 GUIDE.md 里）：",
