@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // 供应商插件规定 —— 可执行版
 //
-//   node scripts/check.mjs            # 检查当前目录
+//   node scripts/check.mjs            # 检查当前目录（严格：占位符会失败）
 //   node scripts/check.mjs ../my-plugin
+//   node scripts/check.mjs --template .   # 仅脚手架自身：允许「未命名」占位符
 //
 // 退出码 0 = 合规，1 = 不合规（CI 靠它卡门）。
 //
@@ -16,8 +17,18 @@ import { readFileSync, existsSync, statSync, readdirSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
 
-const ROOT = resolve(process.argv[2] ?? ".")
+const ARGS = process.argv.slice(2)
+const TEMPLATE_MODE = ARGS.includes("--template")
+const ROOT = resolve(ARGS.find((arg) => !arg.startsWith("--")) ?? ".")
 const results = []
+
+/** 脚手架自己的 npm 包名；派生插件用 create.mjs 生成自己的 publish:npm。 */
+const SCAFFOLD_PACKAGE = "magpie-plugin-scaffold"
+/** 模板占位符：派生项目不改就会在 check 里红。 */
+const PLACEHOLDER_PACKAGE_NAME = "⚠ 未命名插件 Unnamed Plugin"
+const PLACEHOLDER_PROVIDER_NAME = "⚠ 未命名供应商 Unnamed Provider"
+const PLACEHOLDER_MARKERS = ["未命名", "Unnamed", "TODO"]
+const SCAFFOLD_NAMES = new Set([SCAFFOLD_PACKAGE, "magpie-plugin-template", PLACEHOLDER_PACKAGE_NAME])
 
 function ok(cond, name, note, fix) {
   results.push({ level: cond ? "pass" : "fail", name, note, fix })
@@ -38,6 +49,44 @@ function walk(dir) {
   return out
 }
 
+/**
+ * 读到发布脚本里注入的 npm 包名。显示名（package.json.name）与 npm 名是两件事：
+ * 前者是卡片标题，后者由 publish:npm 在发布那一刻写入。
+ * 查找顺序：scripts/publish-npm.mjs（create 生成）→ publish-npm.mjs（旧写法）
+ * → registry-entry.json 的 package（派生项目已填好时）→ 无。
+ * @param {object|null} manifest package.json 内容
+ * @returns {{name: string, source: string}|null}
+ */
+function resolveNpmName(manifest) {
+  const candidates = []
+  const script = manifest?.scripts?.["publish:npm"]
+  if (typeof script === "string") {
+    const m = script.match(/(?:node|bun)\s+([^\s]+\.(?:mjs|js|cjs))/)
+    if (m) candidates.push(join(ROOT, m[1]))
+  }
+  candidates.push(join(ROOT, "scripts", "publish-npm.mjs"), join(ROOT, "publish-npm.mjs"))
+  for (const file of [...new Set(candidates)]) {
+    if (!existsSync(file)) continue
+    const src = readFileSync(file, "utf8")
+    const constant = src.match(/(?:PUBLISH_AS|NPM_NAME)\s*=\s*["']([^"']+)["']/)
+    if (constant) return { name: constant[1], source: file }
+    const assigned = src.match(/pkg\.name\s*=\s*["']([^"']+)["']/)
+    if (assigned) return { name: assigned[1], source: file }
+  }
+  const entryPath = join(ROOT, "registry-entry.json")
+  if (existsSync(entryPath)) {
+    try {
+      const entry = JSON.parse(readFileSync(entryPath, "utf8"))
+      if (typeof entry.package === "string" && entry.package !== "your-package-name") {
+        return { name: entry.package, source: entryPath }
+      }
+    } catch {
+      // 非法 JSON 由后面的 registry 检查单独报
+    }
+  }
+  return null
+}
+
 // ── 读 package.json ───────────────────────────────────────────────────
 
 let pkg = null
@@ -50,16 +99,50 @@ if (ok(existsSync(pkgPath), "package.json 存在", "插件必须是一个 npm �
   }
 }
 
+const npmInfo = pkg ? resolveNpmName(pkg) : null
+
 if (pkg) {
   // ── ① 身份 ────────────────────────────────────────────────────────
   ok(typeof pkg.name === "string" && pkg.name.length > 0,
      "package.json 的 name 非空",
-     "magpie 用包名做依赖键，卡片标题也从它来")
+     "卡片标题就是它；npm 包名另由 publish:npm 注入")
 
-  warn(pkg.name !== "magpie-plugin-scaffold" && pkg.name !== "magpie-plugin-template",
-       "name 已改成自己的（不是脚手架默认值）",
-       "还叫脚手架名的话，别人装了会跟脚手架撞",
-       "改成 <你的包名>")
+  warn(TEMPLATE_MODE || !SCAFFOLD_NAMES.has(pkg.name),
+       "name 已改成自己的（不是脚手架默认值/占位符）",
+       "模板占位符或脚手架名都不能直接发布",
+       "改成 <中文> <English>，例如「华为云 HUAWEI」")
+
+  const displayName = typeof pkg.name === "string" ? pkg.name : ""
+  const placeholder = PLACEHOLDER_MARKERS.find((marker) => displayName.includes(marker))
+  if (!TEMPLATE_MODE) {
+    ok(!placeholder,
+       "显示名不是占位符",
+       `仍含「${placeholder ?? ""}」—— 这说明身份还没改；卡片上会一直显示占位符`,
+       '请把显示名改成 <中文> <English>，例如「华为云 HUAWEI」')
+  }
+  ok(/[\u3400-\u9fff]/.test(displayName),
+     "显示名含中文",
+     "只写英文，用户搜中文时找不到",
+     '例如「果办 OfficeAce」')
+  ok(/[A-Za-z]/.test(displayName),
+     "显示名含 English",
+     "只写中文，用户搜英文/包名时找不到",
+     '例如「码道 CodeArts」')
+  ok(/\s/.test(displayName),
+     "显示名用空格分隔中文与 English",
+     "「中文English」没有空格，看起来像一串乱码",
+     '格式：<中文> <English>，例如「华为云 HUAWEI」')
+  if (npmInfo) {
+    ok(displayName !== npmInfo.name,
+       "显示名不等于 npm 包名",
+       "npm 包名不能当卡片标题；英文部分要按厂商官方品牌写法",
+       `npm 包名是 ${npmInfo.name}；显示名应另写成「中文 + English」`)
+  } else if (!TEMPLATE_MODE) {
+    warn(false,
+         "无法确定 npm 包名",
+         "没有 publish:npm，也没有填好的 registry-entry.json；无法核对「显示名 ≠ npm 包名」",
+         "加 scripts/publish-npm.mjs（PUBLISH_AS = npm 包名），或让 create.mjs 生成")
+  }
 
   ok(/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(pkg.version ?? ""),
      "version 是语义化版本",
@@ -145,6 +228,7 @@ if (ok(existsSync(licPath), "LICENSE 文件存在", "GitHub 靠它认许可，�
 // 官方原话：模块导出的**每个函数**都会被当作插件调用。
 // 所以入口文件里不许有辅助函数 —— 这条不查出来，装上去会多出一堆假供应商。
 
+const providerNames = []
 const entryFile = pkg?.main ?? (typeof pkg?.exports === "string" ? pkg.exports : pkg?.exports?.["."]?.import ?? pkg?.exports?.["."])
 if (entryFile && existsSync(join(ROOT, String(entryFile)))) {
   const p = join(ROOT, String(entryFile))
@@ -175,6 +259,44 @@ if (entryFile && existsSync(join(ROOT, String(entryFile)))) {
       ok(known.length > 0, `导出函数 ${name} 返回了钩子`,
          "一个都没有 = 它不是插件，只是被误导出（辅助函数要挂到 _internal 对象上）",
          `拿到的键：${keys.join(",") || "(空)"}`)
+      if (typeof hooks.config === "function") {
+        const cfg = {}
+        try {
+          await hooks.config(cfg)
+          for (const [providerId, provider] of Object.entries(cfg.provider ?? {})) {
+            if (provider && typeof provider.name === "string") {
+              providerNames.push({ exportName: name, providerId, name: provider.name })
+            }
+          }
+        } catch (e) {
+          warn(false,
+               `导出函数 ${name} 的 config() 能读出 provider name`,
+               String(e?.message ?? e).slice(0, 200),
+               "provider 的显示名也要检查，config() 必须能在空配置上安全执行")
+        }
+      }
+    }
+
+    for (const { providerId, name: providerName } of providerNames) {
+      const placeholder = PLACEHOLDER_MARKERS.find((marker) => providerName.includes(marker))
+      if (!TEMPLATE_MODE) {
+        ok(!placeholder,
+           `provider name 不是占位符（${providerId}）`,
+           `仍含「${placeholder ?? ""}」—— 卡片上的供应商名会一直显示占位符`,
+           `请把 provider name 改成 <中文> <English>，例如「码道 CodeArts」；模板默认是 ${PLACEHOLDER_PROVIDER_NAME}`)
+      }
+      ok(/[\u3400-\u9fff]/.test(providerName),
+         `provider name 含中文（${providerId}）`,
+         "只写英文，用户搜中文时找不到",
+         "例如「果办 OfficeAce」")
+      ok(/[A-Za-z]/.test(providerName),
+         `provider name 含 English（${providerId}）`,
+         "只写中文，用户搜英文时找不到",
+         "例如「码道 CodeArts」")
+      ok(/\s/.test(providerName),
+         `provider name 用空格分隔中文与 English（${providerId}）`,
+         "没有空格会读成一串",
+         "格式：<中文> <English>；英文大小写按厂商官方品牌字样")
     }
 
     const objExports = Object.keys(mod).filter((k) => k !== "default" && typeof mod[k] === "object")
@@ -276,22 +398,16 @@ for (const target of ["src", "index.mjs"]) {
   }
 }
 
-// ── ⑪ registry 条目与包名一致 ─────────────────────────────────────────
+// ── ⑪ registry 条目与 npm 包名一致 ────────────────────────────────────
 //
 // 条目是提交给 magpie-community/plugins 的那份 JSON。它**不属于运行时** ——
 // 插件不许把条目写进 magpie 的市场缓存（plugins#399 的 review 明确要求）。
 //
-// ⚠ 要核对的是 **npm 上的包名**，不是 package.json 的 name：显示名带大写的插件
-// （OfficeAce、Loomy…）用 publish-npm.mjs 在发布时换名，registry 条目跟的是那个名字。
-// 所以有发布脚本就取它里面的 PUBLISH_AS / NPM_NAME，没有才退回 package.json 的 name。
+// ⚠ 要核对的是 **npm 上的包名**，不是 package.json 的 name：name 是卡片显示名
+// （中文 + English），发布时由 publish:npm 把 name 临时换成 npm 包名。
+// 所以 registry 条目的 package 跟的是 publish 脚本里的 PUBLISH_AS，不是显示名。
 
-const publishScript = join(ROOT, "publish-npm.mjs")
-let npmName = pkg?.name
-if (existsSync(publishScript)) {
-  const src = readFileSync(publishScript, "utf8")
-  const m = src.match(/(?:PUBLISH_AS|NPM_NAME)\s*=\s*["']([^"']+)["']/)
-  if (m) npmName = m[1]
-}
+const npmName = npmInfo?.name ?? pkg?.name
 
 const entryJson = join(ROOT, "registry-entry.json")
 if (existsSync(entryJson) && pkg?.name) {
@@ -309,7 +425,7 @@ if (existsSync(entryJson) && pkg?.name) {
     } else {
       ok(entry.package === npmName,
          "registry 条目的 package 与 npm 包名一致",
-         "不一致会让市场认错包（UPDATING.md「改名的三处必须同步」）",
+         "不一致会让市场认错包（UPDATING.md「包名与卡片标题不同怎么办」）",
          `条目写 ${entry.package}，npm 包名是 ${npmName}`)
     }
     ok(typeof entry.name === "string" && entry.name.length > 0,

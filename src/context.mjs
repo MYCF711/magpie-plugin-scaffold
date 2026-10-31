@@ -6,8 +6,8 @@
 /** 厂商 id：agent 用 `<id>/<model>` 命名，改完全世界都要跟着改 */
 export const PROVIDER = "xxx"
 
-/** 卡片上显示的供应商名 */
-export const PROVIDER_NAME = "Xxx（模板，请改）"
+/** 卡片上显示的供应商名：必须 <中文> <English>，英文照抄厂商官方品牌写法 */
+export const PROVIDER_NAME = "⚠ 未命名供应商 Unnamed Provider"
 
 /** 上游 API 基址 */
 export const BASE = "https://api.xxx.example/v1"

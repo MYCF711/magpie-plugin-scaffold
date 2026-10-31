@@ -1,14 +1,16 @@
 #!/usr/bin/env node
 // 从一个已验证的模板起一个新插件 —— 不可变部分照抄，身份三处自动改掉。
 //
-//   npx --yes github:MYCF711/magpie-plugin-scaffold#v0.1.34 create \
-//     --dir my-plugin --provider acme --name "Acme" --base https://api.acme.example/v1
+//   npx --yes github:MYCF711/magpie-plugin-scaffold#v0.2.0 create \
+//     --dir my-plugin --provider huawei --name "华为云 HUAWEI" --package huawei-auth \
+//     --base https://api.huawei.example/v1
 //
 // 它做的事只有「复制 + 改身份」：
 //   · 复制模板的全部源码、测试、文档、CI（跳过 .git / node_modules / 打包产物）
-//   · package.json：name / version / description；删掉指向模板仓库的 repository / bugs / homepage
+//   · package.json：name（显示名）/ version / description；加发布脚本 publish:npm
 //   · index.mjs、src/context.mjs：PROVIDER / PROVIDER_NAME / BASE
-//   · registry-entry.json：package / name / providers
+//   · scripts/publish-npm.mjs：发布时把 name 换成 npm 包名
+//   · registry-entry.json：package（npm 包名）/ name（显示名）/ providers
 //   · 打印接下来要做的五件事
 //
 // 它**不做**：不联网、不装依赖、不改 magpie 的配置、不发布、不碰已有目录。
@@ -27,11 +29,12 @@ const SKIP_FILES = new Set([".DS_Store", "package-lock.json", "bun.lock", "bun.l
 function usage(stream = process.stdout) {
   stream.write(
     [
-      "用法：magpie-plugin create --dir <目录> --provider <id> [--name <显示名>] [--base <URL>] [--package <包名>]",
+      "用法：magpie-plugin create --dir <目录> --provider <id> --name <显示名> [--base <URL>] [--package <包名>]",
       "",
       "  --dir      必填，新插件目录（不存在，或存在但为空）",
       "  --provider 必填，magpie provider id，小写字母/数字/连字符",
-      "  --name     卡片上显示的供应商名，默认与 provider 相同",
+      "  --name     必填，显示名，格式 <中文> <English>（英文照抄厂商官方写法）",
+      "             例：\"华为云 HUAWEI\"、\"码道 CodeArts\"、\"果办 OfficeAce\"",
       "  --base     上游 API 基址，默认 https://api.<provider>.example/v1",
       "  --package  npm 包名，默认 <provider>-auth",
       "",
@@ -144,7 +147,14 @@ function main() {
   if (!/^[a-z0-9][a-z0-9-]*$/.test(provider)) {
     fail(`provider id 只能是小写字母、数字、连字符，且以字母/数字开头：${provider}`)
   }
-  const name = String(args.name ?? provider).trim() || provider
+  const name = String(args.name ?? "").trim()
+  if (!name) fail('缺少 --name：显示名必须是 <中文> <English>，例如 "华为云 HUAWEI"')
+  if (!/[\u3400-\u9fff]/.test(name) || !/[A-Za-z]/.test(name) || !/\s/.test(name)) {
+    fail(`--name 必须是 <中文> <English>，中间一个空格；英文照抄厂商官方品牌写法：${name}`)
+  }
+  if (["未命名", "Unnamed", "TODO"].some((marker) => name.includes(marker))) {
+    fail(`--name 不能保留占位符（未命名 / Unnamed / TODO）：${name}`)
+  }
   const base = String(args.base ?? `https://api.${provider}.example/v1`).trim()
   const packageName = String(args.package ?? `${provider}-auth`).trim()
   if (!/^[a-z0-9][a-z0-9._-]*$/.test(packageName)) fail(`包名不像 npm 包名：${packageName}`)
@@ -157,10 +167,10 @@ function main() {
   mkdirSync(target, { recursive: true })
   copyTemplate(target)
 
-  // ① package.json —— 身份换成调用方的，去掉指向模板仓库的元数据
+  // ① package.json —— name 是卡片显示名；npm 包名交给 publish:npm 注入
   const pkgPath = join(target, "package.json")
   const pkg = readJson(pkgPath)
-  pkg.name = packageName
+  pkg.name = name
   pkg.version = "0.1.0"
   pkg.description = `A magpie / OpenCode provider plugin for ${name}.`
   delete pkg.repository
@@ -168,7 +178,36 @@ function main() {
   delete pkg.homepage
   delete pkg.bin
   pkg.keywords = [...new Set([...(Array.isArray(pkg.keywords) ? pkg.keywords : []), provider])]
+  pkg.scripts = { ...(pkg.scripts ?? {}), "publish:npm": "node scripts/publish-npm.mjs" }
+  delete pkg.scripts["check:template"]
   writeJson(pkgPath, pkg)
+
+  // ①b 发布脚本：仓库里 name 是显示名，npm 上必须是合法的 ASCII 包名
+  writeFileSync(
+    join(target, "scripts", "publish-npm.mjs"),
+    [
+      "#!/usr/bin/env node",
+      "// 发布时临时换 name：仓库里的 name 是卡片显示名，npm 上必须是另一个合法的包名。",
+      "// 用法：npm run publish:npm",
+      "",
+      "import { execSync } from \"node:child_process\"",
+      "import { readFileSync, writeFileSync } from \"node:fs\"",
+      "",
+      `const PUBLISH_AS = ${JSON.stringify(packageName)}`,
+      "const file = new URL(\"../package.json\", import.meta.url)",
+      "const original = readFileSync(file, \"utf8\")",
+      "const pkg = JSON.parse(original)",
+      "",
+      "pkg.name = PUBLISH_AS",
+      "writeFileSync(file, JSON.stringify(pkg, null, 2) + \"\\n\")",
+      "try {",
+      "  execSync(\"npm publish --access public\", { stdio: \"inherit\" })",
+      "} finally {",
+      "  writeFileSync(file, original)",
+      "}",
+      "",
+    ].join("\n"),
+  )
 
   // ② 三处身份常量
   replaceConst(join(target, "index.mjs"), "", provider, name, base)
@@ -221,7 +260,8 @@ function main() {
       "",
       `✓ 已生成 ${target}`,
       `  provider   ${provider}`,
-      `  包名       ${packageName}`,
+      `  显示名     ${name}`,
+      `  npm 包名   ${packageName}`,
       `  基址       ${base}`,
       "",
       "接下来五件事（都在 GUIDE.md 里）：",

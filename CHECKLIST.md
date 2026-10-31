@@ -73,6 +73,13 @@
             手机号（去掉国家码后 ≥11 位）是打码的（`189****8051`）；短号不显示；名字取不到时是**空串**而不是 ID；
             多账号重复登录仍是替换（slug 不变）
       出处：HOOKS 八 · src/account-name.mjs 的 resolveAccount
+
+□ 16. 显示名是 中文 + English 组合，不是 npm 包名
+      判据：package.json.name 与 provider 的 name 都同时含汉字、ASCII 字母和空格；
+            英文部分按厂商官方品牌字样的大小写照抄（如 `华为云 HUAWEI`，不是 `Huawei`）；
+            不含 `未命名` / `Unnamed` / `TODO` 占位符；显示名 ≠ npm 包名；
+            registry-entry.json.package 是 npm 包名，不是显示名
+      出处：README「卡片标题 = 中文 + English」/ UPDATING「包名与卡片标题不同怎么办」
 ```
 
 ---
@@ -110,7 +117,7 @@
 □ 第 5 步 · 从已合并的默认分支发 npm
       命令：git switch main && git pull --ff-only origin main
             node scripts/release.mjs --yes --npm
-           （包内 name 与 npm 包名不同时自动用 npm run publish:npm）
+           （显示名不是 npm 包名时自动用 npm run publish:npm）
       判据：HEAD == origin/main；发布脚本没有推 main；返回 `+ <包名>@<版本>`
 
 □ 第 6 步 · tag + GitHub Release

@@ -100,8 +100,9 @@ git switch -c feat/<这次改动>
 npm version patch --no-git-tag-version     # 0.1.7 → 0.1.8；minor/major 同理
 ```
 
-⚠ 改了包名的话，三处必须同步（缺一个静默错位）：
-`package.json` 的 `name`、`registry-entry.json` 的 `package`、README 里的安装命令。
+⚠ 改名分两种，别混：
+- **显示名**（`<中文> <English>`）：`package.json.name`、provider 的 `name`、`registry-entry.json.name`；
+- **npm 包名**：`publish:npm` 脚本里的 `PUBLISH_AS`、`registry-entry.json.package`、README 安装命令。
 
 ### 第 2 步 · 本地检查，测试不是可选项
 
@@ -110,6 +111,10 @@ node scripts/check.mjs       # 派生仓库若没有自己的，就跑脚手架�
 npm test                     # 没有 test 脚本时，运行仓库实际的 tests/*.test.mjs / smoke 测试
 npm pack --dry-run           # README、CHANGELOG、docs 都在包里吗
 ```
+
+⚠ 模板默认的 `⚠ 未命名插件 Unnamed Plugin` / `⚠ 未命名供应商 Unnamed Provider` 不改，
+`check.mjs` 会退出 1 并打印「请把显示名改成 <中文> <English>」。
+`--template` 只给脚手架自身用，派生项目不要加。
 
 任何一条失败就留在功能分支修，**不许靠 `|| true` 把红色检查抹成绿色**。
 
@@ -158,7 +163,7 @@ node scripts/release.mjs --yes --npm  # 真做；有 publish:npm 脚本会自动
 它还会在任何远端副作用之前重跑合规检查、测试和 `npm pack --dry-run`。
 
 ⚠ 同版本号重复 publish 会被拒；改了代码必须 bump。
-⚠ 包内 `name` 与 npm 包名不同的插件走 `npm run publish:npm`，裸 `npm publish` 会被拒。
+⚠ 显示名（`package.json.name`）不是 npm 包名的插件，一律走 `npm run publish:npm`；裸 `npm publish` 会被 registry 拒。
 
 ### 第 6 步 · tag + GitHub Release
 
@@ -308,7 +313,7 @@ magpie plugin add github:owner/repo
 自备 CA 环境，裸跑会报 `UNABLE_TO_GET_ISSUER_CERT_LOCALLY`（而且 exit code 是 0，
 看不出来）。一律走 `magpie plugin ...`。
 
-### 卡片标题：在仓库里改 `name`，不要指望用户手改
+### 卡片标题与 provider name：中文 + English，不是 npm 包名
 
 **卡片标题 = 包自己的 `package.json` 的 `name`。** 链路（源码
 `internal/plugin/store.go`）：
@@ -321,60 +326,81 @@ magpie 反查键名当标题      gitName():  for name, s := range pj.Dependenci
                           Name():     IsGit(spec) → gitName(spec)，取不到才回退成 spec 原文
 ```
 
-实测：`bun add` 一个 `name: "OfficeAce"` 的包，依赖键就写成 `"OfficeAce"`。
-
 ⇒ **要永久生效，改仓库里 `package.json` 的 `name`。** 更新多少次都不会变，用户一根手指都不用动。
 **这才是正路** —— 手改用户那边的键只是权宜。
 
-⚠ 限制：**npm 不允许新包名含大写**（npm 官方校验库逐字：
-`name can no longer contain capital letters`，`validForNewPackages: false`）。所以：
+⚠ **显示名约定（2026-10-31）**：`name` 是**卡片标题**，不是 npm 包名。格式固定为
+`<中文> <English>`，中间一个空格；**英文部分以厂商官方品牌字样的写法为准（大小写照抄）**。
+provider 的 `name` 也适用同一条约定、同一套写法。
 
-| 卡片标题想要 | `name` 写成 | 能发 npm 吗 |
+| 显示名（正确） | `package.json.name` | npm 包名（`publish:npm` 注入） |
 |---|---|---|
-| `officeace` | `"officeace"` | ✅ |
-| `OfficeAce` | `"OfficeAce"` | ❌ —— 只能走 git 源，不发 npm |
+| `华为云 HUAWEI` | `"华为云 HUAWEI"` | `huawei-auth` |
+| `码道 CodeArts` | `"码道 CodeArts"` | `codearts-auth` |
+| `果办 OfficeAce` | `"果办 OfficeAce"` | `officeace-auth` |
 
-⚠ **换 `name` 就是换包**：npm 上是一个新包，已装用户要重装一次。
-所以**新建插件时就把 `name` 定成想要的显示名**，别等发出去再改。
+错误形态：直接写 npm 包名（`officeace-auth`）、只写英文（`OfficeAce`）、只写中文（`华为云`）。
+好处很直接：magpie 的本地搜索同时匹配 `name` 与 provider id，用户搜中文或英文都能命中。
 
-#### git 源想要大写标题、npm 又要能发？发布时临时换 `name`
+⚠ **npm 不允许新包名含中文 / 大写**（npm 官方校验库逐字：
+`name can no longer contain capital letters`，`validForNewPackages: false`）。
+所以显示名与 npm 包名必须分开：`name` 放显示名，npm 包名由 `publish:npm` 在发布那一刻注入。
+模板默认是 `⚠ 未命名插件 Unnamed Plugin` / `⚠ 未命名供应商 Unnamed Provider`，
+不改就会在 `check.mjs` 里失败。
+
+⚠ **换 `name` 就是换 git 安装的依赖键**：已装用户要重装或手改键。所以新建插件时就把
+`name` 定成显示名，别等发出去再改。
+
+#### 包名与卡片标题不同怎么办：发布时由 `publish:npm` 注入
 
 两个来源读的是**同一个** `package.json`：
 
 | 谁读 | 读哪份 | 决定了什么 |
 |---|---|---|
-| bun（`plugin add github:…`）| 仓库里的 `package.json` | 依赖键 → **卡片标题** |
+| bun（`plugin add github:…`）| 仓库里的 `package.json` | 依赖键 → **卡片标题（显示名）** |
 | `npm publish` | **同一份** | npm 上的**包名** |
 
-一个文件喂两个地方，所以想「git 装显示 `OfficeAce`，npm 上仍是小写包名」，
+一个文件喂两个地方，所以想「git 装显示 `果办 OfficeAce`，npm 上仍是 `officeace-auth`」，
 只能在**发布那一下**换掉 `name`：
 
 ```js
-// publish-npm.mjs —— 用 `npm run publish:npm` 跑
-import fs from "node:fs"
+// scripts/publish-npm.mjs —— 用 `npm run publish:npm` 跑
 import { execSync } from "node:child_process"
+import { readFileSync, writeFileSync } from "node:fs"
 
-const file = "package.json"
-const orig = fs.readFileSync(file, "utf8")
-const pkg = JSON.parse(orig)
+const PUBLISH_AS = "officeace-auth"            // npm 包名：小写 ASCII、不变
+const file = new URL("../package.json", import.meta.url)
+const original = readFileSync(file, "utf8")
+const pkg = JSON.parse(original)
 
-pkg.name = "officeace-auth"                    // npm 上的包名：小写、不变
-fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + "\n")
+pkg.name = PUBLISH_AS
+writeFileSync(file, JSON.stringify(pkg, null, 2) + "\n")
 try {
-  execSync("npm publish", { stdio: "inherit" })
+  execSync("npm publish --access public", { stdio: "inherit" })
 } finally {
-  fs.writeFileSync(file, orig)                 // 无论成败都改回来
+  writeFileSync(file, original)                 // 无论成败都改回来
 }
 ```
 
 ```jsonc
 // package.json
-"name": "OfficeAce",                           // git 源看到的显示名
-"scripts": { "publish:npm": "node publish-npm.mjs" }
+"name": "果办 OfficeAce",                      // 卡片标题（中文 + English）
+"scripts": { "publish:npm": "node scripts/publish-npm.mjs" }
 ```
 
-**实测**（2026-10-26，officeace 与 loomy 各一次）：把 `name` 改成 `OfficeAce` 之后，
-`magpie plugin rm OfficeAce` + `plugin add github:MYCF711/magpie-officeace`，
+`registry-entry.json` 的两个名字要分开：
+
+```jsonc
+{
+  "package": "officeace-auth",                 // npm 包名（不是显示名）
+  "name": "果办 OfficeAce",                    // 市场里的显示名
+  "providers": ["officeace"],
+  "summary": { "en": "...", "zh": "..." }
+}
+```
+
+**机制实测**（2026-10-26，officeace 与 loomy 各一次）：把 `name` 改成当时的显示名
+`OfficeAce` 后，`magpie plugin rm OfficeAce` + `plugin add github:MYCF711/magpie-officeace`，
 **全程不碰任何文件** —— 装出来的依赖键就是
 
 ```jsonc
@@ -382,16 +408,20 @@ try {
 ```
 
 `bun.lock` 里也跟着变成 `"OfficeAce": ["OfficeAce@github:…#<sha>", …]`（值首段 = 包名）。
-⇒ 从此 `add` / `update` 都写这个键，**再也不用手改**，卡片标题稳定是供应商名。
+新约定只是把显示名从 `OfficeAce` 换成 `果办 OfficeAce`，依赖键机制不变。
 
-⚠ 从此**不要裸跑 `npm publish`** —— 那会拿 `OfficeAce` 去发，而 registry 拒绝含大写的
-**新**包名（不会静默变小写）。一律用 `npm run publish:npm`。
+⚠ 从此**不要裸跑 `npm publish`** —— 那会拿含中文/大写的显示名去发，而 registry 拒绝
+**新**包名（不会静默变小写/转拼音）。一律用 `npm run publish:npm`。
 
-⚠ 两个来源的包名从此不同：npm 装的依赖键是 `officeace-auth`（标题就是包名），
-git 装上的是 `OfficeAce`。**这正是「分开」的含义**，不是 bug。
+⚠ 两个来源的依赖键从此不同：npm 装的是 `officeace-auth`（标题就是包名），
+git 装的是 `果办 OfficeAce`。**这正是「分开」的含义**，不是 bug。
 好处是 npm 那边的包名没变 —— 已装用户照旧收到更新，不用重装。
 
 #### 已经发出去了、又不想换包名
+
+> 这一段是**旧版纯英文显示名**（`OfficeAce`）的实际操作记录；新约定下显示名写成
+> `果办 OfficeAce`，三处同步的原则不变，把示例里的名字换成你的显示名即可。
+> 优先的做法仍然是改仓库里的 `name` 后重新安装，不要长期手改用户缓存。
 
 那只能在用户那边手改依赖键（三处同步），并且**每次 `add` / `update` 后都要改回来** ——
 bun 会按包内 `name` 重写它。
@@ -427,13 +457,13 @@ mv node_modules/officeace-auth node_modules/OfficeAce
 
 ```
 "OfficeAce": ["officeace-auth@github:MYCF711/magpie-officeace#<sha>", ...]
-   ↑ 改成这个            ↑ 这个不动（它是 npm 包名 / 包内 name）
+   ↑ 改成这个            ↑ 这个不动（它是 npm 包名）
 ```
 
 （把包内 `name` 改成 `OfficeAce` 之后两者会一致，就不存在这个问题了 —— 见上一节。）
 
 > 为什么值得争这个标题：卡片标题是用户唯一看到的名字。`officeace-auth` 是包名，
-> `OfficeAce` 才是他装的那个服务。
+> `果办 OfficeAce` 才是他装的那个服务。
 
 ---
 
@@ -508,7 +538,7 @@ README 里只留路标 —— 别把 changelog 抄一遍进 README，那是两�
 □ 合规检查、语义测试、npm pack --dry-run 全过，没有用 || true 掩盖失败
 □ 推的是功能分支，PR 的 `rules` 全绿后才合并进默认分支
 □ 本地 main 与 origin/main 完全一致，release.mjs 预演通过
-□ npm publish 成功（显示名与包名不同的插件：`npm run publish:npm`）
+□ npm publish 成功（显示名不是 npm 包名时用 `npm run publish:npm`）
 □ GitHub Release 发了：tag `v<version>`，说明里一条条列了这次的更新
 □ npm view <包名> version 已是新版本
 □ 线上 tarball 抓下来看过（不只是版本号）
