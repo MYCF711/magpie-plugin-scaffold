@@ -67,6 +67,22 @@ const version = pkg.version
 const tag = `v${version}`
 if (!version) bad("package.json 里没有 version")
 
+/** 这个版本是否已经在 npm 上（本地发过、重跑 workflow 时很常见）。 */
+function npmHasVersion(name, v) {
+  try {
+    const out = execFileSync("npm", ["view", `${name}@${v}`, "version"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 20_000,
+    }).trim()
+    return out === v
+  } catch {
+    return false
+  }
+}
+const npmName = publishAsName(pkg)
+const npmAlready = ALSO_NPM && npmHasVersion(npmName, version)
+
 const changelogPath = join(ROOT, "CHANGELOG.md")
 if (!existsSync(changelogPath)) {
   bad("没有 CHANGELOG.md —— 用户感知不到这一版改了什么（UPDATING.md 第 0 步）")
@@ -234,7 +250,11 @@ plan.push({
 })
 if (ALSO_NPM) {
   const script = pkg.scripts?.["publish:npm"] ? "npm run publish:npm" : "npm publish"
-  plan.push({ what: script, why: "第 5 步：npm 源的用户比 registry 上的 version" })
+  if (npmAlready) {
+    plan.push({ what: `npm ${npmName}@${version} 已存在，跳过`, why: "第 5 步：发布已完成；重跑是安全的，不中断 tag/Release" })
+  } else {
+    plan.push({ what: script, why: "第 5 步：npm 源的用户比 registry 上的 version" })
+  }
 }
 plan.push({ what: "五条验证", why: "第 7 步：维护状态 / npm 版本 / tarball 内容 / magpie plugin list / Release 在" })
 

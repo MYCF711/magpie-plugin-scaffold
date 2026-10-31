@@ -377,7 +377,7 @@ rm -rf .git && git init    # 换掉历史
 ### 方式三：一条命令生成（身份自动改对）
 
 ```bash
-npx --yes github:MYCF711/magpie-plugin-scaffold#v0.3.2 create \
+npx --yes github:MYCF711/magpie-plugin-scaffold#v0.3.3 create \
   --dir my-provider \
   --provider huawei \
   --name "华为云 HUAWEI" \
@@ -404,14 +404,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: MYCF711/magpie-plugin-scaffold/.github/actions/check@v0.3.2
+      - uses: MYCF711/magpie-plugin-scaffold/.github/actions/check@v0.3.3
         with:
           target: .
 ```
 
 这个复合动作直接跑动作仓库里的 `scripts/check.mjs`，不下载 npm 包、不装依赖、不写你的目录。
-本地等价命令：`npx --yes github:MYCF711/magpie-plugin-scaffold#v0.3.2 check .`。
-上面的 `#v0.3.2` / `@v0.3.2` 是写这份文档时的最新 Release；固定 tag 能让行为可复现，
+本地等价命令：`npx --yes github:MYCF711/magpie-plugin-scaffold#v0.3.3 check .`。
+上面的 `#v0.3.3` / `@v0.3.3` 是写这份文档时的最新 Release；固定 tag 能让行为可复现，
 想跟随最新可以换成 `#main`（Action 的 `@main` 同理，但固定 tag 更安全）。
 
 ### 建好仓库后：四件 check 查不到的事
@@ -845,6 +845,10 @@ npm run publish:npm
 3. 推 tag 或手动跑 `release.yml`，npm 日志必须看到 `+ <包名>@<版本>`。
 
 细节见 [UPDATING.md](./UPDATING.md) 的「NPM_TOKEN：CI 发布不能假绿」。
+
+**已经手工发过 npm 后重跑 workflow 是安全的**：`release.yml` 会先 `npm view` 同版本；
+已存在就 `already published, skipping` + `exit 0`（保持绿），不会再 E409。
+`release.mjs --npm` 也会先查一次，已存在就跳过 npm、继续 tag/Release。
 
 ### 收录进 magpie 的市场
 
