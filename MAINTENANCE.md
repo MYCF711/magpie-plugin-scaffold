@@ -11,7 +11,7 @@
 |---|---|
 | 仓库 | `magpie-plugin-scaffold` |
 | npm 包名 | `magpie-plugin-scaffold` |
-| 当前版本 | `0.3.5`（待发布） |
+| 当前版本 | `0.3.6`（待发布） |
 | 定位 | magpie 供应商插件脚手架：模板 + 21 个通用 `src/` 模块 + 28 条坑表 + 评分卡 + 受控发布脚本 |
 | 现状负责人 | 待派（候选角色：`plugin-forge`） |
 
