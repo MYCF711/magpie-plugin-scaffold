@@ -84,8 +84,9 @@ PR 是 GitHub 对受保护分支的技术要求（直推报 `GH006`），批准�
 
 ```bash
 # 合规检查 —— 退出码非 0 就是不合规，别靠眼睛看
-node scripts/check.mjs              # 检查当前目录
+node scripts/check.mjs              # 检查当前目录（严格：占位符会失败）
 node scripts/check.mjs ../my-plugin # 检查别的仓库
+npm run check:template              # 仅脚手架自身：允许「未命名」占位符
 
 # 打包面预演：README / CHANGELOG / docs 在不在包里
 npm pack --dry-run
@@ -100,9 +101,9 @@ node --test
 #   六条全不报错，但后果同一个：用户永远拿不到新版。发布前必跑。
 node scripts/check-maintenance.mjs
 
-# 卡片标题与 npm 包名不同（包内 name 是大写标题）时发布
-#   ⚠ 这个脚本是**派生仓库自己加的**，本模板的 package.json 里没有 —— 裸跑会 Missing script。
-#   派生仓库按 UPDATING.md「包名与卡片标题不同怎么办」加 scripts["publish:npm"]；
+# 显示名（中文 + English）与 npm 包名不同时发布
+#   模板自带 scripts/publish-npm.mjs（PUBLISH_AS = magpie-plugin-scaffold）；
+#   派生仓库由 create.mjs 生成自己的 PUBLISH_AS。
 #   release.mjs 会自动检测：有它就用它，没有就退回 npm publish。
 npm run publish:npm
 

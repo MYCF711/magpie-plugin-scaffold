@@ -40,7 +40,8 @@
 // ═══════════════════════════════════════════════════════════════════════
 //
 //   PROVIDER        改成厂商自己的 id（agent 用 <id>/<model> 命名）
-//   PROVIDER_NAME   供应商名 —— 供应商列表里那一行（插件卡片标题是 package.json 的 name）
+//   PROVIDER_NAME   供应商名 —— 必须 <中文> <English>，英文照抄厂商官方品牌写法
+//                   （插件卡片标题是 package.json 的 name，同一套约定）
 //   BASE            上游 API 基址
 //
 // 然后实现 index.mjs 底部的五个 TODO 函数。
@@ -56,8 +57,8 @@ import { createUsageCache } from "./src/usage-cache.mjs"
 
 // ── 配置 ──────────────────────────────────────────────────────────────
 
-const PROVIDER = "xxx" // ⚠ 改成厂商 id，如 "acme"
-const PROVIDER_NAME = "Xxx（模板，请改）"
+const PROVIDER = "xxx" // ⚠ 改成厂商 id，如 "huawei"
+const PROVIDER_NAME = "⚠ 未命名供应商 Unnamed Provider" // ⚠ 改成 <中文> <English>，英文照抄厂商官方写法
 const BASE = "https://api.xxx.example/v1"
 const SDK = "@ai-sdk/openai-compatible" // 决定 API 形状，见下表
 const REFRESH_LEAD_MS = 5 * 60_000

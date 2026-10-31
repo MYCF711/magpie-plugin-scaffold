@@ -1,6 +1,6 @@
 {
-  "name": "magpie-plugin-scaffold",
-  "version": "0.1.34",
+  "name": "⚠ 未命名插件 Unnamed Plugin",
+  "version": "0.2.0",
   "description": "A magpie / OpenCode provider plugin scaffold: all nine hooks implemented in one file, plus the enforceable rules a provider plugin must pass — icon in two places, MIT license, no helper functions exported, no secrets. Clone it, implement five functions, run the check.",
   "type": "module",
   "main": "./index.mjs",
@@ -61,9 +61,11 @@
   "scripts": {
     "test": "node --test",
     "check": "node scripts/check.mjs",
+    "check:template": "node scripts/check.mjs --template",
     "create": "node scripts/create.mjs",
     "release": "node scripts/release.mjs",
     "score": "node scripts/score.mjs",
-    "maintenance": "node scripts/check-maintenance.mjs"
+    "maintenance": "node scripts/check-maintenance.mjs",
+    "publish:npm": "node scripts/publish-npm.mjs"
   }
 }
