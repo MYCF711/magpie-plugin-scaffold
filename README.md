@@ -103,6 +103,9 @@ unrecognised dependency format: 爱派AiPy Trustoken
 `magpie.name` 不是依赖键，空格随便写；已有带空格 `name` 的安装按
 [UPDATING.md](./UPDATING.md) 的「旧版带空格依赖键」迁移。**不需要 `rm` + `add`，登录态不丢。**
 
+⚠ **bun 只吃 ASCII 键**：中文键即使没有空格也报 `unrecognised dependency format`（实测 bun 1.4.4）。
+所以 `name` 必须 slug，这是硬约束，不是风格偏好。
+
 模板默认：`package.json.name = "unnamed-plugin"`、`magpie.name = "⚠ 未命名插件 Unnamed Plugin"`、
 provider `name = "⚠ 未命名供应商 Unnamed Provider"`。看到占位符 / `unnamed-plugin` 就说明身份还没改，
 `check.mjs` 会失败。
@@ -374,7 +377,7 @@ rm -rf .git && git init    # 换掉历史
 ### 方式三：一条命令生成（身份自动改对）
 
 ```bash
-npx --yes github:MYCF711/magpie-plugin-scaffold#v0.3.0 create \
+npx --yes github:MYCF711/magpie-plugin-scaffold#v0.3.1 create \
   --dir my-provider \
   --provider huawei \
   --name "华为云 HUAWEI" \
@@ -401,14 +404,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: MYCF711/magpie-plugin-scaffold/.github/actions/check@v0.3.0
+      - uses: MYCF711/magpie-plugin-scaffold/.github/actions/check@v0.3.1
         with:
           target: .
 ```
 
 这个复合动作直接跑动作仓库里的 `scripts/check.mjs`，不下载 npm 包、不装依赖、不写你的目录。
-本地等价命令：`npx --yes github:MYCF711/magpie-plugin-scaffold#v0.3.0 check .`。
-上面的 `#v0.3.0` / `@v0.3.0` 是写这份文档时的最新 Release；固定 tag 能让行为可复现，
+本地等价命令：`npx --yes github:MYCF711/magpie-plugin-scaffold#v0.3.1 check .`。
+上面的 `#v0.3.1` / `@v0.3.1` 是写这份文档时的最新 Release；固定 tag 能让行为可复现，
 想跟随最新可以换成 `#main`（Action 的 `@main` 同理，但固定 tag 更安全）。
 
 ### 建好仓库后：四件 check 查不到的事

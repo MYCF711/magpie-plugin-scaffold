@@ -142,6 +142,12 @@ if (pkg) {
      "缺中文/English/空格：用户搜另一种语言找不到，或标题读成一串",
      '在 package.json 加 "magpie": { "name": "华为云 HUAWEI" }')
   if (npmInfo) {
+    ok(displayName !== npmInfo.name,
+       "magpie.name 不是 npm 包名",
+       "npm 名是 ASCII slug，显示名要另写；拿包名当标题会显示成 huawei-auth",
+       `npm 包名是 ${npmInfo.name}；magpie.name 写「华为云 HUAWEI」`)
+  }
+  if (npmInfo) {
     ok(NPM_NAME.test(npmInfo.name),
        "npm 包名是合法依赖键",
        "npm 名由 publish:npm 注入；npm 名本身也不能带空格",
