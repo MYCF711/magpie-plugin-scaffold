@@ -369,6 +369,10 @@ unrecognised dependency format: 华为云 HUAWEI
 结果不是「标题不好看」，是**整个 `magpie plugin update` 失败**。把显示名放进 `magpie.name`
 后，依赖键保持 slug，update 恢复正常。
 
+⚠ **bun 只吃 ASCII 键**：中文键**即使没有空格**也会报同样的
+`unrecognised dependency format`（实测 bun 1.4.4）。所以 `name` 必须是 ASCII slug，
+这不是风格偏好，是硬约束。
+
 ⚠ **npm 不允许新包名含中文 / 大写**（npm 官方校验库逐字：
 `name can no longer contain capital letters`，`validForNewPackages: false`）。
 `package.json.name` 用 slug，npm 名由 `publish:npm` 注入。

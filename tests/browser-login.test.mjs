@@ -25,11 +25,12 @@ test("Windows 候选：注册表命中优先，Chrome 在 Edge 前，国产浏�
 
 test("findBrowser 只返回真实存在的候选；找不到返回 null", () => {
   const env = { PROGRAMFILES: "C:\\PF", LOCALAPPDATA: "C:\\L" }
+  const chrome = join("C:\\PF", "Google", "Chrome", "Application", "chrome.exe")
   const found = findBrowser({
     platform: "win32",
     env,
     lookup: () => "",
-    exists: (p) => p === "C:\\PF\\Google\\Chrome\\Application\\chrome.exe",
+    exists: (p) => p === chrome,
   })
   assert.equal(found.name, "Chrome")
   assert.equal(findBrowser({ platform: "win32", env, lookup: () => "", exists: () => false }), null)
