@@ -101,8 +101,8 @@ npm version patch --no-git-tag-version     # 0.1.7 → 0.1.8；minor/major 同�
 ```
 
 ⚠ 改名分两种，别混：
-- **显示名**（`<中文> <English>`）：`package.json.name`、provider 的 `name`、`registry-entry.json.name`；
-- **npm 包名**：`publish:npm` 脚本里的 `PUBLISH_AS`、`registry-entry.json.package`、README 安装命令。
+- **显示名**（`<中文> <English>`，可带空格）：`package.json.magpie.name`、provider 的 `name`、`registry-entry.json.name`；
+- **包名 / npm 名**（slug，无空格）：`package.json.name`、`publish:npm` 脚本里的 `PUBLISH_AS`、`registry-entry.json.package`、README 安装命令。
 
 ### 第 2 步 · 本地检查，测试不是可选项
 
@@ -112,9 +112,9 @@ npm test                     # 没有 test 脚本时，运行仓库实际的 tes
 npm pack --dry-run           # README、CHANGELOG、docs 都在包里吗
 ```
 
-⚠ 模板默认的 `⚠ 未命名插件 Unnamed Plugin` / `⚠ 未命名供应商 Unnamed Provider` 不改，
-`check.mjs` 会退出 1 并打印「请把显示名改成 <中文> <English>」。
-`--template` 只给脚手架自身用，派生项目不要加。
+⚠ 模板默认的 `name = "unnamed-plugin"` / `magpie.name = "⚠ 未命名插件 Unnamed Plugin"` /
+`⚠ 未命名供应商 Unnamed Provider` 不改，`check.mjs` 会退出 1 并打印
+「magpie.name 不是占位符」。`--template` 只给脚手架自身用，派生项目不要加。
 
 任何一条失败就留在功能分支修，**不许靠 `|| true` 把红色检查抹成绿色**。
 
@@ -163,7 +163,27 @@ node scripts/release.mjs --yes --npm  # 真做；有 publish:npm 脚本会自动
 它还会在任何远端副作用之前重跑合规检查、测试和 `npm pack --dry-run`。
 
 ⚠ 同版本号重复 publish 会被拒；改了代码必须 bump。
-⚠ 显示名（`package.json.name`）不是 npm 包名的插件，一律走 `npm run publish:npm`；裸 `npm publish` 会被 registry 拒。
+⚠ npm 名与 `package.json.name` 不同时，一律走 `npm run publish:npm`；裸 `npm publish` 会被 registry 拒（或发错名）。
+`publish:npm` 失败时脚本会还原 `package.json.name`，并提示「版本已存在就 bump」。
+
+#### NPM_TOKEN：CI 发布不能假绿
+
+`release.yml` 的 npm 步骤用 `NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}`。没配 secret 时
+**0.3.0 起会显式失败**（之前是 `exit 0` 跳过，日志绿但 npm 上什么都没发 —— 假绿）：
+
+```
+::error title=NPM_TOKEN 未配置::在仓库 Settings → Secrets and variables → Actions 加 NPM_TOKEN
+```
+
+配置步骤：
+
+1. 登录 [npmjs.com](https://www.npmjs.com/) → 头像 → **Access Tokens** → Generate New Token
+   （选 **Automation** 或 Classic 的 publish 权限；只给这个仓库用，别复用个人 token）。
+2. GitHub 仓库 → **Settings → Secrets and variables → Actions → New repository secret**
+   → Name 填 `NPM_TOKEN`，Value 粘 token。
+3. 推 tag / 手动跑 `release.yml`，npm 步骤必须真的看到 `+ <包名>@<版本>`。
+
+没有 `NPM_TOKEN` 时：git 源与 GitHub Release 仍可走，但 **npm 步骤失败**，不要把它当成功。
 
 ### 第 6 步 · tag + GitHub Release
 
@@ -313,43 +333,81 @@ magpie plugin add github:owner/repo
 自备 CA 环境，裸跑会报 `UNABLE_TO_GET_ISSUER_CERT_LOCALLY`（而且 exit code 是 0，
 看不出来）。一律走 `magpie plugin ...`。
 
-### 卡片标题与 provider name：中文 + English，不是 npm 包名
+### 卡片标题：`magpie.name`；依赖键仍是 slug
 
-**卡片标题 = 包自己的 `package.json` 的 `name`。** 链路（源码
-`internal/plugin/store.go`）：
+**卡片标题不再依赖添加方式。** magpie 的 `shownName()`
+（`internal/gui/assets/plugins.js:1120`）优先级：
 
 ```
-bun 按包内 name 写依赖键   plugins/package.json:  "<name>": "github:owner/repo"
-        ↓
-magpie 反查键名当标题      gitName():  for name, s := range pj.Dependencies { if s == spec { return name } }
-        ↓
-                          Name():     IsGit(spec) → gitName(spec)，取不到才回退成 spec 原文
+社区 registry 名 → package.json 的 magpie.name → bun 依赖键 → spec
 ```
 
-⇒ **要永久生效，改仓库里 `package.json` 的 `name`。** 更新多少次都不会变，用户一根手指都不用动。
-**这才是正路** —— 手改用户那边的键只是权宜。
+所以显示名写进 `package.json.magpie.name`，`package.json.name` 只做 slug：
 
-⚠ **显示名约定（2026-10-31）**：`name` 是**卡片标题**，不是 npm 包名。格式固定为
-`<中文> <English>`，中间一个空格；**英文部分以厂商官方品牌字样的写法为准（大小写照抄）**。
-provider 的 `name` 也适用同一条约定、同一套写法。
+```json
+{
+  "name": "huawei",
+  "magpie": { "name": "华为云 HUAWEI" }
+}
+```
 
-| 显示名（正确） | `package.json.name` | npm 包名（`publish:npm` 注入） |
+| 位置 | 放什么 | 例 |
 |---|---|---|
-| `华为云 HUAWEI` | `"华为云 HUAWEI"` | `huawei-auth` |
-| `码道 CodeArts` | `"码道 CodeArts"` | `codearts-auth` |
-| `果办 OfficeAce` | `"果办 OfficeAce"` | `officeace-auth` |
+| `package.json.name` | bun 依赖键 / npm 名（slug，无空格） | `huawei`、`codearts-auth` |
+| `package.json.magpie.name` | 卡片标题（中文 + English，可带空格） | `华为云 HUAWEI` |
+| provider 的 `name` | 供应商列表显示名 | `华为云 HUAWEI` |
+| `registry-entry.json.name` | 市场条目显示名 | `果办 OfficeAce` |
 
-错误形态：直接写 npm 包名（`officeace-auth`）、只写英文（`OfficeAce`）、只写中文（`华为云`）。
-好处很直接：magpie 的本地搜索同时匹配 `name` 与 provider id，用户搜中文或英文都能命中。
+⚠⚠ **为什么 `name` 不能有空格（实测）**：bun 用包内 `name` 写
+`~/.config/magpie/plugins/package.json` 的依赖键；`magpie plugin update` 对 git 插件的
+`reinstall()` 会把依赖键当包 spec 传给 `bun update`。键里有空格时 bun 直接报：
+
+```
+unrecognised dependency format: 华为云 HUAWEI
+```
+
+结果不是「标题不好看」，是**整个 `magpie plugin update` 失败**。把显示名放进 `magpie.name`
+后，依赖键保持 slug，update 恢复正常。
+
+⚠ **bun 只吃 ASCII 键**：中文键**即使没有空格**也会报同样的
+`unrecognised dependency format`（实测 bun 1.4.4）。所以 `name` 必须是 ASCII slug，
+这不是风格偏好，是硬约束。
 
 ⚠ **npm 不允许新包名含中文 / 大写**（npm 官方校验库逐字：
 `name can no longer contain capital letters`，`validForNewPackages: false`）。
-所以显示名与 npm 包名必须分开：`name` 放显示名，npm 包名由 `publish:npm` 在发布那一刻注入。
-模板默认是 `⚠ 未命名插件 Unnamed Plugin` / `⚠ 未命名供应商 Unnamed Provider`，
-不改就会在 `check.mjs` 里失败。
+`package.json.name` 用 slug，npm 名由 `publish:npm` 注入。
+模板默认 `name = "unnamed-plugin"`、`magpie.name = "⚠ 未命名插件 Unnamed Plugin"` /
+provider `⚠ 未命名供应商 Unnamed Provider`；不改就会在 `check.mjs` 里失败。
 
-⚠ **换 `name` 就是换 git 安装的依赖键**：已装用户要重装或手改键。所以新建插件时就把
-`name` 定成显示名，别等发出去再改。
+#### 旧版带空格依赖键：迁移步骤
+
+2026-10-31 之前按「`name` 里写中文+空格」装出去的插件，依赖键里已经有空格，
+`magpie plugin update` 会失败。**不需要 `rm` + `add`，登录态不丢**；手工把键改成 slug，
+再让新版本带 `magpie.name`：
+
+```bash
+cd ~/.config/magpie/plugins
+
+# 1. 插件仓库：package.json
+#    "name": "huawei"                 ← slug
+#    "magpie": { "name": "华为云 HUAWEI" }  ← 显示名
+#    发新版本后，用户 update 会用 slug 当依赖键
+
+# 2. 本机依赖键：package.json 与 bun.lock 都改（bun.lock 两处：
+#    workspaces.dependencies 和 packages），旧键 → slug
+
+# 3. node_modules 目录名同步
+mv "node_modules/华为云 HUAWEI" "node_modules/huawei"
+
+# 4. 校验依赖图（不联网，只读缓存）
+~/.cache/magpie/bun/1.4.4/magpie-bun.exe install --offline
+
+# 5. 重启 magpie，再跑 magpie plugin update
+```
+
+如果手工改键太麻烦，也可以 `magpie plugin rm "旧名"` + `magpie plugin add github:owner/repo`，
+但会丢该插件的登录态；能改键就优先改键。改完后 `plugin update` 不会再报
+`unrecognised dependency format`，标题由 `magpie.name` 提供。
 
 #### 包名与卡片标题不同怎么办：发布时由 `publish:npm` 注入
 
@@ -384,7 +442,8 @@ try {
 
 ```jsonc
 // package.json
-"name": "果办 OfficeAce",                      // 卡片标题（中文 + English）
+"name": "officeace-auth",                     // slug（bun 依赖键 / npm 名）
+  "magpie": { "name": "果办 OfficeAce" },       // 卡片标题（中文 + English）
 "scripts": { "publish:npm": "node scripts/publish-npm.mjs" }
 ```
 
@@ -408,13 +467,13 @@ try {
 ```
 
 `bun.lock` 里也跟着变成 `"OfficeAce": ["OfficeAce@github:…#<sha>", …]`（值首段 = 包名）。
-新约定只是把显示名从 `OfficeAce` 换成 `果办 OfficeAce`，依赖键机制不变。
+新约定只是把显示名从 `OfficeAce` 换成 `果办 OfficeAce`（放 `magpie.name`），依赖键仍是 slug，机制不变。
 
 ⚠ 从此**不要裸跑 `npm publish`** —— 那会拿含中文/大写的显示名去发，而 registry 拒绝
 **新**包名（不会静默变小写/转拼音）。一律用 `npm run publish:npm`。
 
 ⚠ 两个来源的依赖键从此不同：npm 装的是 `officeace-auth`（标题就是包名），
-git 装的是 `果办 OfficeAce`。**这正是「分开」的含义**，不是 bug。
+git 装的标题是 `果办 OfficeAce`（`magpie.name`），依赖键是 `officeace-auth`。**这正是「分开」的含义**，不是 bug。
 好处是 npm 那边的包名没变 —— 已装用户照旧收到更新，不用重装。
 
 #### 已经发出去了、又不想换包名
@@ -538,7 +597,7 @@ README 里只留路标 —— 别把 changelog 抄一遍进 README，那是两�
 □ 合规检查、语义测试、npm pack --dry-run 全过，没有用 || true 掩盖失败
 □ 推的是功能分支，PR 的 `rules` 全绿后才合并进默认分支
 □ 本地 main 与 origin/main 完全一致，release.mjs 预演通过
-□ npm publish 成功（显示名不是 npm 包名时用 `npm run publish:npm`）
+□ npm publish 成功（npm 名与 `package.json.name` 不同时用 `npm run publish:npm`）
 □ GitHub Release 发了：tag `v<version>`，说明里一条条列了这次的更新
 □ npm view <包名> version 已是新版本
 □ 线上 tarball 抓下来看过（不只是版本号）

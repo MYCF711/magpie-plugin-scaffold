@@ -62,7 +62,7 @@ PR 是 GitHub 对受保护分支的技术要求（直推报 `GH006`），批准�
 |---|---|---|---|
 | 16 | 加了第二个账号，第一个账号的数据变了 / 串号 | 一切按账号落盘的东西，文件名必须带账号（`<plugin>-<siteId>__<account>.json`）；**不要用模块级变量存 per-account 状态** —— 宿主是同一个进程跑所有账号 | [`src/hooks/models.mjs`](HOOKS.md) 的 `inScope` |
 | 17 | 接口抖一下，列表整个空掉；或某个模型缺价格，用户选了报错 | **部分成功有三态**，方向要各自选对：① 整个接口失败 → 退回上次快照（不要返回空表）② 接口成功但单条缺字段 → **不列**（不猜）③ 登录失效 → 抛 `signIn: "expired"` | [`src/models.mjs`](./src/models.mjs) 的 `buildModels` |
-| 18 | 越改越乱，`index.mjs` 涨到几百行，改一个钩子要读全篇 | 成熟形态是**`index.mjs` 只做九项钩子的装配，实现全在 `src/`**。实测四个真实插件的 `index.mjs` 是 80~715 行，而 `src/` 是 1.4k~3.7k 行 —— 本模板现在是 index 558 行 / `src/` 20 文件 3,716 行（已不是「单文件 78 行」） | 本文件「五、长大之后」 |
+| 18 | 越改越乱，`index.mjs` 涨到几百行，改一个钩子要读全篇 | 成熟形态是**`index.mjs` 只做九项钩子的装配，实现全在 `src/`**。实测四个真实插件的 `index.mjs` 是 80~715 行，而 `src/` 是 1.4k~3.7k 行 —— 本模板现在是 index 558 行 / `src/` 21 文件 3,900+ 行（已不是「单文件 78 行」） | 本文件「五、长大之后」 |
 
 还有两条是 **magpie 0.1.1763 重新提取契约后才发现**的（2026-10-28）：
 
@@ -77,6 +77,7 @@ PR 是 GitHub 对受保护分支的技术要求（直推报 `GH006`），批准�
 | 25 | **模型明明收不了图，却被当成能收图**：截图直发上游报 `The request model is not multimodal` / 400，或者模型回「图片无法查看」 | 模型条目的 `capabilities.input.image` **必须写成布尔值**：省略不等于 text，等于「厂商未表态」，magpie 会拿 models.dev 的裸模型 id 投票补 —— 同名模型在别家标过 `image`，这个模型就会被带成能收图。text-only 模板见 HOOKS 十一之三；反向的手动覆盖（厂商说 `false` 却勾了 `Accepts images`）在 magpie 侧暂无警告 | HOOKS 十一之三 · CHECKLIST A-14 |
 | 26 | 邀请码填了、主登录也过了，但上级没拿到奖励；或「邀请码」那条登录方式点开只有一个框、后面什么都没接 | 两个原因：① 与码成对的额外参数没带（Accio 的 `sId`）—— 换码时必须一起换，见 `src/invite.mjs` 的 `write()`；② 用 `prompts` 数组串「邀请码 → 主登录」是串不起来的，必须用 `ask()`（HOOKS 四·陷阱 5） | HOOKS 四·陷阱 5 · 四之二 · `src/invite.mjs` |
 | 27 | **卡片上的账号名是一串看不懂的 ID**（`iam::01a1642a…:user:hw0615…`、`urn:…`、uuid），用户以为是「显示乱码」 | `accountId` 是**名字**，不是身份：手机号（`maskPhone` 对去掉国家码后 ≥11 位的号码打码 `189****8051`；短号返回空串不显示）→ 昵称/邮箱 → **空串**（宿主回退供应商名）。内部 ID 只进 `uid`。**URN 写进 `accountId` 极难改回** —— 续期返回值是合并、插件落盘又多保留旧值，所以续期路径也要重算一遍 | HOOKS 八的「`accountId` 是名字，`uid` 是身份」· `src/account-name.mjs` 的 `resolveAccount` |
+| 28 | 卡片标题写 `华为云 HUAWEI` 之后，`magpie plugin update` 报 `unrecognised dependency format: 华为云 HUAWEI` | `package.json.name` 同时是 bun 依赖键，**必须是 slug、不能有空格**；显示名写 `package.json.magpie.name`（可带空格），provider/registry 同步。旧安装按 UPDATING 的「旧版带空格依赖键」改键 + 目录 + lock，不用 rm+add | README「包名是 slug；显示名写 magpie.name」· UPDATING 迁移 |
 
 ---
 
@@ -101,10 +102,11 @@ node --test
 #   六条全不报错，但后果同一个：用户永远拿不到新版。发布前必跑。
 node scripts/check-maintenance.mjs
 
-# 显示名（中文 + English）与 npm 包名不同时发布
+# 显示名（magpie.name，中文 + English）与 npm 包名不同时发布
 #   模板自带 scripts/publish-npm.mjs（PUBLISH_AS = magpie-plugin-scaffold）；
 #   派生仓库由 create.mjs 生成自己的 PUBLISH_AS。
 #   release.mjs 会自动检测：有它就用它，没有就退回 npm publish。
+#   CI 的 release.yml 必须配 NPM_TOKEN；没配会显式失败（不是 exit 0 假绿）。
 npm run publish:npm
 
 # 受控发布：只在 PR 合并后运行；脚本不推 main，只推 tag
@@ -173,7 +175,7 @@ node scripts/probe-vision.mjs <provider/model> …
 
 结论：**`index.mjs` 只做装配，实现全在 `src/`** —— 最成熟的那个（magicrew）index 只有 86 行。
 
-已经备好 20 个 `src/` 模块（前四块四个插件里 4/4 都有；`store` 只有 magicrew 独立成文件，
+已经备好 21 个 `src/` 模块（前四块四个插件里 4/4 都有；`store` 只有 magicrew 独立成文件，
 另两个各自实现了等价逻辑；其余是 2026-10-29～30 从 magicrew / 社区 MIT 包抽出的通用协议）：
 
 | 文件 | 里面写什么 | 为什么单独拎出来 |
@@ -196,6 +198,7 @@ node scripts/probe-vision.mjs <provider/model> …
 | [`src/rotation-captcha.mjs`](./src/rotation-captcha.mjs) | `encodeAngle` / `createRotationCaptcha` / `solveRotationCaptcha` / `createCookieJar` | 「旋转图片对正」的验证码：角度编码是从前端反出来的（实测 4 组提交正向穷举唯一命中）；`acw_tc` WAF cookie 不带回去会回「客户端信息不匹配」；判角不可信要换图而不是硬撞 |
 | [`src/vision-clock.mjs`](./src/vision-clock.mjs) | `readVisionModel` / `decideDegFromImage` / `clockToDeg` / `clockSpread` | 用用户自己在 magpie 里选的识图模型判「主体朝几点」；两个判官并行 + 分歧阈值；`max_tokens` 是给推理留的（400 会饿死答案） |
 | [`src/local-browser.mjs`](./src/local-browser.mjs) | `readLocalCreds` / `credsNear` / `leveldbText` | 用户在自己浏览器里登录过时，直接读 localStorage 的 leveldb —— 不开窗、不弹浏览器；跨 origin 必须截断，否则 A 站 jwt 会配到 B 站 org |
+| [`src/browser-login.mjs`](./src/browser-login.mjs) | `browserCandidates` / `findBrowser` / `chromiumLogin` / `selectCookies` | 需要用户在网页里登录时，开一个一次性 Chromium profile 从 CDP 取 Cookie；国产浏览器也要覆盖，Windows 注册表 App Paths 优先 |
 | [`src/tempmail-client.mjs`](./src/tempmail-client.mjs) | `createTempMailbox` / `waitTempCode` | 邮箱验证码自动登录的一次性地址；域名有黑名单（`maxxspace.com` 被 magicrew 拒），换厂商先用真实请求确认 |
 | [`tests/semantics.test.mjs`](./tests/semantics.test.mjs) | 语义锁（含额度窗口 / accountId 规则） | `check.mjs` 查不到的那部分，只有它能拦 |
 | [`tests/mount.test.mjs`](./tests/mount.test.mjs) | 入口唯一函数导出 / 九钩子 / config 模型 / loader / usage 形状 | 模块测试全绿也拦不住「index 改坏了」 |

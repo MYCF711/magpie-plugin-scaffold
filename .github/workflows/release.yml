@@ -140,8 +140,9 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo "没配 NPM_TOKEN —— 跳过 npm 发布（git 源与 Release 不受影响）"
-            exit 0
+            echo "::error title=NPM_TOKEN 未配置::在仓库 Settings → Secrets and variables → Actions 加 NPM_TOKEN；没有它 npm 步骤不能假装成功"
+            echo "✗ 缺少 NPM_TOKEN：npm 发布门禁失败（不是跳过）" >&2
+            exit 1
           fi
           if [ -f scripts/publish-npm.mjs ]; then
             node scripts/publish-npm.mjs

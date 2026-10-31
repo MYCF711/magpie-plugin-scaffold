@@ -11,24 +11,24 @@
 |---|---|
 | 仓库 | `magpie-plugin-scaffold` |
 | npm 包名 | `magpie-plugin-scaffold` |
-| 当前版本 | `0.2.0` |
-| 定位 | magpie 供应商插件脚手架：模板 + 20 个通用 `src/` 模块 + 27 条坑表 + 评分卡 + 受控发布脚本 |
+| 当前版本 | `0.3.1`（待发布） |
+| 定位 | magpie 供应商插件脚手架：模板 + 21 个通用 `src/` 模块 + 28 条坑表 + 评分卡 + 受控发布脚本 |
 | 现状负责人 | 待派（候选角色：`plugin-forge`） |
 
 ## 二、当前状态（2026-10-31 15:25）
 
 ```
-分支        main（与 origin/main 同步，1f60788）
-发布        v0.2.0：PR #14 squash 1f60788；tag v0.2.0；npm 0.2.0；Release 2026-10-31T07:20:06Z
-工作区      clean
+分支        feat/magpie-name-and-npm-publish（从 e5b0b12 起）
+待发布      0.3.0：slug + magpie.name、npm publish 门禁、browser-login
+工作区      本分支未提交（发布前）
 ```
 
 | 资产 | 数量 |
 |---|---|
-| `src/` 模块 | 20 个（见 AGENTS.md 第五节表） |
-| `tests/` | 16 个 / 157 条（`node --test` 全跑） |
+| `src/` 模块 | 21 个（见 AGENTS.md 第五节表） |
+| `tests/` | 18 个 / 161 条（`node --test` 全跑） |
 | `HOOKS.md` | 21 章字段级钩子契约 |
-| AGENTS.md 坑表 | 27 条 |
+| AGENTS.md 坑表 | 28 条 |
 
 ## 三、下一步
 
