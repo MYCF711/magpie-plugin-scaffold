@@ -99,11 +99,13 @@
 
 <必须提醒的冲突，比如先卸掉同类插件>
 
-> 卡片标题来自包内的 `name`，必须是 `<中文> <English>`，中间一个空格；英文部分按厂商官方
-> 品牌字样的大小写照抄（例如 `华为云 HUAWEI`）。它**不是 npm 包名**：npm 名由
-> `scripts/publish-npm.mjs` 的 `PUBLISH_AS` 注入，发布时临时替换。模板默认是
-> `⚠ 未命名插件 Unnamed Plugin`，看到占位符就说明身份还没改，`check.mjs` 会失败。
-> 完整机制见 [UPDATING.md](./UPDATING.md) 的「包名与卡片标题不同怎么办」。
+> 卡片标题来自 `package.json.magpie.name`（`shownName()` 优先取它），写 `<中文> <English>`，
+> 可带空格；`package.json.name` 必须是 slug（bun 依赖键 / npm 名），不能带空格。
+> 英文部分按厂商官方品牌字样的大小写照抄（例如 `华为云 HUAWEI`）。
+> npm 名由 `scripts/publish-npm.mjs` 的 `PUBLISH_AS` 注入，发布时临时替换。
+> provider 的 `name` 同显示名。模板默认 `name = "unnamed-plugin"`、
+> `magpie.name = "⚠ 未命名插件 Unnamed Plugin"`，看到占位符就说明身份还没改，`check.mjs` 会失败。
+> 完整机制见 [UPDATING.md](./UPDATING.md) 的「卡片标题：magpie.name」。
 
 ### 命令行
 
@@ -221,15 +223,18 @@ npm view <包名> version     # 有输出 = 被占了，换个名
 
 | 位置 | 填什么 |
 |---|---|
-| `package.json` 的 `name` | 显示名：`<中文> <English>`（英文照抄官方写法） |
-| `scripts/publish-npm.mjs` 的 `PUBLISH_AS` | npm 包名（小写 ASCII） |
+| `package.json` 的 `name` | slug（bun 依赖键 / npm 名）：小写 ASCII，无空格，如 `huawei` |
+| `package.json.magpie.name` | 卡片显示名：`<中文> <English>`（可带空格，如 `华为云 HUAWEI`） |
+| provider 的 `name` | 供应商显示名：同 `magpie.name` |
+| `scripts/publish-npm.mjs` 的 `PUBLISH_AS` | npm 包名（小写 ASCII，无空格） |
 | `registry-entry.json` 的 `package` | npm 包名 |
-| `registry-entry.json` 的 `name` | 显示名（市场卡片标题） |
+| `registry-entry.json` 的 `name` | 显示名（市场卡片标题，可带空格） |
 | magpie 侧 `plugins.json` 的 `spec` | npm 包名（npm 安装）或 `github:owner/repo`（git 安装） |
-| `plugins/package.json` 的 `dependencies` 键 | 显示名（git 安装时由 bun 按包内 `name` 写入） |
+| `plugins/package.json` 的 `dependencies` 键 | 包名 slug（git 安装时由 bun 按包内 `name` 写入；**不能有空格**） |
 
 `create.mjs` 会把这几处一起填好；手工克隆时照这张表逐项改。只改一处会在市场、git 安装或
-npm 更新里静默错位。
+npm 更新里静默错位。`package.json.name` 带空格时 `magpie plugin update` 会直接报
+`unrecognised dependency format`；显示名放 `magpie.name` 就不会碰到依赖键。
 
 ### keywords 决定能不能被搜到
 

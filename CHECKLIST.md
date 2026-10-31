@@ -74,12 +74,13 @@
             多账号重复登录仍是替换（slug 不变）
       出处：HOOKS 八 · src/account-name.mjs 的 resolveAccount
 
-□ 16. 显示名是 中文 + English 组合，不是 npm 包名
-      判据：package.json.name 与 provider 的 name 都同时含汉字、ASCII 字母和空格；
-            英文部分按厂商官方品牌字样的大小写照抄（如 `华为云 HUAWEI`，不是 `Huawei`）；
-            不含 `未命名` / `Unnamed` / `TODO` 占位符；显示名 ≠ npm 包名；
+□ 16. 包名是 slug，显示名在 magpie.name
+      判据：package.json.name 只含小写 ASCII（`^(@[a-z0-9][a-z0-9._~-]*/)?[a-z0-9][a-z0-9._~-]*$`），
+            不含空格/中文/大写；package.json.magpie.name 是「中文 + English」（含空格），
+            英文按厂商官方品牌字样大小写照抄（如 `华为云 HUAWEI`，不是 `Huawei`）；
+            provider name 与 registry-entry.json.name 同显示名；都不含占位符；
             registry-entry.json.package 是 npm 包名，不是显示名
-      出处：README「卡片标题 = 中文 + English」/ UPDATING「包名与卡片标题不同怎么办」
+      出处：README「包名是 slug；显示名写 magpie.name」/ UPDATING「旧版带空格依赖键」
 ```
 
 ---
@@ -118,7 +119,9 @@
       命令：git switch main && git pull --ff-only origin main
             node scripts/release.mjs --yes --npm
            （显示名不是 npm 包名时自动用 npm run publish:npm）
-      判据：HEAD == origin/main；发布脚本没有推 main；返回 `+ <包名>@<版本>`
+      判据：HEAD == origin/main；发布脚本没有推 main；返回 `+ <包名>@<版本>`；
+            `npm run publish:npm` 发完 package.json.name 仍是 slug（不是 npm 名）；magpie.name 仍是显示名；
+            release.yml 引用 `NPM_TOKEN`；未配 secret 时 workflow **失败**，不能 exit 0 假绿
 
 □ 第 6 步 · tag + GitHub Release
       命令：git tag v<version> && git push origin v<version>（release.mjs 已做则跳过）

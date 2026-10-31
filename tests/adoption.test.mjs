@@ -50,7 +50,8 @@ test("create.mjs 生成的新插件身份正确，且 check 直接通过", () =>
     assert.ok(existsSync(join(target, "scripts", "publish-npm.mjs")))
 
     const pkg = JSON.parse(readFileSync(join(target, "package.json"), "utf8"))
-    assert.equal(pkg.name, "示例 Example")
+    assert.equal(pkg.name, "demo-auth")
+    assert.equal(pkg.magpie.name, "示例 Example")
     assert.equal(pkg.version, "0.1.0")
     assert.equal(pkg.scripts["publish:npm"], "node scripts/publish-npm.mjs")
     assert.equal(pkg.scripts["check:template"], undefined, "派生插件不能继承模板跳过占位符的检查")
@@ -118,12 +119,12 @@ test("派生项目里仍留占位符时，check.mjs 退出 1", () => {
 
     const pkgPath = join(target, "package.json")
     const pkg = JSON.parse(readFileSync(pkgPath, "utf8"))
-    pkg.name = "⚠ 未命名插件 Unnamed Plugin"
+    pkg.name = "unnamed-plugin"
     writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n")
 
     const checked = runNode(join(target, "scripts", "check.mjs"), [target])
     assert.equal(checked.status, 1, checked.stdout + checked.stderr)
-    assert.match(checked.stdout, /显示名不是占位符/)
+    assert.match(checked.stdout, /name 不是占位符/)
   } finally {
     rmSync(parent, { recursive: true, force: true })
   }

@@ -25,10 +25,16 @@ const results = []
 /** 脚手架自己的 npm 包名；派生插件用 create.mjs 生成自己的 publish:npm。 */
 const SCAFFOLD_PACKAGE = "magpie-plugin-scaffold"
 /** 模板占位符：派生项目不改就会在 check 里红。 */
-const PLACEHOLDER_PACKAGE_NAME = "⚠ 未命名插件 Unnamed Plugin"
+const PLACEHOLDER_PACKAGE_NAME = "unnamed-plugin"
+const PLACEHOLDER_DISPLAY_NAME = "⚠ 未命名插件 Unnamed Plugin"
 const PLACEHOLDER_PROVIDER_NAME = "⚠ 未命名供应商 Unnamed Provider"
 const PLACEHOLDER_MARKERS = ["未命名", "Unnamed", "TODO"]
 const SCAFFOLD_NAMES = new Set([SCAFFOLD_PACKAGE, "magpie-plugin-template", PLACEHOLDER_PACKAGE_NAME])
+/** 与 magpie internal/plugin/store.go 的 pkgName 同一形状：bun 依赖键 / npm 名。
+ *  空格、中文、大写都不合法 —— 带空格时 `magpie plugin update` 会报
+ *  `unrecognised dependency format: <名字>`。 */
+const NPM_NAME = /^(@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/
+const isDisplayName = (v) => /[\u3400-\u9fff]/.test(v) && /[A-Za-z]/.test(v)
 
 function ok(cond, name, note, fix) {
   results.push({ level: cond ? "pass" : "fail", name, note, fix })
@@ -105,42 +111,45 @@ if (pkg) {
   // ── ① 身份 ────────────────────────────────────────────────────────
   ok(typeof pkg.name === "string" && pkg.name.length > 0,
      "package.json 的 name 非空",
-     "卡片标题就是它；npm 包名另由 publish:npm 注入")
+     "它同时是卡片标题、git 依赖键与 npm 包名")
 
   warn(TEMPLATE_MODE || !SCAFFOLD_NAMES.has(pkg.name),
        "name 已改成自己的（不是脚手架默认值/占位符）",
        "模板占位符或脚手架名都不能直接发布",
-       "改成 <中文> <English>，例如「华为云 HUAWEI」")
+       "改成小写 ASCII 包名，例如 huawei")
 
-  const displayName = typeof pkg.name === "string" ? pkg.name : ""
-  const placeholder = PLACEHOLDER_MARKERS.find((marker) => displayName.includes(marker))
+  const packageName = typeof pkg.name === "string" ? pkg.name : ""
   if (!TEMPLATE_MODE) {
-    ok(!placeholder,
-       "显示名不是占位符",
-       `仍含「${placeholder ?? ""}」—— 这说明身份还没改；卡片上会一直显示占位符`,
-       '请把显示名改成 <中文> <English>，例如「华为云 HUAWEI」')
+    ok(!SCAFFOLD_NAMES.has(packageName),
+       "package.json 的 name 不是占位符",
+       `仍是「${packageName}」—— 这说明包名还没改`,
+       "改成小写 ASCII 包名，例如 huawei")
   }
-  ok(/[\u3400-\u9fff]/.test(displayName),
-     "显示名含中文",
-     "只写英文，用户搜中文时找不到",
-     '例如「果办 OfficeAce」')
-  ok(/[A-Za-z]/.test(displayName),
-     "显示名含 English",
-     "只写中文，用户搜英文/包名时找不到",
-     '例如「码道 CodeArts」')
-  ok(/\s/.test(displayName),
-     "显示名用空格分隔中文与 English",
-     "「中文English」没有空格，看起来像一串乱码",
-     '格式：<中文> <English>，例如「华为云 HUAWEI」')
+  ok(NPM_NAME.test(packageName),
+     "package.json 的 name 是合法依赖键（slug）",
+     "bun 用包名当依赖键：空格/中文/大写会让 magpie plugin update 报 unrecognised dependency format",
+     "只允许小写字母、数字、. _ -（可带 @scope/）；例：huawei、codearts-auth")
+  const displayName = String(pkg.magpie?.name ?? "")
+  if (!TEMPLATE_MODE) {
+    const marker = PLACEHOLDER_MARKERS.find((m) => displayName.includes(m))
+    ok(!marker,
+       "magpie.name 不是占位符",
+       `仍含「${marker ?? ""}」—— 卡片标题会一直显示占位符`,
+       '写进 package.json.magpie.name，格式 <中文> <English>，例如「华为云 HUAWEI」')
+  }
+  ok(isDisplayName(displayName),
+     "magpie.name 是 <中文> <English> 显示名",
+     "缺中文/English/空格：用户搜另一种语言找不到，或标题读成一串",
+     '在 package.json 加 "magpie": { "name": "华为云 HUAWEI" }')
   if (npmInfo) {
-    ok(displayName !== npmInfo.name,
-       "显示名不等于 npm 包名",
-       "npm 包名不能当卡片标题；英文部分要按厂商官方品牌写法",
-       `npm 包名是 ${npmInfo.name}；显示名应另写成「中文 + English」`)
+    ok(NPM_NAME.test(npmInfo.name),
+       "npm 包名是合法依赖键",
+       "npm 名由 publish:npm 注入；npm 名本身也不能带空格",
+       `现在是 ${npmInfo.name}`)
   } else if (!TEMPLATE_MODE) {
     warn(false,
          "无法确定 npm 包名",
-         "没有 publish:npm，也没有填好的 registry-entry.json；无法核对「显示名 ≠ npm 包名」",
+         "没有 publish:npm，也没有填好的 registry-entry.json",
          "加 scripts/publish-npm.mjs（PUBLISH_AS = npm 包名），或让 create.mjs 生成")
   }
 
@@ -167,6 +176,30 @@ if (pkg) {
   ok(Array.isArray(pkg.files) && pkg.files.length > 0,
      "files 白名单非空",
      "不写就把整个仓库（含测试、截图）发到 npm")
+
+  // ── ②b npm 发布能力：显示名 ≠ npm 名，必须有发布脚本与 secret 门 ──────
+  ok(typeof pkg.scripts?.["publish:npm"] === "string" && pkg.scripts["publish:npm"].length > 0,
+     "package.json 有 publish:npm 脚本",
+     "显示名不能直接 npm publish（含中文/大写会被 registry 拒）；发布时由脚本临时换名",
+     '加 "publish:npm": "node scripts/publish-npm.mjs"')
+  const publishFile = [join(ROOT, "scripts", "publish-npm.mjs"), join(ROOT, "publish-npm.mjs")]
+    .find((f) => existsSync(f))
+  ok(!!publishFile,
+     "publish-npm 脚本存在",
+     "有 publish:npm 脚本但没有文件，npm run publish:npm 会直接失败",
+     "从脚手架复制 scripts/publish-npm.mjs，改 PUBLISH_AS 为 npm 包名")
+  const releaseYml = join(ROOT, ".github", "workflows", "release.yml")
+  if (existsSync(releaseYml)) {
+    ok(/NPM_TOKEN/.test(readFileSync(releaseYml, "utf8")),
+       "release.yml 引用 NPM_TOKEN",
+       "没有 secret 门，CI 的 npm 步骤会静默跳过（假绿），用户以为已发布",
+       "在 release.yml 的 npm 步骤加 env: NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}")
+  } else {
+    ok(false,
+       "release.yml 存在",
+       "没有 release.yml 就没有 tag/Release/npm 的门禁",
+       "从脚手架复制 .github/workflows/release.yml")
+  }
 
   // ── ③ 能不能被搜到 ────────────────────────────────────────────────
   const kw = Array.isArray(pkg.keywords) ? pkg.keywords.map((k) => String(k).toLowerCase()) : []
@@ -285,18 +318,10 @@ if (entryFile && existsSync(join(ROOT, String(entryFile)))) {
            `仍含「${placeholder ?? ""}」—— 卡片上的供应商名会一直显示占位符`,
            `请把 provider name 改成 <中文> <English>，例如「码道 CodeArts」；模板默认是 ${PLACEHOLDER_PROVIDER_NAME}`)
       }
-      ok(/[\u3400-\u9fff]/.test(providerName),
-         `provider name 含中文（${providerId}）`,
-         "只写英文，用户搜中文时找不到",
-         "例如「果办 OfficeAce」")
-      ok(/[A-Za-z]/.test(providerName),
-         `provider name 含 English（${providerId}）`,
-         "只写中文，用户搜英文时找不到",
-         "例如「码道 CodeArts」")
-      ok(/\s/.test(providerName),
-         `provider name 用空格分隔中文与 English（${providerId}）`,
-         "没有空格会读成一串",
-         "格式：<中文> <English>；英文大小写按厂商官方品牌字样")
+      ok(isDisplayName(providerName),
+         `provider name 含中文 + English（${providerId}）`,
+         "只写一种语言，用户搜另一种时找不到；provider name 不是依赖键，可以带空格",
+         "例如「码道 CodeArts」「果办 OfficeAce」")
     }
 
     const objExports = Object.keys(mod).filter((k) => k !== "default" && typeof mod[k] === "object")
@@ -430,6 +455,13 @@ if (existsSync(entryJson) && pkg?.name) {
     }
     ok(typeof entry.name === "string" && entry.name.length > 0,
        "registry 条目有 name（市场里的显示名）")
+    if (!TEMPLATE_MODE) {
+      const marker = PLACEHOLDER_MARKERS.find((m) => String(entry.name).includes(m))
+      ok(!marker && isDisplayName(String(entry.name)),
+         "registry 条目的 name 是 中文 + English 显示名",
+         `中文 + English 可在市场里搜到两种语言；当前是「${entry.name}」`,
+         '改成 <中文> <English>，例如「华为云 HUAWEI」')
+    }
     ok(entry.summary && typeof entry.summary.zh === "string" && typeof entry.summary.en === "string",
        "registry 条目有中英双语 summary")
   }
