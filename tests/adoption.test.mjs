@@ -60,6 +60,9 @@ test("create.mjs 生成的新插件身份正确，且 check 直接通过", () =>
 
     const publishScript = readFileSync(join(target, "scripts", "publish-npm.mjs"), "utf8")
     assert.match(publishScript, /const PUBLISH_AS = "demo-auth"/)
+    const ci = readFileSync(join(target, ".github", "workflows", "ci.yml"), "utf8")
+    assert.match(ci, /template: "false"/, "派生项目的 action 自测必须走严格模式")
+    assert.doesNotMatch(ci, /template: "true"/)
 
     const index = readFileSync(join(target, "index.mjs"), "utf8")
     assert.match(index, /const PROVIDER = "demo"/)

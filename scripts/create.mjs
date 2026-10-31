@@ -170,6 +170,13 @@ function main() {
   mkdirSync(target, { recursive: true })
   copyTemplate(target)
 
+  // GitHub Template 复制的 ci.yml 仍带 template: "true"（给脚手架自己用的）；
+  // 派生项目必须走严格模式，否则 action 自测会替占位符放行。
+  const ciPath = join(target, ".github", "workflows", "ci.yml")
+  if (existsSync(ciPath)) {
+    writeFileSync(ciPath, readFileSync(ciPath, "utf8").replace(/template:\s*"true"/g, 'template: "false"'))
+  }
+
   // ① package.json —— name 是 slug（bun 依赖键）；显示名进 magpie.name
   const pkgPath = join(target, "package.json")
   const pkg = readJson(pkgPath)
