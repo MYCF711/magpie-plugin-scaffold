@@ -79,6 +79,8 @@ npm 用户又可能停在旧版或拿到未验包。发版前逐条过 [CHECKLIS
 
 英文部分以**厂商官方品牌字样的写法**为准，大小写照抄 —— 华为云官方是全大写 `HUAWEI`，不要改写成 `Huawei`。
 provider 的 `name` 适用同一条约定、同一套写法（`码道 CodeArts`、`果办 OfficeAce`）。
+`check.mjs` 只能查「有没有中文 / English / 空格、是不是占位符」，**查不了**「`HUAWEI` 是否厂商官方写法」——
+后者照厂商官网/品牌页，别自己改大小写。
 
 npm 包名不是它：`publish:npm` 在发布那一刻才把 `name` 换成 npm 包名。
 模板默认放的是 `⚠ 未命名插件 Unnamed Plugin` / `⚠ 未命名供应商 Unnamed Provider`；
