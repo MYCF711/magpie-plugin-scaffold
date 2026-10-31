@@ -185,6 +185,10 @@ node scripts/release.mjs --yes --npm  # 真做；有 publish:npm 脚本会自动
 
 没有 `NPM_TOKEN` 时：git 源与 GitHub Release 仍可走，但 **npm 步骤失败**，不要把它当成功。
 
+**已经手工发过之后重跑 workflow 是安全的**：npm 步骤先查 `npm view <pkg>@<version> version`；
+已存在就 `already published, skipping` + `exit 0`（保持绿），不会再因 E409 变红。
+`node scripts/release.mjs --npm` 也有同一守卫：已存在时跳过 npm，tag/Release 继续。
+
 ### 第 6 步 · tag + GitHub Release
 
 **这一步是给人看的，不是给 magpie 看的**，但用户需要它确认「这一版改了什么」。
