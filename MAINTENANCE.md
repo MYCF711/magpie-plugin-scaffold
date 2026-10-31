@@ -15,32 +15,29 @@
 | 定位 | magpie 供应商插件脚手架：模板 + 20 个通用 `src/` 模块 + 27 条坑表 + 评分卡 + 受控发布脚本 |
 | 现状负责人 | 待派（候选角色：`plugin-forge`） |
 
-## 二、当前状态（2026-10-31 15:15）
+## 二、当前状态（2026-10-31 15:25）
 
 ```
-分支        feat/display-name-convention（从 05e5b48 起）
-未提交      README / UPDATING / GUIDE / CHECKLIST / README-TEMPLATE / AGENTS /
-            package.json / registry-entry.json / index.mjs / src/context.mjs /
-            scripts/{check,create,release,cli}.mjs / scripts/publish-npm.mjs /
-            tests/adoption.test.mjs / CHANGELOG.md / MAINTENANCE.md
-main vs origin/main  已同步（05e5b48 docs authorize account #13）
+分支        main（与 origin/main 同步，1f60788）
+发布        v0.2.0：PR #14 squash 1f60788；tag v0.2.0；npm 0.2.0；Release 2026-10-31T07:20:06Z
+工作区      clean
 ```
 
 | 资产 | 数量 |
 |---|---|
 | `src/` 模块 | 20 个（见 AGENTS.md 第五节表） |
-| `tests/` | 16 个（`node --test` 全跑） |
+| `tests/` | 16 个 / 157 条（`node --test` 全跑） |
 | `HOOKS.md` | 21 章字段级钩子契约 |
 | AGENTS.md 坑表 | 27 条 |
 
 ## 三、下一步
 
-**P1 · 显示名约定 + 占位符机制已完成（v0.2.0，`feat/display-name-convention`，待 PR / 发布）。**
+**P1 · 显示名约定 + 占位符机制已发布（v0.2.0，PR #14 / 1f60788）。**
 
 - 约定：`package.json.name` 与 provider `name` 都是 `<中文> <English>`；英文照抄厂商官方品牌大小写；npm 包名由 `publish:npm` 注入
 - 模板默认占位符：`⚠ 未命名插件 Unnamed Plugin` / `⚠ 未命名供应商 Unnamed Provider`；`check.mjs` 严格模式会失败，脚手架自身用 `--template` 放行
-- `create.mjs` 强制 `--name`，生成 `scripts/publish-npm.mjs`（`PUBLISH_AS` = npm 包名）；新增 `tests/adoption.test.mjs` 覆盖正/负例
-- 测试：`node --test` 157 条全过；`node scripts/check.mjs --template` 退出 0
+- `create.mjs` 强制 `--name`，生成 `scripts/publish-npm.mjs`（`PUBLISH_AS` = npm 包名）；`tests/adoption.test.mjs` 覆盖正/负例
+- 测试：`node --test` 157 条全过；`node scripts/check.mjs --template` 退出 0；`npm pack --dry-run` 退出 0
 
 **下一批候选（按原顺序）：**
 
