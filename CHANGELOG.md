@@ -3,6 +3,14 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.3.5 — 2026-10-31
+
+**CI 发布同版本时按成功处理：npm 的 staged 窗口不再让 release workflow 假红**
+
+- `publish-npm.mjs`：捕获 npm 输出；`CI=true` 且报 E409 / previously staged 时 warning + exit 0；本地仍报错提示 bump
+- `create.mjs`：派生项目复用脚手架这份 `publish-npm.mjs`（只替换 `PUBLISH_AS`），不再各自维护一份
+- 保留 release.mjs / release.yml 的发布前守卫与 `NPM_TOKEN` 缺失显式失败
+
 ## 0.3.4 — 2026-10-31
 
 **发布刚完成时 npm view 还没刷新，workflow 仍会 E409；现在发布失败后再查一次，同版本已存在就按成功处理**

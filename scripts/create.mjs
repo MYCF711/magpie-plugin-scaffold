@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 从一个已验证的模板起一个新插件 —— 不可变部分照抄，身份三处自动改掉。
 //
-//   npx --yes github:MYCF711/magpie-plugin-scaffold#v0.3.4 create \
+//   npx --yes github:MYCF711/magpie-plugin-scaffold#v0.3.5 create \
 //     --dir my-plugin --provider huawei --name "华为云 HUAWEI" --package huawei-auth \
 //     --base https://api.huawei.example/v1
 //
@@ -186,33 +186,13 @@ function main() {
   delete pkg.scripts["check:template"]
   writeJson(pkgPath, pkg)
 
-  // ①b 发布脚本：npm 名是 ASCII，package.json.name 保持 slug
-  writeFileSync(
-    join(target, "scripts", "publish-npm.mjs"),
-    [
-      "#!/usr/bin/env node",
-      "// 发布时临时换 name：仓库里的 name 是 slug（bun 依赖键），",
-      "// npm 上必须使用真正的 npm 包名。发布后无论成败都还原。",
-      "// 用法：npm run publish:npm",
-      "",
-      "import { execSync } from \"node:child_process\"",
-      "import { readFileSync, writeFileSync } from \"node:fs\"",
-      "",
-      `const PUBLISH_AS = ${JSON.stringify(packageName)}`,
-      "const file = new URL(\"../package.json\", import.meta.url)",
-      "const original = readFileSync(file, \"utf8\")",
-      "const pkg = JSON.parse(original)",
-      "",
-      "pkg.name = PUBLISH_AS",
-      "writeFileSync(file, JSON.stringify(pkg, null, 2) + \"\\n\")",
-      "try {",
-      "  execSync(\"npm publish --access public\", { stdio: \"inherit\" })",
-      "} finally {",
-      "  writeFileSync(file, original)",
-      "}",
-      "",
-    ].join("\n"),
+  // ①b 发布脚本：复用脚手架那份（含 CI 同版本幂等），只替换 PUBLISH_AS
+  const publishPath = join(target, "scripts", "publish-npm.mjs")
+  const publishSrc = readFileSync(publishPath, "utf8").replace(
+    /const PUBLISH_AS = "[^"]*"/,
+    `const PUBLISH_AS = ${JSON.stringify(packageName)}`,
   )
+  writeFileSync(publishPath, publishSrc)
 
   // ② 三处身份常量（provider 显示名）
   replaceConst(join(target, "index.mjs"), "", provider, providerName, base)
