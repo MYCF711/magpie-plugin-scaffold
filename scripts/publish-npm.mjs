@@ -21,7 +21,7 @@ const pkg = JSON.parse(original)
 pkg.name = PUBLISH_AS
 writeFileSync(file, JSON.stringify(pkg, null, 2) + "\n")
 try {
-  const r = spawnSync("npm", ["publish", "--access", "public"], { encoding: "utf8" })
+  const r = spawnSync("npm publish --access public", { shell: true, encoding: "utf8" })
   if (r.stdout) process.stdout.write(r.stdout)
   if (r.stderr) process.stderr.write(r.stderr)
   if (r.status !== 0) {

@@ -3,6 +3,13 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.3.6 — 2026-10-31
+
+**修复 Windows 上 publish-npm 的 spawn 失败：`spawnSync("npm")` 找不到 npm.cmd**
+
+- `publish-npm.mjs` 改用 shell 执行 `npm publish`，Windows / Linux 都能跑；失败时打印 `r.error` 的错误码
+- 0.3.5 的 CI 幂等、GitHub Template 文档、派生 CI 严格化全部包含
+
 ## 0.3.5 — 2026-10-31
 
 **CI 发布同版本时按成功处理：npm 的 staged 窗口不再让 release workflow 假红**
