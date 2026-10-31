@@ -3,7 +3,7 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
-## 0.3.1 — 2026-10-31
+## 0.3.2 — 2026-10-31
 
 **包名回到 slug，显示名写 `magpie.name`；`plugin update` 不再被空格依赖键打挂，npm 发布能力标准化**
 
@@ -15,6 +15,7 @@
 - `scripts/create.mjs`：`--name` 写 `magpie.name`，`--package` 写 slug；自动生成 `publish-npm.mjs` / `publish:npm`，派生项目默认严格检查
 - 新增 `src/browser-login.mjs`：受控 Chromium 登录（Windows 注册表优先、覆盖 360/QQ/搜狗等国产浏览器，CDP 取 Cookie），从 WPS 灵犀 0.4.11（MIT）的实测实现抽取；带纯函数单测
 - README / UPDATING / CHECKLIST / GUIDE / README-TEMPLATE / AGENTS / SCORING 同步新口径；删除「显示名写 `package.json.name`」的旧说法
+- 修复：tag 触发的 release.yml 发现同版本已在 npm 时跳过并给 warning，不再因本地已发布而 409 变红；npm 包名由 `scripts/npm-name.mjs` 解析
 
 ## 0.2.0 — 2026-10-31
 
