@@ -13,7 +13,7 @@ const { maskPhone, looksLikeIdentifier, accountLabelOf, resolveAccount } = await
 test("maskPhone：0086- / +86 / 裸号 / 已打码，一律 3+4", () => {
   // 华为云 IAM 的原始形状（实测 0086-13800138000）
   assert.equal(maskPhone("0086-13800138000"), "138****8000")
-  assert.equal(maskPhone("+86 189 7009 8051"), "138****8000")
+  assert.equal(maskPhone("+86 138 0013 8000"), "138****8000")
   assert.equal(maskPhone("13800138000"), "138****8000")
   // 厂商已经打过码的值：不能被二次破坏
   assert.equal(maskPhone("138****8000"), "138****8000")

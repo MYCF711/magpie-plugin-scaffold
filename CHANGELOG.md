@@ -217,7 +217,7 @@ OFFICIAL-SOURCES 增量清单（4 条标为「已进官方文档」）。
 
 **账号名那条规矩补齐：`accountId` 是名字，`uid` 是身份 —— 内部 ID 不许当名字。**
 
-- **新增 [`maskPhone`](./src/account-name.mjs)**：`0086-13800138000` / `+86 189 7009 8051` / 裸号 / 厂商已打码的值，一律给出 `138****8000`。国家码只在后面还剩够长的号码时才砍（`86123456789` 这种 86 开头的真号不会被砍成 9 位）。
+- **新增 [`maskPhone`](./src/account-name.mjs)**：`0086-<PHONE>` / `+86 138 0013 8000` / 裸号 / 厂商已打码的值，一律给出 `138****8000`。国家码只在后面还剩够长的号码时才砍（`86123456789` 这种 86 开头的真号不会被砍成 9 位）。
 - **新增 [`looksLikeIdentifier`](./src/account-name.mjs)**：`iam::<domain>:user:<name>`、`urn:…`、uuid、裸 hash、华为 IAM 的 `hw061571365626786` —— 一眼看出是 ID 的形状，不当名字。
 - **新增 [`resolveAccount`](./src/account-name.mjs)**：登录成功时直接拿到 `{ accountId: "138****8000", uid: "iam::…" }` —— 名字给人看，身份给宿主去重（HOOKS 八的 `settle`）。名字全取不到就**不给 `accountId`**，让宿主回退供应商名，**绝不拿 URN 顶上**。
 - **`accountLabelOf` 行为变了（默认打码 + 跳过像 ID 的值）**：`mask` 默认 `true`、`allowId` 默认 `false`；要旧行为显式传 `{ mask: false }` / `{ allowId: true }`。
