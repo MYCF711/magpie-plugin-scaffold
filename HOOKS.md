@@ -576,7 +576,7 @@ return {
 
 ### `accountId` 是名字，`uid` 是身份 —— 别拿内部 ID 当名字
 
-`accountId` 只放**人扫一眼就能分辨**的东西：打码手机号（`189****8051`）、邮箱、昵称。
+`accountId` 只放**人扫一眼就能分辨**的东西：打码手机号（`138****8000`）、邮箱、昵称。
 厂商的内部 ID（`iam::<domain>:user:<name>`、`urn:…`、uuid、裸 hash、华为的 `hw0615…`）
 不是名字，它们进 `uid`。
 
@@ -590,7 +590,7 @@ import { resolveAccount } from "./src/account-name.mjs"
 // 登录成功：名字给人看，身份给宿主去重
 const { phone, name, urn } = await readWhoSignedIn(cred)   // 你的接口
 return { type: "success", refresh, access, expires, ...resolveAccount({ phone, name, urn }) }
-// → { accountId: "189****8051", uid: "iam::01a1642ad2ae7f93bf6387ad2fc5f09e:user:hw061571365626786" }
+// → { accountId: "138****8000", uid: "iam::01a1642ad2ae7f93bf6387ad2fc5f09e:user:hw061571365626786" }
 ```
 
 三条判据：
@@ -604,7 +604,7 @@ return { type: "success", refresh, access, expires, ...resolveAccount({ phone, n
 
 > 真实事故：CodeArts 0.2.4 从 refresh token 的 `user_profile` 取 `principal_urn` 当 `accountId`，
 > 三个账号显示成三串 ID；0.2.5 改成登录后读一次华为云 IAM 的手机号（`GET /v3.0/OS-USER/users/
-> {principal_id}` → `user.phone`），打码成 `189****8051`，URN 改走 `uid`。
+> {principal_id}` → `user.phone`），打码成 `138****8000`，URN 改走 `uid`。
 
 ### 没有 accountId 时
 

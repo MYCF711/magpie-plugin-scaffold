@@ -11,12 +11,12 @@ const { maskPhone, looksLikeIdentifier, accountLabelOf, resolveAccount } = await
 )
 
 test("maskPhone：0086- / +86 / 裸号 / 已打码，一律 3+4", () => {
-  // 华为云 IAM 的原始形状（实测 0086-18970098051）
-  assert.equal(maskPhone("0086-18970098051"), "189****8051")
-  assert.equal(maskPhone("+86 189 7009 8051"), "189****8051")
-  assert.equal(maskPhone("18970098051"), "189****8051")
+  // 华为云 IAM 的原始形状（实测 0086-13800138000）
+  assert.equal(maskPhone("0086-13800138000"), "138****8000")
+  assert.equal(maskPhone("+86 138 0013 8000"), "138****8000")
+  assert.equal(maskPhone("13800138000"), "138****8000")
   // 厂商已经打过码的值：不能被二次破坏
-  assert.equal(maskPhone("189****8051"), "189****8051")
+  assert.equal(maskPhone("138****8000"), "138****8000")
   assert.equal(maskPhone("181****0632"), "181****0632")
   // 不是号码形状 → 空串，让调用方回退，而不是显示半截
   assert.equal(maskPhone(""), "")
@@ -51,8 +51,8 @@ test("looksLikeIdentifier：这些都不许当名字", () => {
 test("resolveAccount：accountId 是人看的名字，uid 是身份", () => {
   const urn = "iam::01a1642ad2ae7f93bf6387ad2fc5f09e:user:hw061571365626786"
   // 有手机号：打码当名字，URN 进 uid —— 这就是 CodeArts 0.2.5 的形状
-  assert.deepEqual(resolveAccount({ phone: "0086-18970098051", name: "hw061571365626786", urn }), {
-    accountId: "189****8051",
+  assert.deepEqual(resolveAccount({ phone: "0086-13800138000", name: "hw061571365626786", urn }), {
+    accountId: "138****8000",
     uid: urn,
   })
   // 没手机号：真人名可以当名字
@@ -65,7 +65,7 @@ test("resolveAccount：accountId 是人看的名字，uid 是身份", () => {
 })
 
 test("accountLabelOf：手机号优先于任何 id 字段，短号不当作手机号显示", () => {
-  const info = { phone: "0086-18170806710", email: "x@y.com", accountId: "iam::d1:user:hw0406" }
+  const info = { phone: "0086-13800138000", email: "x@y.com", accountId: "iam::d1:user:hw0406" }
   assert.equal(accountLabelOf(info), "181****6710")
   // 短号不是手机号：跳过它，回退到邮箱（不能把 1234567 原样显示）
   assert.equal(accountLabelOf({ phone: "1234567", email: "x@y.com" }), "x@y.com")

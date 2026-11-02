@@ -17,13 +17,13 @@ test("建邮箱 → 轮询收件 → 拿到验证码", async () => {
   globalThis.fetch = async (url, init = {}) => {
     calls.push({ url: String(url), body: init.body ? JSON.parse(String(init.body)) : null })
     if (String(url).endsWith("/v3/email/new")) {
-      return new Response(JSON.stringify({ email: "mkabc@yzcalo.com", token: "t" }), { status: 200 })
+      return new Response(JSON.stringify({ email: "user@example.com", token: "t" }), { status: 200 })
     }
     return new Response(JSON.stringify([{ body_text: "Your code is 123456" }]), { status: 200 })
   }
   try {
     const mb = await createTempMailbox({ base: "https://mail.test/api" })
-    assert.equal(mb.address, "mkabc@yzcalo.com")
+    assert.equal(mb.address, "user@example.com")
     const code = await waitTempCode(mb.address, {
       base: "https://mail.test/api",
       timeoutMs: 3000,

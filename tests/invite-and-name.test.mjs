@@ -86,7 +86,7 @@ test("makeInviteMethod：ask 三步（邀请码 → 主问题 → null），auth
 })
 
 test("accountLabelOf：手机号（打码）→ 邮箱 → id → 空串，且不编造", () => {
-  assert.equal(accountLabelOf({ maskedMobile: "+86 189****8051", userId: "1" }), "189****8051")
+  assert.equal(accountLabelOf({ maskedMobile: "+86 138****8000", userId: "1" }), "138****8000")
   // 完整号码也要打码：卡片是给人扫一眼的，不是通讯录（规矩 ②）
   assert.equal(accountLabelOf({ mobile: "13800138000" }), "138****8000")
   assert.equal(accountLabelOf({ email: "a@b.com", userId: "1" }), "a@b.com")

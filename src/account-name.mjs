@@ -16,7 +16,7 @@
 // ① **失败不能阻塞登录**：取不到账号名只是显示问题，登录本身已经成功。
 //    `accountId` 留空串 → magpie 回退到供应商名（HOOKS 八的三级回退），不编造。
 // ② **优先级固定**：手机号 → 邮箱 → 用户 id → 空串。手机号要**打码**
-//    （`0086-18970098051` / `+86 189 7009 8051` / `18970098051` 一律 `189****8051`），
+//    （`0086-13800138000` / `+86 138 0013 8000` / `13800138000` 一律 `138****8000`），
 //    和别的供应商一致。**只有去掉国家码后 ≥11 位的才算手机号**；7–10 位短号返回空串，
 //    让调用方回退到邮箱/空名 —— 否则 `1234567` 会被打成 `123****4567`，原号码全部数字都在里面。
 // ③ **别把 `accountId` 当唯一键**：它是给人看的；区分同名账号靠 `uid`（HOOKS 八）。
@@ -28,11 +28,11 @@
 //    `principal_urn`，三个账号显示成 `iam::01a1642a…:user:hw0615…` 三行，用户以为是乱码，
 //    而那串 ID 从没被换掉过。修法是登录后读一次 IAM 的手机号 —— 见 `resolveAccount`。
 
-/** 手机号打码成 `189****8051`：厂商给 `0086-1…`、`+86 1…`、已打码的，都认。 */
+/** 手机号打码成 `138****8000`：厂商给 `0086-1…`、`+86 1…`、已打码的，都认。 */
 export function maskPhone(raw) {
   const text = String(raw ?? "").trim()
-  // 已经是 `189****8051` 这种形状：不能再按数字串处理（去掉 * 后只剩 7 位）。
-  // 允许带国家码/空格前缀（厂商的 maskedMobile 常给 `+86 189****8051`）。
+  // 已经是 `138****8000` 这种形状：不能再按数字串处理（去掉 * 后只剩 7 位）。
+  // 允许带国家码/空格前缀（厂商的 maskedMobile 常给 `+86 138****8000`）。
   const compact = text.replace(/\s+/g, "")
   const stripped = compact.replace(/^(?:\+?86|0086)/, "")
   if (/^\d{3}\*{4}\d{4}$/.test(stripped)) return stripped
@@ -130,7 +130,7 @@ export async function resolveAccountLabel(fetchUserInfo, credential, log = () =>
  * ```js
  * const { urn, phone, name } = await readWhoSignedIn(cred) // 你的接口
  * return { type: "success", refresh, access, expires, ...resolveAccount({ phone, name, urn }) }
- * // → { accountId: "189****8051", uid: "iam::…:user:hw…" }
+ * // → { accountId: "138****8000", uid: "iam::…:user:hw…" }
  * ```
  *
  * 名字全取不到就**不给 `accountId`**（宿主回退到供应商名），而不是拿 URN 顶上。
