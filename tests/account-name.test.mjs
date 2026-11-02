@@ -17,7 +17,7 @@ test("maskPhone：0086- / +86 / 裸号 / 已打码，一律 3+4", () => {
   assert.equal(maskPhone("13800138000"), "138****8000")
   // 厂商已经打过码的值：不能被二次破坏
   assert.equal(maskPhone("138****8000"), "138****8000")
-  assert.equal(maskPhone("181****0632"), "181****0632")
+  assert.equal(maskPhone("138****8000"), "138****8000")
   // 不是号码形状 → 空串，让调用方回退，而不是显示半截
   assert.equal(maskPhone(""), "")
   assert.equal(maskPhone(undefined), "")
@@ -66,7 +66,7 @@ test("resolveAccount：accountId 是人看的名字，uid 是身份", () => {
 
 test("accountLabelOf：手机号优先于任何 id 字段，短号不当作手机号显示", () => {
   const info = { phone: "0086-13800138000", email: "x@y.com", accountId: "iam::d1:user:hw0406" }
-  assert.equal(accountLabelOf(info), "181****6710")
+  assert.equal(accountLabelOf(info), "138****8000")
   // 短号不是手机号：跳过它，回退到邮箱（不能把 1234567 原样显示）
   assert.equal(accountLabelOf({ phone: "1234567", email: "x@y.com" }), "x@y.com")
   // 邮箱优先于「像 ID」的 id
