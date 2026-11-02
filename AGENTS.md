@@ -78,6 +78,7 @@ PR 是 GitHub 对受保护分支的技术要求（直推报 `GH006`），批准�
 | 26 | 邀请码填了、主登录也过了，但上级没拿到奖励；或「邀请码」那条登录方式点开只有一个框、后面什么都没接 | 两个原因：① 与码成对的额外参数没带（Accio 的 `sId`）—— 换码时必须一起换，见 `src/invite.mjs` 的 `write()`；② 用 `prompts` 数组串「邀请码 → 主登录」是串不起来的，必须用 `ask()`（HOOKS 四·陷阱 5） | HOOKS 四·陷阱 5 · 四之二 · `src/invite.mjs` |
 | 27 | **卡片上的账号名是一串看不懂的 ID**（`iam::01a1642a…:user:hw0615…`、`urn:…`、uuid），用户以为是「显示乱码」 | `accountId` 是**名字**，不是身份：手机号（`maskPhone` 对去掉国家码后 ≥11 位的号码打码 `138****8000`；短号返回空串不显示）→ 昵称/邮箱 → **空串**（宿主回退供应商名）。内部 ID 只进 `uid`。**URN 写进 `accountId` 极难改回** —— 续期返回值是合并、插件落盘又多保留旧值，所以续期路径也要重算一遍 | HOOKS 八的「`accountId` 是名字，`uid` 是身份」· `src/account-name.mjs` 的 `resolveAccount` |
 | 28 | 卡片标题写 `华为云 HUAWEI` 之后，`magpie plugin update` 报 `unrecognised dependency format: 华为云 HUAWEI` | `package.json.name` 同时是 bun 依赖键，**必须是 slug、不能有空格**；显示名写 `package.json.magpie.name`（可带空格），provider/registry 同步。旧安装按 UPDATING 的「旧版带空格依赖键」改键 + 目录 + lock，不用 rm+add | README「包名是 slug；显示名写 magpie.name」· UPDATING 迁移 |
+| 29 | 仓库里写了真手机号 / 邮箱 / 本机路径，把那次提交删掉就以为没事了 | **历史里那份还在**：`git log -p`、下载任意旧 commit 都能看到。提交前跑 `node scripts/privacy-scan.mjs`（0 = 干净）；已经 push 过的要 `git filter-repo --replace-text` 重写全部历史再强推，作者邮箱顺手换 `…@users.noreply.github.com`（`git log` 会聚合作者，真邮箱=公开 QQ 号/手机号）。**改前改后 `git rev-parse HEAD^{tree}` 必须一致** —— 一致才说明「用户装到的东西没变」，只是 SHA 变了 | 本文件「八、脱敏」 |
 
 ---
 
@@ -252,3 +253,71 @@ node scripts/probe-vision.mjs <provider/model> …
 2. 第二节只放一句话判据，**论证留在出处那一份**。别在这里复制长段落 —— 两份会打架。
 3. 新增一份文档，就要在第五节加一行，并说明「什么时候读」。
 4. 判据要能**当场验证**（能跑的命令、能看的字段）。写不成判据的，是感想，不是规矩。
+
+---
+
+## 八、脱敏：公开仓库前必须做
+
+> **公开仓库 = 永久。** 把带真手机号的那次提交 `git rm` 掉、或者「下次提交里删掉」都不算数 ——
+> 历史里那份还在，任何人 `git log -p`、下载任意旧 commit、`git show <sha>:file` 都能看到。
+> 这一节是 2026-11-02 全量清理 31 个仓库后立的规矩：那次 16 个仓库、214 个文件命中。
+
+### 8.1 必须脱的（按后果排序）
+
+| 类 | 例子 | 为什么必须 |
+|---|---|---|
+| **真凭证** | `ghp_…` / `sk-…` / `eyJ…` JWT / 私钥 / 带值的 `Cookie` | 等于账号被人用；**公开即视为已泄露，只能轮换**，删掉不算 |
+| **个人身份** | 手机号（含 `+86 189 7009 8051` 这种空格写法）、邮箱、QQ / 微信号 | 会被爬；**协作者提交里也有别人的 PII**，一并处理 |
+| **内网 / 本机** | `192.168.x.x`、`10.x.x.x`、`C:\Users\<登录名>`（含 `ADMINI~1` 短名、`/c/Users/…`）、自己起的密钥目录（`D:\<密钥目录>`） | 机器指纹 + 内网拓扑 |
+| **业务敏感** | 上游账号 `user_id`、未公开的接口地址 / 封顶 / 倍率 | 商业信息 |
+
+**不用脱的**：相对路径、产品约定的端口（19499 / 8188）、示例域名（`example.com`、`a@b.co`）、
+已经打码的串（`138****8000`）。这些在文末的 `ALLOW` / `MAIL_OK` 里放行。
+
+### 8.2 怎么脱（占位符约定）
+
+| 原值 | 文档（`.md`） | 代码 / 测试 |
+|---|---|---|
+| 手机号 | `<PHONE>` | `13800138000`；掩码样例统一 `138****8000` |
+| 邮箱 / QQ | `<EMAIL>` / `<QQ>` | `user@example.com` / `100000000` |
+| 本机登录名 | `<HOME>` | `C:\Users\<user>` |
+| 仓库 / 工作区绝对路径 | `<WORKSPACE>` / `<REPO>` | **保留盘符形状**：`D:\workspace\…` |
+| 密钥目录 | `<KEYS>` | `D:\keys` |
+| 内网主机 | `<LAN_HOST>` | `<LAN_HOST>` |
+| 凭证 | `<JWT>` / 从环境变量读 | 同左 |
+
+两条踩过的坑：
+
+1. **代码里别一律换成 `<WORKSPACE>`** —— 「路径必须是绝对路径、必须带盘符」这类断言会当场变红（`dsh-GOkifu-compact` 的 A7/A8 就是这么红的）。只换尾部，保留 `D:` 和分隔符。
+2. **换假值后要同步改断言，且不同真号不能都换成同一个**：同一个文件里出现两个真号时，都变成 `13800138000` 会让两条掩码断言自相矛盾（`138****8000` ≠ `181****0632`）。
+
+### 8.3 判据（能跑的命令）
+
+```bash
+node scripts/privacy-scan.mjs            # 扫已跟踪 + 未跟踪（不含 .gitignore）；0 = 干净
+node scripts/privacy-scan.mjs --staged   # 提交前只扫暂存区
+```
+
+挂成 pre-commit（推荐，一行）：
+
+```bash
+printf '#!/bin/sh\nexec node scripts/privacy-scan.mjs --staged\n' > .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+```
+
+### 8.4 已经 push 上去了怎么办
+
+按这个顺序，别跳步：
+
+1. **先轮换凭证**（token / 密码 / 会话）。重写历史不等于别人没抓过。
+2. `git filter-repo --mailmap <map> --replace-text <rules>`
+   —— `--mailmap` 顺手把作者邮箱换成 `…@users.noreply.github.com`；`--replace-text` 的规则是 `旧值==>新值`，正则写 `regex:…==>…`。
+3. **对比 HEAD 的 tree 哈希**：改前改后 `git rev-parse HEAD^{tree}` 必须一致。一致才说明「用户装到的东西没变，只是 SHA 变了」；不一致就是误伤了当前版本，先回滚。
+4. **force push 全部 refs + tags**。受保护分支要先临时关保护（`gh api -X DELETE repos/<o>/<r>/branches/<b>/protection`），推完按原样 `PUT` 回去 —— `enforce_admins` / `required_status_checks.contexts` 这些要逐个还原，别只把开关打开。
+5. **归档仓库**推送会被拒（`remote: This repository was archived so it is read-only` → 403）：先 `PATCH {"archived":false}`，推完再 `true`。
+6. **告知还在用的人重新 clone**：SHA 全变了，旧 clone 里的 commit 对不上，`git pull` 会打架。
+
+### 8.5 为什么这条要进 AGENTS
+
+因为它是**唯一一类「做得对不对，当时看不出来」的错**：代码能跑、测试能过、用户装得上，
+只有等某天有人翻你的历史，才发现三个月前那次提交里有手机号和能用三天的 token。
+判据只有一条 —— **提交前 `node scripts/privacy-scan.mjs` 退出 0**。
