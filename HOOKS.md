@@ -544,6 +544,12 @@ function sdkHeaders(npm, key) {
 
 **尽量用该 API 自己的错误形状回答**，agent 才能显示供应商的原始消息。
 
+> **上面这张表只回答「用哪个状态码」，不回答「错误怎么说清楚」。**
+> 每条错误还必须带一个稳定的 `code`（机器读）和一段有信息量的 `message`（人读），
+> 否则宿主只能拿到一个数字、用户只能看到「服务异常」。
+> 词表、流式错误帧的形状、最小实现模板都在 [`ERROR-CODES.md`](./ERROR-CODES.md)；
+> 形态由 `node scripts/check-error-codes.mjs <插件目录>` 卡门（已并入 `npm run check`）。
+
 ---
 
 ## 八、账号标识（决定卡片显示什么）

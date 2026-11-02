@@ -3,6 +3,15 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.3.7 — 2026-11-02
+
+**新增 ERROR-CODES.md：错误码规范 + 可执行检查，约束「每条错误都带 status + code」**
+
+- `ERROR-CODES.md`：状态码 → 宿主行为对照表、12 个冻结的 `code` 词表（标了可重试/换号有救）、R1–R9 硬性规则、SSE 错误帧形状、最小实现模板、交付验收清单
+- `scripts/check-error-codes.mjs`：静态近似检查 R1/R2/R4/R6/R8（脚手架自身全绿；对已知有缺陷的插件能抓到「端点不存在用 404」这类会被宿主当成模型坏了的错法）
+- 并入 `npm run check`（`check.mjs` 新增一条断言），也可 `npm run check:errors` 单独跑
+- `CHECKLIST.md` A 表新增第 17/18 条；`AGENTS.md` 坑表新增第 14 条；`HOOKS.md` 第七节指过去
+
 ## 0.3.6 — 2026-10-31
 
 **修复 Windows 上 publish-npm 的 spawn 失败：`spawnSync("npm")` 找不到 npm.cmd**

@@ -16,6 +16,7 @@
 import { readFileSync, existsSync, statSync, readdirSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
+import { scanErrorCodes } from "./check-error-codes.mjs"
 
 const ARGS = process.argv.slice(2)
 const TEMPLATE_MODE = ARGS.includes("--template")
@@ -496,6 +497,20 @@ if (existsSync(entryJson) && pkg?.name) {
      "不写 magpie 的市场缓存（plugin-market.json）",
      "那份文件属于 magpie：按包名 merge 会把 registry 条目盖掉",
      `命中的文件：${hits.join(", ")}`)
+}
+
+{
+  // 错误码规范（ERROR-CODES.md §4）：只查**形态** —— 每个错误出口都要带 status + code、
+  // code 在词表内、404 不越界到「端点不存在」。语义（message 有没有信息量、分类对不对）
+  // 查不出，留给 CHECKLIST A 表第 17/18 条。
+  // 为什么值得单独一条断言：404 用错的代价不是「显示难看」，是宿主把这个模型搁置掉；
+  // 超时落到 502 的代价是宿主既不换号也不退避，用户干等一个永远好不了的错误。
+  const rows = scanErrorCodes(ROOT)
+  const bad = rows.filter((r) => !r.ok)
+  ok(bad.length === 0,
+     "错误出口都带 status + code，且 code 在 ERROR-CODES 词表内",
+     bad.length ? bad.map((r) => `${r.file}:${r.line} ${r.rule} ${r.message}`).join("；") : "",
+     "ERROR-CODES.md §4（R1-R9）· §6 有最小实现模板")
 }
 
 // ── 输出 ──────────────────────────────────────────────────────────────

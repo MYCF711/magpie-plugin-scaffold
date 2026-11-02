@@ -81,6 +81,18 @@
             provider name 与 registry-entry.json.name 同显示名；都不含占位符；
             registry-entry.json.package 是 npm 包名，不是显示名
       出处：README「包名是 slug；显示名写 magpie.name」/ UPDATING「旧版带空格依赖键」
+
+□ 17. 每个错误出口都带 status + code，code 在 ERROR-CODES 词表内
+      判据：node scripts/check-error-codes.mjs . 退出码 = 0；
+            errorResponse / SSE 错误帧的 code 都在词表里，没有自造的
+      出处：ERROR-CODES.md §3 词表 · §4 R1/R2/R6
+
+□ 18. 错误分类对得上「谁该做什么」
+      判据：404 只出现在「模型不存在」；超时类落 503/504 不落 502；
+            非登录问题的 401 带 X-Magpie-Sign-In: kept；
+            message 里保留上游原文，不是「服务异常」四个字；
+            词表里每个用到的 code 都有测试
+      出处：ERROR-CODES.md §2 状态码表 · §4 R4/R5/R7/R8/R9 · §8 验收清单
 ```
 
 ---

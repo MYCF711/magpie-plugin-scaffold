@@ -48,6 +48,7 @@ PR 是 GitHub 对受保护分支的技术要求（直推报 `GH006`），批准�
 | 11 | `magpie plugin add xxx.tgz` 跑完像成功，实际没装上 | 这个命令有 bug，改 `plugins.json` + `plugins/package.json` 两处 | README 常见坑 1 |
 | 12 | 想让卡片标题/文案对，去改了 magpie 的缓存文件 | 插件对 magpie 的目录**只有读的份**；唯一载体是 `registry-entry.json` | README「不要写 magpie 的缓存」 |
 | 13 | 用户那边没更新 / Release 页面是空的 / 「暂无发布版本」 | 起功能分支 → CHANGELOG + bump → 检查 / 测试 / pack → 推分支 → 提 PR 等 `rules` 绿 → 合并 → npm / tag / Release → 五条验证。**直接推 main 会被分支保护拒绝** | UPDATING 二 · CHECKLIST B |
+| 14 | 整轮失败，但宿主既不换号也不退避，用户干等一个永远不会好的错误 | 每个错误出口都要 `status` + `code` + 有信息量的 `message`。三个高频错法：① 端点不存在用 **404**（宿主以为是模型坏了，把这个模型搁置）；② 超时/流截断落 **502**（不可重试，宿主不换号，用户只能一直撞墙）；③ `message` 只写「服务异常」，排查时无从下手。词表与模板见 `ERROR-CODES.md`，形态由 `npm run check` 卡门 | ERROR-CODES §2/§4 |
 
 补充两条只在发布侧出现的：
 
