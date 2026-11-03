@@ -9,16 +9,16 @@
 |---|---|
 | 仓库 | `MYCF711/magpie-plugin-scaffold` |
 | npm 包名 | `magpie-plugin-scaffold` |
-| 当前版本 | `0.3.8`（待发布） |
+| 当前版本 | `0.3.8`（已发布） |
 | 定位 | magpie 供应商插件脚手架：九钩子模板 + 27 个通用 `src/` 模块 + 35 条坑表 + 评分卡 + 受控发布脚本 |
 | 本批来源 | 当前 magpie 真实启用的 17 个插件；清单与取舍见 `RECYCLING.md` |
 
 ## 二、当前状态（2026-11-03）
 
 ```text
-分支        feat/recycle-active-plugin-utils（从 origin/main ab66e8f 起）
-版本        0.3.8
-工作区      功能分支待提交；.mirror.json / node.json 是既有本地未跟踪文件，不属于本批
+分支        main（PR #25 已合并，merge commit eb97523）
+版本        0.3.8；tag v0.3.8；npm magpie-plugin-scaffold@0.3.8
+工作区      clean；.mirror.json / node.json 只在本地 exclude，不属于发布面
 ```
 
 | 资产 | 数量 |
@@ -38,14 +38,12 @@ SWR、签到 single-flight、400/422 分类接线。没有回收厂商域名、�
 - `npm run check:template`：38 通过 / 0 失败（模板占位名 warning 是既有预期）；
 - `npm run check:errors`：退出 0；
 - `npm pack --dry-run`：91 个文件，`RECYCLING.md` 与新增模块/测试均在包内；
-- `git diff --check`：退出 0。
+- `git diff --check`：退出 0；`privacy-scan`：PASS；
+- `node scripts/check-maintenance.mjs`：6 通过 / 0 失败；
+- npm 已是 0.3.8，发布 tarball 含 `RECYCLING.md` 与 6 个新增模块，bin 保留；
+- GitHub Release `v0.3.8` 非 draft，`release.yml` 成功，tag 指向已合并 HEAD。
 
 ## 三、下一步
-
-1. 提交本批并跑 `node scripts/privacy-scan.mjs --staged`；
-2. 推功能分支 → PR → `rules` 全绿后合并；
-3. 从与 `origin/main` 完全一致的提交运行 `node scripts/release.mjs --yes --npm`；
-4. 验证 npm 0.3.8、tag v0.3.8、GitHub Release 与 tarball 内容。
 
 后续独立批次候选（不要直接混入本批）：
 
