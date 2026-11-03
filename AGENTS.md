@@ -63,7 +63,7 @@ PR 是 GitHub 对受保护分支的技术要求（直推报 `GH006`），批准�
 |---|---|---|---|
 | 16 | 加了第二个账号，第一个账号的数据变了 / 串号 | 一切按账号落盘的东西，文件名必须带账号（`<plugin>-<siteId>__<account>.json`）；**不要用模块级变量存 per-account 状态** —— 宿主是同一个进程跑所有账号 | [`src/hooks/models.mjs`](HOOKS.md) 的 `inScope` |
 | 17 | 接口抖一下，列表整个空掉；或某个模型缺价格，用户选了报错 | **部分成功有三态**，方向要各自选对：① 整个接口失败 → 退回上次快照（不要返回空表）② 接口成功但单条缺字段 → **不列**（不猜）③ 登录失效 → 抛 `signIn: "expired"` | [`src/models.mjs`](./src/models.mjs) 的 `buildModels` |
-| 18 | 越改越乱，`index.mjs` 涨到几百行，改一个钩子要读全篇 | 成熟形态是**`index.mjs` 只做九项钩子的装配，实现全在 `src/`**。实测四个真实插件的 `index.mjs` 是 80~715 行，而 `src/` 是 1.4k~3.7k 行 —— 本模板现在是 index 569 行 / `src/` 27 文件 5,171 行（已不是「单文件 78 行」） | 本文件「五、长大之后」 |
+| 18 | 越改越乱，`index.mjs` 涨到几百行，改一个钩子要读全篇 | 成熟形态是**`index.mjs` 只做九项钩子的装配，实现全在 `src/`**。实测四个真实插件的 `index.mjs` 是 80~715 行，而 `src/` 是 1.4k~3.7k 行 —— 本模板现在是 index 569 行 / `src/` 28 文件 5,331 行（已不是「单文件 78 行」） | 本文件「五、长大之后」 |
 
 还有两条是 **magpie 0.1.1763 重新提取契约后才发现**的（2026-10-28）：
 
@@ -86,6 +86,8 @@ PR 是 GitHub 对受保护分支的技术要求（直推报 `GH006`），批准�
 | 33 | 同一条厂商时间在 CI 与本地差 8 小时 | 无 zone 时间先给显式 `offset` 再转 ISO；不能让 `Date.parse` 先按宿主本地时区吃掉；自带 Z/offset 不覆盖 | `src/quota.mjs` 的 `toIso` · `tests/semantics.test.mjs` |
 | 34 | 登录补任务和每日签到撞在一起，重复领奖或重复上报；两个同名账号还串成一把锁 | 同账号 single-flight 共享同一 Promise，`replayMs:0` 不回放成功；key 用 uid/凭据指纹，**不用可重名的 accountId**；签到上报用前后账单差集，缺 before 时保守 `done` | `index.mjs` · `src/checkin.mjs` |
 | 35 | live 新模型继承了第一个模型的 1M 窗口/看图能力，或静态表把无权限模型补回来 | 只按相同 id 合并静态元数据；未知模型不猜，目录失败才回快照，live 缺项不补回 | `src/models.mjs` · `tests/models-adapters.test.mjs` |
+| 36 | **卡片上的图标是个圆的**，四角露出深色底，和旁边别的插件不齐 | magpie 把图标画在**圆角方框**里；官网 favicon 常是「品牌徽标」，WorkBuddy 那份 `logo.svg` 里 `rect rx="20"`（40 宽画布）就是正圆。真正的**应用图标**在客户端安装包里 —— Windows exe 的 PE 资源 `RT_ICON` 存着 16~256 多档 PNG，256 那档拖出来就是官方原图：`node scripts/app-icon.mjs <installer.exe> --data-uri`。判据：**别只看 favicon**；两处都要写（`auth.icon` 与 `package.json` 的 `magpie.icon`，见 HOOKS 九之三） | `scripts/app-icon.mjs` · HOOKS 九之三 |
+| 37 | **插件里的模型比厂商网页上少几个，或者倍率 / 上下文不对** | 厂商常有**两份目录**：客户端读的那份（如 `/v3/config`）更新慢，控制台 / 网页那份带完整的分角色元数据。用 [`src/catalog-union.mjs`](./src/catalog-union.mjs) 合并：控制台那份作**主目录**（同 id 用它），配置那份补它没有的 id 和促销表；`auto` / 补全 / 过小输出 / 生成图这些非聊天行过滤掉。**两份都读不到要抛**（调用方回退上次快照），返回 `[]` 会被宿主当成「这家没有模型」 | `src/catalog-union.mjs` · 本文件坑 17 |
 
 ---
 
@@ -143,6 +145,14 @@ node scripts/probe-vision.mjs                 # 测网关 /v1/models 里的每�
 node scripts/probe-vision.mjs --vision-only   # 只测设置里那个识图模型
 node scripts/probe-vision.mjs <provider/model> …
 #   退出码 2 = 有假声明；只读本机网关与 settings.json，不改任何配置
+
+# 卡片图标：厂商官网的 favicon 多半是圆形品牌徽标，magpie 画在圆角方框里会四角留空（坑 36）
+#   真正的应用图标在客户端安装包里（Windows exe 的 PE 资源 RT_ICON）
+node scripts/app-icon.mjs <installer.exe>                # 列出包里的图标尺寸
+node scripts/app-icon.mjs <installer.exe> --data-uri     # 直接出 magpie 的 icon 字段值
+node scripts/app-icon.mjs <installer.exe> --size 256 --out icon.png
+#   只认 PNG 编码的图标（老式 BMP 图标不处理，退出码 2）；
+#   走的是资源树不是 PNG 签名，所以不会把安装包的界面插图当成图标
 ```
 
 ---
@@ -175,7 +185,7 @@ node scripts/probe-vision.mjs <provider/model> …
 
 | 仓库 | `index.mjs` | `src/` | `tests/` |
 |---|---|---|---|
-| 本模板 | 569 行 | 27 文件 / 5,171 行 | 26 |
+| 本模板 | 569 行 | 28 文件 / 5,331 行 | 28 |
 | `magpie-magicrew-auth` | **86** | 27 文件 / 7,773 行 | 17 |
 | `magpie-officeace` | 383 | 8 文件 / 1,566 行 | 2 |
 | `magpie-loomy-auth` | 611 | 9 文件 / 1,905 行 | 4 |
@@ -183,7 +193,7 @@ node scripts/probe-vision.mjs <provider/model> …
 
 结论：**`index.mjs` 只做装配，实现全在 `src/`** —— 最成熟的那个（magicrew）index 只有 86 行。
 
-已经备好 27 个 `src/` 模块（前四块四个插件里 4/4 都有；其余来自社区与当前真实启用插件的择优回收，
+已经备好 28 个 `src/` 模块（前四块四个插件里 4/4 都有；其余来自社区与当前真实启用插件的择优回收，
 2026-11-03 的 17 项启用清单、哈希对照与排除边界见 [RECYCLING.md](./RECYCLING.md)）：
 
 | 文件 | 里面写什么 | 为什么单独拎出来 |
@@ -214,6 +224,7 @@ node scripts/probe-vision.mjs <provider/model> …
 | [`src/local-browser.mjs`](./src/local-browser.mjs) | `readLocalCreds` / `credsNear` / `leveldbText` | 用户在自己浏览器里登录过时，直接读 localStorage 的 leveldb —— 不开窗、不弹浏览器；跨 origin 必须截断，否则 A 站 jwt 会配到 B 站 org |
 | [`src/browser-login.mjs`](./src/browser-login.mjs) | `browserCandidates` / `findBrowser` / `chromiumLogin` / `selectCookies` | 需要用户在网页里登录时，开一个一次性 Chromium profile 从 CDP 取 Cookie；国产浏览器也要覆盖，Windows 注册表 App Paths 优先 |
 | [`src/tempmail-client.mjs`](./src/tempmail-client.mjs) | `createTempMailbox` / `waitTempCode` | 邮箱验证码自动登录的一次性地址；域名有黑名单（`maxxspace.com` 被 magicrew 拒），换厂商先用真实请求确认 |
+| [`src/catalog-union.mjs`](./src/catalog-union.mjs) | `catalogRows` / `isChatLike` / `mergeCatalogs` | 厂商有两份模型目录（客户端配置 + 控制台）时：控制台那份作主目录（元数据新），配置文件补 id 和促销表；非聊天行过滤掉；两份都读不到要抛 —— 返回 `[]` 会被当成「这家没有模型」（坑 37） |
 | [`tests/semantics.test.mjs`](./tests/semantics.test.mjs) | 语义锁（含额度窗口 / accountId 规则） | `check.mjs` 查不到的那部分，只有它能拦 |
 | [`tests/mount.test.mjs`](./tests/mount.test.mjs) | 入口唯一函数导出 / 九钩子 / config 模型 / loader / usage 形状 | 模块测试全绿也拦不住「index 改坏了」 |
 

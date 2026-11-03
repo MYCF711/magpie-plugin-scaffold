@@ -299,6 +299,7 @@ package.json    → 版本、许可证、repository 链接（卡片上自动显�
 | [`src/local-browser.mjs`](./src/local-browser.mjs) | 从本机浏览器 localStorage（LevelDB）读登录态 | 必须按 origin 截断：A 站的 jwt 配到 B 站的 org 就是「登录成功却拿错号」 |
 | [`src/browser-login.mjs`](./src/browser-login.mjs) | 受控 Chromium 登录：候选浏览器（含 360/QQ/搜狗等国产壳）+ CDP 抓 Cookie | Chrome/Edge 之外也得能选；Windows 注册表 App Paths 优先，退出码不可靠，以 CDP 端口连上为准 |
 | [`src/tempmail-client.mjs`](./src/tempmail-client.mjs) | 一次性邮箱建址 + 收验证码 | 域名有黑名单：`maxxspace.com` 会被部分上游拒，`yzcalo.com` / 常见邮箱域可过 —— 换厂商先用真实请求确认 |
+| [`src/catalog-union.mjs`](./src/catalog-union.mjs) | 两份模型目录合并：`catalogRows` 归一化、`isChatLike` 过滤非聊天行、`mergeCatalogs` 定主次 | 厂商的「客户端配置」更新慢、「控制台/网页」那份带完整元数据 —— 只读一份会让插件里的模型比网页上少几个、倍率还是旧的（坑 37） |
 
 表里的模块都有 `tests/*.test.mjs` 语义锁，`node --test` 全跑，照着测就能改。
 
