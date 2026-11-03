@@ -9,12 +9,13 @@ import {
   uidOf,
 } from "../src/credential.mjs"
 
-test("rawCredentialOf 逐候选 trim，按 access → key → token 选首个非空值", () => {
+test("rawCredentialOf 逐候选 trim，按 access → key → token → refresh 选首个非空值", () => {
   assert.equal(rawCredentialOf({ access: "  access-token  ", key: "key-token", token: "fallback" }), "access-token")
   assert.equal(rawCredentialOf({ access: "", key: " key-token ", token: "fallback" }), "key-token")
   assert.equal(rawCredentialOf({ access: " \t\n", key: " key-token ", token: "fallback" }), "key-token")
   assert.equal(rawCredentialOf({ access: "  ", key: "\r\n", token: " fallback " }), "fallback")
   assert.equal(rawCredentialOf({ token: " fallback " }), "fallback")
+  assert.equal(rawCredentialOf({ access: " ", refresh: " refresh-only " }), "refresh-only")
   assert.equal(rawCredentialOf({ key: 123 }), "123")
 })
 
@@ -102,4 +103,12 @@ test("uidOf 回退到凭据指纹，空白高优先级凭据不会遮蔽有效�
   assert.equal(uidOf({ access: "  ", key: "\r\n", token: " fallback " }), fingerprint("fallback"))
   assert.equal(uidOf({}), "")
   assert.equal(uidOf(), "")
+})
+
+test("uidOf 支持 refresh-only，并优先用更稳定的 refresh 指纹", () => {
+  assert.equal(uidOf({ type: "oauth", refresh: " refresh-only " }), fingerprint("refresh-only"))
+  assert.equal(
+    uidOf({ type: "oauth", access: "rotating-access", refresh: "stable-refresh" }),
+    fingerprint("stable-refresh"),
+  )
 })

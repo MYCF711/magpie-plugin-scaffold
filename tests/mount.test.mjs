@@ -147,6 +147,20 @@ test("usage/checkin 的账号 key 用 uid 或凭据指纹，不用可重名的 a
   assert.doesNotMatch(source, /auth\.uid \|\| auth\.accountId/)
 })
 
+test("refresh-only OAuth 不会被 usage/checkin 的账号 key 误判为未登录", async () => {
+  const plugin = await XxxAuthPlugin({ client: {} })
+  const getAuth = async () => ({ type: "oauth", refresh: "refresh-only-credential", accountId: "duplicate-display-name" })
+
+  const usage = await plugin.auth.usage(getAuth, { id: "xxx" })
+  assert.notEqual(usage.error, "未登录")
+  assert.match(usage.error, /TODO/)
+
+  const checkin = await plugin.auth.checkin(getAuth, { id: "xxx" })
+  assert.equal(checkin.outcome, "failed")
+  assert.notEqual(checkin.message, "未登录")
+  assert.match(checkin.message, /TODO/)
+})
+
 test("auth.usage 接入 SWR，并给无旧值读取设置上限", () => {
   const source = readFileSync(new URL("../index.mjs", import.meta.url), "utf8")
   assert.match(source, /usageCache\.readSWR\(String\(usageKey\), \(\) => fetchUsage\(auth\), \{ timeoutMs: 10_000 \}\)/)

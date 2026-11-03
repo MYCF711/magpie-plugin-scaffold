@@ -5,14 +5,14 @@
 import { createHash } from "node:crypto"
 
 /**
- * 读取原始凭据，优先级为 access → key → token，并去掉首尾空白。
+ * 读取原始凭据，优先级为 access → key → token → refresh，并去掉首尾空白。
  *
- * @param {{access?: *, key?: *, token?: *}} [auth] magpie 的 auth 对象
+ * @param {{access?: *, key?: *, token?: *, refresh?: *}} [auth] magpie 的 auth 对象
  * @returns {string} 没有凭据时返回空串
  */
 export function rawCredentialOf(auth) {
   if (!auth) return ""
-  for (const candidate of [auth.access, auth.key, auth.token]) {
+  for (const candidate of [auth.access, auth.key, auth.token, auth.refresh]) {
     const value = String(candidate || "").trim()
     if (value) return value
   }
@@ -69,6 +69,8 @@ export function credentialKindOf(auth, cached, shapeDetector) {
  * @returns {string} 没有任何身份或凭据时返回空串
  */
 export function uidOf(auth, record) {
-  const raw = rawCredentialOf(auth)
+  // refresh_token 通常比 access_token 稳定；有它时优先作为账号身份，仍只存指纹。
+  const refresh = String(auth?.refresh || "").trim()
+  const raw = refresh || rawCredentialOf(auth)
   return String(record?.userId || metadataOf(auth).userId || auth?.uid || (raw ? fingerprint(raw) : ""))
 }
