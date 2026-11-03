@@ -39,6 +39,30 @@ export function wait(ms, signal) {
   })
 }
 
+/** 用有引用的计时器兜底：即使注入的 fetch 不遵守 signal，也不能越过总 deadline。 */
+function withDeadline(promise, ms, signal) {
+  return new Promise((resolve, reject) => {
+    let settled = false
+    const finish = (settle, value) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      signal?.removeEventListener("abort", onAbort)
+      settle(value)
+    }
+    const onAbort = () => finish(reject, abortError())
+    const timer = setTimeout(() => {
+      finish(reject, Object.assign(new Error("等待授权超时，重新发起授权即可"), { name: "TimeoutError" }))
+    }, Math.ceil(ms))
+    if (signal?.aborted) onAbort()
+    else signal?.addEventListener("abort", onAbort, { once: true })
+    Promise.resolve(promise).then(
+      (value) => finish(resolve, value),
+      (error) => finish(reject, error),
+    )
+  })
+}
+
 /**
  * 发送 application/x-www-form-urlencoded POST。
  * 返回值同时保留解析后的 JSON 与截断文本，非 JSON 响应不会在这里抛出。
@@ -138,11 +162,11 @@ export async function pollDeviceToken(dev, {
 
     const timeoutSignal = AbortSignal.timeout(Math.ceil(remainingMs))
     const fetchSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal
-    const res = await postForm(
+    const res = await withDeadline(postForm(
       dev.tokenUrl,
       { grant_type: DEVICE_GRANT, device_code: dev.deviceCode, client_id: dev.clientId },
       { signal: fetchSignal, fetchImpl },
-    )
+    ), remainingMs, signal)
     if (res.status === 200 && res.json?.access_token) return res.json
 
     const code = DEVICE_ERRORS[res.json?.error]
