@@ -73,7 +73,7 @@ test("merge: 未知 live 不继承 fallback 第一条，也不猜 context", () =
   assert.equal(merged.api, undefined)
 })
 
-test("merge: 不补回 live 缺失的模型，也不深合并能力或窗口", () => {
+test("merge: 不补回 live 缺失的模型，只深合并 input/output 模态键", () => {
   const live = [{
     id: "known",
     limit: { output: 4_000 },
@@ -83,7 +83,11 @@ test("merge: 不补回 live 缺失的模型，也不深合并能力或窗口", (
     {
       id: "known",
       limit: { context: 900_000, output: 8_000 },
-      capabilities: { input: { text: true, image: true }, toolcall: true },
+      capabilities: {
+        input: { text: true, image: true },
+        output: { text: true, image: false },
+        toolcall: true,
+      },
     },
     { id: "fallback-only", limit: { context: 1_000_000 } },
   ]
@@ -91,9 +95,39 @@ test("merge: 不补回 live 缺失的模型，也不深合并能力或窗口", (
   assert.deepEqual(merged.map((record) => record.id), ["known"])
   assert.deepEqual(merged[0].limit, { output: 4_000 })
   assert.equal(merged[0].limit.context, undefined)
-  assert.deepEqual(merged[0].capabilities, { input: { text: true } })
+  assert.deepEqual(merged[0].capabilities, {
+    input: { text: true, image: true },
+    output: { text: true, image: false },
+  })
   assert.equal(merged[0].capabilities.toolcall, undefined)
-  assert.equal(merged[0].capabilities.input.image, undefined)
+})
+
+test("merge: partial input.image:false 不丢，live false 不被 fallback true 覆盖", () => {
+  const [merged] = mergeModelMetadata([{
+    id: "known",
+    capabilities: {
+      input: { image: false },
+      output: { text: false },
+      toolcall: false,
+    },
+  }], [{
+    id: "known",
+    capabilities: {
+      input: { text: true, image: true, audio: true },
+      output: { text: true, image: true },
+      toolcall: true,
+      reasoning: true,
+    },
+  }])
+
+  assert.deepEqual(merged.capabilities, {
+    input: { text: true, image: false, audio: true },
+    output: { text: false, image: true },
+    toolcall: false,
+  })
+  assert.equal(merged.capabilities.input.image, false)
+  assert.equal(merged.capabilities.output.text, false)
+  assert.equal(merged.capabilities.reasoning, undefined)
 })
 
 test("适配层不修改输入，并返回新的数组和条目", () => {

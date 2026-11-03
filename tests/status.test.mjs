@@ -6,6 +6,8 @@ import {
   isChannelDown,
   isModelUnserved,
   isMoneyRefusal,
+  isUpstreamTimeout,
+  isUpstreamUnavailable,
   rewriteRefusal,
   upstreamText,
 } from "../src/status.mjs"
@@ -81,7 +83,7 @@ for (const [status, text, name] of unchangedCases) {
 }
 
 test("请求过长优先于其它分类，保持原状态", () => {
-  const text = "max_tokens exceeded; insufficient balance; bad response status code; model_not_found; rate limit"
+  const text = "max_tokens exceeded; insufficient balance; upstream timeout; upstream temporarily unavailable; bad response status code; model_not_found; rate limit"
   assert.equal(classifyRefusal(400, text), 0)
   assert.equal(classifyRefusal(422, text), 0)
 })
@@ -89,7 +91,7 @@ test("请求过长优先于其它分类，保持原状态", () => {
 test("money、channel、model、rate 按顺序决定优先级", async () => {
   const cases = [
     {
-      text: "insufficient balance; bad response status code; model_not_found; rate limit",
+      text: "insufficient balance; upstream timeout; upstream temporarily unavailable; bad response status code; model_not_found; rate limit",
       mapped: 402,
       reason: "Payment Required",
     },
@@ -125,6 +127,29 @@ test("money、channel、model、rate 按顺序决定优先级", async () => {
     }
   }
 })
+
+const upstreamStatusCases = [
+  { kind: "timeout", text: "upstream timeout", mapped: 504, reason: "Gateway Timeout" },
+  { kind: "unavailable", text: "upstream temporarily unavailable", mapped: 503, reason: "Service Unavailable" },
+  { kind: "channel", text: "bad response status code", mapped: 502, reason: "Bad Gateway" },
+]
+
+for (const status of [400, 422]) {
+  for (const { kind, text, mapped, reason } of upstreamStatusCases) {
+    test(`${status} 的 ${kind} 映射为 ${mapped}，原响应仍可读`, async () => {
+      assert.equal(classifyRefusal(status, text), mapped)
+      const original = new Response(text, { status })
+      const result = await rewriteRefusal(original)
+      assert.notStrictEqual(result, original)
+      assert.equal(result.status, mapped)
+      assert.equal(result.statusText, reason)
+      assert.equal(result.headers.get("x-magpie-vendor-status"), String(status))
+      assert.equal(await result.text(), text)
+      assert.equal(original.bodyUsed, false)
+      assert.equal(await original.text(), text)
+    })
+  }
+}
 
 test("其它 400/422 非 JSON 文本原样放行", async () => {
   for (const status of [400, 422]) {
@@ -189,9 +214,14 @@ test("普通非 JSON 文本去空白并截断到 200 字", () => {
   assert.equal(upstreamText(null, 500), "")
 })
 
-test("分类谓词识别通用错误文案", () => {
+test("分类谓词识别通用错误文案，并区分超时、暂不可用与渠道异常", () => {
   assert.equal(isMoneyRefusal("insufficient balance"), true)
+  assert.equal(isUpstreamTimeout("上游服务超时"), true)
+  assert.equal(isUpstreamUnavailable("上游服务暂时不可用"), true)
   assert.equal(isChannelDown("no available channels"), true)
+  assert.equal(isChannelDown("upstream timeout"), false)
+  assert.equal(isChannelDown("upstream unavailable"), false)
   assert.equal(isModelUnserved("model_not_found"), true)
+  assert.equal(isModelUnserved("无权访问该模型"), true)
   assert.equal(isMoneyRefusal("invalid schema"), false)
 })

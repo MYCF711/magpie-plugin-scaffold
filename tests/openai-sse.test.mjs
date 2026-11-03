@@ -342,22 +342,29 @@ test("foldOpenAI：有效调用加无名调用只保留有效调用", async () =
   assert.equal(completion.choices[0].finish_reason, "tool_calls")
 })
 
-test("foldOpenAI：只有 reasoning 加无名调用不抛错", async () => {
-  const completion = await foldOpenAI([
-    { choices: [{ index: 0, delta: { reasoning_content: "保留推理过程" } }] },
-    {
-      choices: [
+test("foldOpenAI：只有 reasoning 加无名调用仍是没有最终答案，抛 502", async () => {
+  await assert.rejects(
+    () =>
+      foldOpenAI([
+        { choices: [{ index: 0, delta: { reasoning_content: "只有推理过程" } }] },
         {
-          index: 0,
-          delta: { tool_calls: [{ index: 0, id: "call_nameless", function: { arguments: "{}" } }] },
-          finish_reason: "tool_calls",
+          choices: [
+            {
+              index: 0,
+              delta: { tool_calls: [{ index: 0, id: "call_nameless", function: { arguments: "{}" } }] },
+              finish_reason: "tool_calls",
+            },
+          ],
         },
-      ],
+      ]),
+    (error) => {
+      assert.ok(error instanceof Error)
+      assert.equal(error.status, 502)
+      assert.equal(error.code, "upstream_error")
+      assert.equal(error.nameless, true)
+      return true
     },
-  ])
-  assert.equal(completion.choices[0].message.reasoning_content, "保留推理过程")
-  assert.equal(completion.choices[0].message.tool_calls, undefined)
-  assert.equal(completion.choices[0].finish_reason, "stop")
+  )
 })
 
 test("foldOpenAI：接受 openAIEvents 异步生成器；usage 帧 choices 为空也能保留", async () => {

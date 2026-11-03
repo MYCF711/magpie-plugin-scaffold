@@ -55,7 +55,10 @@ export async function postForm(url, form, { signal, fetchImpl = globalThis.fetch
     body: new URLSearchParams(form),
     signal,
   })
-  const text = await response.text().catch(() => "")
+  const text = await response.text().catch((error) => {
+    if (error?.name === "AbortError" || signal?.aborted) throw error
+    return ""
+  })
   let json = null
   try {
     json = text ? JSON.parse(text) : null
@@ -107,7 +110,8 @@ const DEVICE_ERRORS = {
 /**
  * 轮询到用户完成授权。
  *
- * 总预算取 min(maxWaitMs, expires_in)；slow_down 按 RFC 8628 将后续间隔增加 5 秒。
+ * 总预算取 min(maxWaitMs, expires_in)，同时约束 sleep 与在飞 token 请求；
+ * slow_down 按 RFC 8628 将后续间隔增加 5 秒。
  * authorization_pending 继续等待，access_denied 与 expired_token 分别报错。
  */
 export async function pollDeviceToken(dev, {
@@ -129,11 +133,15 @@ export async function pollDeviceToken(dev, {
     if (signal?.aborted) throw abortError()
     await sleep(Math.min(interval, Math.max(0, deadline - now())), signal)
     if (signal?.aborted) throw abortError()
+    const remainingMs = deadline - now()
+    if (remainingMs <= 0) break
 
+    const timeoutSignal = AbortSignal.timeout(Math.ceil(remainingMs))
+    const fetchSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal
     const res = await postForm(
       dev.tokenUrl,
       { grant_type: DEVICE_GRANT, device_code: dev.deviceCode, client_id: dev.clientId },
-      { signal, fetchImpl },
+      { signal: fetchSignal, fetchImpl },
     )
     if (res.status === 200 && res.json?.access_token) return res.json
 
@@ -177,7 +185,7 @@ export async function refreshAccessToken({
     { grant_type: "refresh_token", refresh_token: String(refresh), client_id: clientId },
     { signal, fetchImpl },
   ).catch((error) => {
-    if (error?.name === "AbortError") throw error
+    if (error?.name === "AbortError" || signal?.aborted) throw error
     return { status: 0, json: null, text: String(error?.message || error) }
   })
 

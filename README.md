@@ -281,7 +281,7 @@ package.json    → 版本、许可证、repository 链接（卡片上自动显�
 | 模块 | 解决什么 | 一个必须知道的实测 |
 |---|---|---|
 | [`src/http.mjs`](./src/http.mjs) | 公共请求头、OpenAI 错误 Response、异构错误摘要、保守 401/403 判定、Retry-After | 401 纯模型错误不杀账号；403 只有明确登录文本才算 expired；429 等待钳制在 1–60 秒 |
-| [`src/status.mjs`](./src/status.mjs) | 400/422 的余额 / 渠道 / 模型 / 限流分类与安全 Response 改写 | 只读 clone；200/SSE 原对象返回且零 pull；schema 与上下文过长不换号 |
+| [`src/status.mjs`](./src/status.mjs) | 400/422 的余额 / 超时(504) / 暂不可用(503) / 渠道 / 模型 / 限流分类与安全改写 | 只读 clone；200/SSE 原对象返回且零 pull；schema 与上下文过长不换号 |
 | [`src/credential.mjs`](./src/credential.mjs) | 凭据读取、SHA-256 指纹、种类识别与 uid | 种类顺序 cached → metadata → shape；不要按 `auth.type` 猜 Cookie 还是 API Key |
 | [`src/oauth-device.mjs`](./src/oauth-device.mjs) | RFC 8628 设备码申请、轮询、刷新 | `slow_down` 后续间隔 +5 秒；总预算取 maxWait/expires_in 较小值；网络失败不冒充登录失效 |
 | [`src/checkin.mjs`](./src/checkin.mjs) | 签到前后账单差集对账、一次性奖励防双计 | 没有 before 快照时保守 `done`，不能把历史账单算成本次新奖励 |

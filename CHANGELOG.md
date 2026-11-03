@@ -15,6 +15,7 @@
 - `src/store.mjs` / `src/invite.mjs`：独立临时名、0600/0700、原子替换与厂商时区日键；邀请存储复用同一写原语
 - `src/quota.mjs`：无 zone 时间支持显式 offset；`src/usage-cache.mjs`：新增 stale-while-revalidate；`index.mjs`：签到按账号 single-flight
 - `src/api.mjs`：不再把任意 400/422 当模型 404，也不再把所有 403 当登录失效；全部新增与修改路径都有离线语义测试
+- 审查加固：流终态向所有等待者广播；设备轮询 deadline 覆盖在飞请求；usage/checkin 不再用可重名 accountId 作 key；补齐中文模型 401、400/422 的 503/504、reasoning-only 无名调用、partial capabilities 与 SWR failTTL 回归
 
 ## 0.3.7 — 2026-11-02
 

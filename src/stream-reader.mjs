@@ -23,7 +23,8 @@ function timeoutError(timeoutMs) {
  *
  * timeoutMs 与 signal 只退出当次等待，不取消底层 reader，也不丢弃或重复发起
  * 已在飞的 reader.read()。等待退出后到达的块仍按序入队，下一次 read 可以拿到。
- * 底层 done/error 是终态：消费一次后仍会持续重放，不再调用 reader.read()。
+ * 底层 done/error 是终态：按既有 chunk 顺序交付后广播给所有剩余等待者，
+ * 后续 read 仍会持续重放，不再调用 reader.read()。
  * signal 已中止时不会发起底层 read；等待中中止时优先使用 signal.reason 拒绝。
  *
  * 背压策略：只有存在等待者才继续拉取，且最多一个底层 read 在飞。因此包装器
@@ -97,6 +98,13 @@ export function createStreamReader(reader, { onTimeout } = {}) {
       const slot = slots.shift()
       if (slot.ok) waiter.resolve(slot.result)
       else waiter.reject(slot.error)
+    }
+    if (ended && !slots.length) {
+      for (const waiter of waiters) {
+        if (failed) waiter.reject(endError)
+        else waiter.resolve(doneResult())
+      }
+      waiters.clear()
     }
     pump()
   }

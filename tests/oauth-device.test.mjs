@@ -159,7 +159,7 @@ test("pollDeviceToken 将 expired_token 报为设备码过期", async () => {
   )
 })
 
-test("pollDeviceToken 的总等待预算不超过 expires_in", async () => {
+test("pollDeviceToken 的总等待预算不超过 expires_in，sleep 后到期不再请求", async () => {
   let clock = 0
   const sleeps = []
   let requests = 0
@@ -182,7 +182,54 @@ test("pollDeviceToken 的总等待预算不超过 expires_in", async () => {
 
   assert.equal(clock, 3000)
   assert.deepEqual(sleeps, [2000, 1000])
-  assert.equal(requests, 2)
+  assert.equal(requests, 1)
+})
+
+for (const budget of [
+  { name: "maxWaitMs", dev: device({ expiresIn: 60 }), maxWaitMs: 25 },
+  { name: "expires_in", dev: device({ expiresIn: 0.025 }), maxWaitMs: 1000 },
+]) {
+  test(`pollDeviceToken 的 ${budget.name} 会中止永不 resolve 的在飞 fetch`, { timeout: 1000 }, async () => {
+    let requests = 0
+    const pending = pollDeviceToken(budget.dev, {
+      maxWaitMs: budget.maxWaitMs,
+      fetchImpl: async (_url, { signal }) => {
+        requests += 1
+        return new Promise((_, reject) => {
+          signal.addEventListener("abort", () => reject(signal.reason), { once: true })
+        })
+      },
+      sleep: async () => {},
+    })
+
+    await assert.rejects(pending, { name: "TimeoutError" })
+    assert.equal(requests, 1)
+  })
+}
+
+test("pollDeviceToken 在 token fetch 期间可被调用方 AbortSignal 取消", async () => {
+  const controller = new AbortController()
+  let requestSignal
+  let markStarted
+  const started = new Promise((resolve) => {
+    markStarted = resolve
+  })
+  const pending = pollDeviceToken(device(), {
+    signal: controller.signal,
+    fetchImpl: async (_url, { signal }) => {
+      requestSignal = signal
+      markStarted()
+      return new Promise((_, reject) => {
+        signal.addEventListener("abort", () => reject(signal.reason), { once: true })
+      })
+    },
+    sleep: async () => {},
+  })
+
+  await started
+  assert.notEqual(requestSignal, controller.signal)
+  controller.abort()
+  await assert.rejects(pending, { name: "AbortError" })
 })
 
 test("pollDeviceToken 在等待期间可被 AbortSignal 取消", async () => {
@@ -284,6 +331,45 @@ test("refreshAccessToken 遇到网络错误与 5xx 返回 null 而不误判失�
   assert.equal(server, null)
 })
 
+test("refreshAccessToken 继续 rethrow 响应读取的 AbortError", async () => {
+  const failure = Object.assign(new Error("读取响应时中止"), { name: "AbortError" })
+  await assert.rejects(
+    refreshAccessToken({
+      refresh: "old-refresh",
+      tokenUrl: TOKEN_URL,
+      clientId: CLIENT_ID,
+      fetchImpl: async () => ({
+        status: 200,
+        async text() {
+          throw failure
+        },
+      }),
+    }),
+    (error) => error === failure,
+  )
+})
+
+test("refreshAccessToken 不把自定义 signal.reason 当普通网络失败", async () => {
+  const controller = new AbortController()
+  const failure = new Error("用户取消")
+  controller.abort(failure)
+  await assert.rejects(
+    refreshAccessToken({
+      refresh: "old-refresh",
+      tokenUrl: TOKEN_URL,
+      clientId: CLIENT_ID,
+      signal: controller.signal,
+      fetchImpl: async () => ({
+        status: 200,
+        async text() {
+          throw failure
+        },
+      }),
+    }),
+    (error) => error === failure,
+  )
+})
+
 test("postForm 保留非 JSON 响应文本且不抛解析错误", async () => {
   const result = await postForm(
     TOKEN_URL,
@@ -296,4 +382,50 @@ test("postForm 保留非 JSON 响应文本且不抛解析错误", async () => {
     json: null,
     text: "<html>bad gateway</html>",
   })
+})
+
+test("postForm 不吞 response.text() 抛出的 AbortError", async () => {
+  const failure = Object.assign(new Error("响应读取已中止"), { name: "AbortError" })
+  await assert.rejects(
+    postForm(TOKEN_URL, { client_id: CLIENT_ID }, {
+      fetchImpl: async () => ({
+        status: 200,
+        async text() {
+          throw failure
+        },
+      }),
+    }),
+    (error) => error === failure,
+  )
+})
+
+test("postForm 不吞 signal 已 abort 时的响应读取错误", async () => {
+  const controller = new AbortController()
+  controller.abort()
+  const failure = new Error("abort 后的读取失败")
+  await assert.rejects(
+    postForm(TOKEN_URL, { client_id: CLIENT_ID }, {
+      signal: controller.signal,
+      fetchImpl: async () => ({
+        status: 200,
+        async text() {
+          throw failure
+        },
+      }),
+    }),
+    (error) => error === failure,
+  )
+})
+
+test("postForm 将普通响应读取错误转为空文本", async () => {
+  const result = await postForm(TOKEN_URL, { client_id: CLIENT_ID }, {
+    fetchImpl: async () => ({
+      status: 502,
+      async text() {
+        throw new Error("响应流损坏")
+      },
+    }),
+  })
+
+  assert.deepEqual(result, { status: 502, json: null, text: "" })
 })

@@ -2,6 +2,8 @@
 //
 // 这里只放与厂商无关的协议工具。上游地址、鉴权方式和业务码仍留在各插件的 api.mjs。
 
+import { isModelUnserved } from "./status.mjs"
+
 /**
  * 错误码词表：status 决定宿主如何分流，code 供程序判断，message 给人看。
  */
@@ -167,9 +169,9 @@ export function retryAfter(response, attempt = 0, { now = Date.now } = {}) {
 export function isLoginBroken(status, body) {
   const text = errorText(body).toLowerCase()
   if (Number(status) === 401) {
-    const modelish = /model|not available|model_not_found|模型不支持/.test(text)
     const authish = /token|key|session|login|登录/.test(text)
-    return !modelish || authish
+    if (authish) return true
+    return !isModelUnserved(text)
   }
   if (Number(status) === 403) return /not_logged_in|login|session|csrf|登录|未登录/.test(text)
   return false

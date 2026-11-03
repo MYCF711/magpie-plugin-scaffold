@@ -42,6 +42,9 @@ export function createUsageCache({
 
   /** @type {Map<string, { ok: boolean, value?: unknown, error?: unknown, expiresAt: number }>} */
   const entries = new Map()
+  /** SWR 后台失败单独短缓存，不能用失败项覆盖 entries 里的成功 stale。 */
+  /** @type {Map<string, { error: unknown, expiresAt: number }>} */
+  const failures = new Map()
   /** @type {Map<string, Promise<unknown>>} */
   const inflight = new Map()
 
@@ -51,6 +54,12 @@ export function createUsageCache({
     for (const [key, entry] of entries) {
       if (entry.expiresAt <= at) {
         entries.delete(key)
+        removed += 1
+      }
+    }
+    for (const [key, failure] of failures) {
+      if (failure.expiresAt <= at) {
+        failures.delete(key)
         removed += 1
       }
     }
@@ -65,12 +74,16 @@ export function createUsageCache({
       .then(compute)
       .then(
         (value) => {
+          failures.delete(key)
           entries.set(key, { ok: true, value, expiresAt: now() + ttlMs })
           return value
         },
         (error) => {
-          // SWR 已有成功旧值时，刷新失败不能用失败项覆盖它；普通 read 仍缓存失败 5 秒。
-          if (!preserveStale) {
+          // SWR 失败单独记 failTtl，旧成功值继续作为 stale 返回；普通 read 语义不变。
+          if (preserveStale) {
+            failures.set(key, { error, expiresAt: now() + failTtlMs })
+          } else {
+            failures.delete(key)
             entries.set(key, { ok: false, error, expiresAt: now() + failTtlMs })
           }
           throw error
@@ -128,13 +141,16 @@ export function createUsageCache({
         return Promise.reject(signal.reason ?? new Error("usage cache 读取已中止"))
       }
 
+      if (stale) {
+        const failure = failures.get(key)
+        if (failure?.expiresAt > now()) return Promise.resolve(stale.value)
+        if (failure) failures.delete(key)
+      }
+
       const task = start(key, compute, { preserveStale: Boolean(stale) })
       if (stale) {
         // 后台失败由这里兜底，既保留旧成功值，也避免无人等待时产生 unhandled rejection。
-        void task.catch(() => {
-          const current = entries.get(key)
-          if (current && !current.ok) entries.set(key, stale)
-        })
+        void task.catch(() => {})
         return Promise.resolve(stale.value)
       }
 
@@ -176,10 +192,12 @@ export function createUsageCache({
     clear(key) {
       if (key === undefined) {
         entries.clear()
+        failures.clear()
         return
       }
       assertKey(key)
       entries.delete(key)
+      failures.delete(key)
     },
 
     /** 清理过期项，返回条数（诊断用） */

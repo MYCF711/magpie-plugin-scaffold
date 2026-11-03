@@ -139,6 +139,14 @@ test("chat.headers 只给本 provider 的请求加头", async () => {
   assert.deepEqual(other.headers, {})
 })
 
+test("usage/checkin 的账号 key 用 uid 或凭据指纹，不用可重名的 accountId", () => {
+  const source = readFileSync(new URL("../index.mjs", import.meta.url), "utf8")
+  assert.match(source, /const usageKey = uidOf\(auth\)/)
+  assert.match(source, /const account = uidOf\(auth\)/)
+  assert.doesNotMatch(source, /auth\.uid \?\? auth\.accountId/)
+  assert.doesNotMatch(source, /auth\.uid \|\| auth\.accountId/)
+})
+
 test("auth.usage 接入 SWR，并给无旧值读取设置上限", () => {
   const source = readFileSync(new URL("../index.mjs", import.meta.url), "utf8")
   assert.match(source, /usageCache\.readSWR\(String\(usageKey\), \(\) => fetchUsage\(auth\), \{ timeoutMs: 10_000 \}\)/)

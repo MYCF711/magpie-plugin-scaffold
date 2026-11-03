@@ -9,9 +9,11 @@ import {
   uidOf,
 } from "../src/credential.mjs"
 
-test("rawCredentialOf 按 access → key → token 读取并 trim", () => {
+test("rawCredentialOf 逐候选 trim，按 access → key → token 选首个非空值", () => {
   assert.equal(rawCredentialOf({ access: "  access-token  ", key: "key-token", token: "fallback" }), "access-token")
   assert.equal(rawCredentialOf({ access: "", key: " key-token ", token: "fallback" }), "key-token")
+  assert.equal(rawCredentialOf({ access: " \t\n", key: " key-token ", token: "fallback" }), "key-token")
+  assert.equal(rawCredentialOf({ access: "  ", key: "\r\n", token: " fallback " }), "fallback")
   assert.equal(rawCredentialOf({ token: " fallback " }), "fallback")
   assert.equal(rawCredentialOf({ key: 123 }), "123")
 })
@@ -90,12 +92,14 @@ test("uidOf 按 record.userId → metadata.userId → auth.uid 选择身份", ()
   assert.equal(uidOf({ access: "raw-token", uid: "auth-uid", metadata: {} }), "auth-uid")
 })
 
-test("uidOf 回退到凭据指纹，空凭据返回空串且不泄漏 token", () => {
+test("uidOf 回退到凭据指纹，空白高优先级凭据不会遮蔽有效回退", () => {
   const raw = "super-secret-raw-token"
   const uid = uidOf({ access: raw })
   assert.equal(uid, fingerprint(raw))
   assert.match(uid, /^[0-9a-f]{12}$/)
   assert.equal(uid.includes(raw), false)
+  assert.equal(uidOf({ access: " \t\n", key: " key-token " }), fingerprint("key-token"))
+  assert.equal(uidOf({ access: "  ", key: "\r\n", token: " fallback " }), fingerprint("fallback"))
   assert.equal(uidOf({}), "")
   assert.equal(uidOf(), "")
 })

@@ -23,8 +23,8 @@
 
 | 资产 | 数量 |
 |---|---:|
-| `src/` 模块 | 27 个 / 5,071 行 |
-| `tests/` | 26 个 / 272 条（`node --test` 全过） |
+| `src/` 模块 | 27 个 / 5,144 行 |
+| `tests/` | 26 个 / 299 条（`node --test` 全过） |
 | `HOOKS.md` | 21 章字段级钩子契约 |
 | AGENTS.md 坑表 | 35 条 |
 
@@ -34,7 +34,7 @@ SWR、签到 single-flight、400/422 分类接线。没有回收厂商域名、�
 
 已验证：
 
-- `node --test`：272 通过 / 0 失败；
+- `node --test`：299 通过 / 0 失败；
 - `npm run check:template`：38 通过 / 0 失败（模板占位名 warning 是既有预期）；
 - `npm run check:errors`：退出 0；
 - `npm pack --dry-run`：91 个文件，`RECYCLING.md` 与新增模块/测试均在包内；

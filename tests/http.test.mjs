@@ -153,9 +153,25 @@ test("retryAfter 对缺失和非法值使用 5s → 20s → 20s", () => {
   assert.equal(retryAfter(new Response(null, { headers: { "retry-after": "not-a-date" } }), 0), 5000)
 })
 
-test("isLoginBroken 不让 401 的纯模型错误杀账号", () => {
-  assert.equal(isLoginBroken(401, { message: "model_not_found: model is not available" }), false)
-  assert.equal(isLoginBroken(401, { message: "模型不支持" }), false)
+const unservedModelMessages = [
+  "模型不存在",
+  "模型不可用",
+  "模型未开通",
+  "无权访问该模型",
+  "模型不支持",
+  "model_not_found: model is not available",
+]
+
+for (const message of unservedModelMessages) {
+  test(`isLoginBroken 不让 401 的纯模型错误杀账号：${message}`, () => {
+    assert.equal(isLoginBroken(401, { message }), false)
+  })
+}
+
+test("isLoginBroken 的 401 鉴权文案优先于模型错误", () => {
+  for (const message of unservedModelMessages) {
+    assert.equal(isLoginBroken(401, { message: `${message}: invalid token` }), true)
+  }
   assert.equal(isLoginBroken(401, { message: "model access denied: invalid token" }), true)
   assert.equal(isLoginBroken("401", { message: "session expired" }), true)
 })

@@ -374,9 +374,8 @@ export async function foldOpenAI(events, { id, model } = {}) {
   const sortedCalls = allCalls.filter((call) => call.function.name.trim() !== "")
   const nameless = allCalls.length - sortedCalls.length
   const hasContent = content.join("").length > 0
-  const hasReasoning = reasoning.join("").length > 0
-  if (nameless > 0 && !hasContent && !hasReasoning && sortedCalls.length === 0) {
-    // usage 只是计量信息，不能让一整轮没有答案的响应被当成成功。
+  if (nameless > 0 && !hasContent && sortedCalls.length === 0) {
+    // reasoning / usage 都不是最终答案，不能让无名调用造成的空响应被当成成功。
     const error = new Error("上游工具调用缺少有效的 function.name，且整轮没有其它答案")
     error.status = 502
     error.code = "upstream_error"

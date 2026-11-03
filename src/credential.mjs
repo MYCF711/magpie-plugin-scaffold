@@ -12,8 +12,11 @@ import { createHash } from "node:crypto"
  */
 export function rawCredentialOf(auth) {
   if (!auth) return ""
-  const value = auth.access || auth.key || auth.token || ""
-  return String(value || "").trim()
+  for (const candidate of [auth.access, auth.key, auth.token]) {
+    const value = String(candidate || "").trim()
+    if (value) return value
+  }
+  return ""
 }
 
 /**

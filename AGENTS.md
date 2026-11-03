@@ -63,7 +63,7 @@ PR 是 GitHub 对受保护分支的技术要求（直推报 `GH006`），批准�
 |---|---|---|---|
 | 16 | 加了第二个账号，第一个账号的数据变了 / 串号 | 一切按账号落盘的东西，文件名必须带账号（`<plugin>-<siteId>__<account>.json`）；**不要用模块级变量存 per-account 状态** —— 宿主是同一个进程跑所有账号 | [`src/hooks/models.mjs`](HOOKS.md) 的 `inScope` |
 | 17 | 接口抖一下，列表整个空掉；或某个模型缺价格，用户选了报错 | **部分成功有三态**，方向要各自选对：① 整个接口失败 → 退回上次快照（不要返回空表）② 接口成功但单条缺字段 → **不列**（不猜）③ 登录失效 → 抛 `signIn: "expired"` | [`src/models.mjs`](./src/models.mjs) 的 `buildModels` |
-| 18 | 越改越乱，`index.mjs` 涨到几百行，改一个钩子要读全篇 | 成熟形态是**`index.mjs` 只做九项钩子的装配，实现全在 `src/`**。实测四个真实插件的 `index.mjs` 是 80~715 行，而 `src/` 是 1.4k~3.7k 行 —— 本模板现在是 index 567 行 / `src/` 27 文件 5,071 行（已不是「单文件 78 行」） | 本文件「五、长大之后」 |
+| 18 | 越改越乱，`index.mjs` 涨到几百行，改一个钩子要读全篇 | 成熟形态是**`index.mjs` 只做九项钩子的装配，实现全在 `src/`**。实测四个真实插件的 `index.mjs` 是 80~715 行，而 `src/` 是 1.4k~3.7k 行 —— 本模板现在是 index 569 行 / `src/` 27 文件 5,144 行（已不是「单文件 78 行」） | 本文件「五、长大之后」 |
 
 还有两条是 **magpie 0.1.1763 重新提取契约后才发现**的（2026-10-28）：
 
@@ -84,7 +84,7 @@ PR 是 GitHub 对受保护分支的技术要求（直推报 `GH006`），批准�
 | 31 | 非流折叠后出现 `function.name: ""`，客户端保存了不可调用的工具 | 参数/id 可先到，但流末仍无名的 tool_call 必须丢弃；若整轮只有它就抛 `status=502 / nameless=true`，有文本或命名调用则保留原答案 | `src/openai-sse.mjs` · `tests/openai-sse.test.mjs` |
 | 32 | 空闲超时后下一段首块消失；或额度接口一抖卡片就没数 | reader 超时只摘等待者，在飞块入队；usage 用 SWR 返回旧成功值并后台单飞，无旧值才做有界等待 | `src/stream-reader.mjs` · `src/usage-cache.mjs` |
 | 33 | 同一条厂商时间在 CI 与本地差 8 小时 | 无 zone 时间先给显式 `offset` 再转 ISO；不能让 `Date.parse` 先按宿主本地时区吃掉；自带 Z/offset 不覆盖 | `src/quota.mjs` 的 `toIso` · `tests/semantics.test.mjs` |
-| 34 | 登录补任务和每日签到撞在一起，重复领奖或重复上报 | 同账号 single-flight 共享同一 Promise，`replayMs:0` 不回放成功；签到上报用前后账单差集，缺 before 时保守 `done` | `index.mjs` · `src/checkin.mjs` |
+| 34 | 登录补任务和每日签到撞在一起，重复领奖或重复上报；两个同名账号还串成一把锁 | 同账号 single-flight 共享同一 Promise，`replayMs:0` 不回放成功；key 用 uid/凭据指纹，**不用可重名的 accountId**；签到上报用前后账单差集，缺 before 时保守 `done` | `index.mjs` · `src/checkin.mjs` |
 | 35 | live 新模型继承了第一个模型的 1M 窗口/看图能力，或静态表把无权限模型补回来 | 只按相同 id 合并静态元数据；未知模型不猜，目录失败才回快照，live 缺项不补回 | `src/models.mjs` · `tests/models-adapters.test.mjs` |
 
 ---
@@ -175,7 +175,7 @@ node scripts/probe-vision.mjs <provider/model> …
 
 | 仓库 | `index.mjs` | `src/` | `tests/` |
 |---|---|---|---|
-| 本模板 | 567 行 | 27 文件 / 5,071 行 | 26 |
+| 本模板 | 569 行 | 27 文件 / 5,144 行 | 26 |
 | `magpie-magicrew-auth` | **86** | 27 文件 / 7,773 行 | 17 |
 | `magpie-officeace` | 383 | 8 文件 / 1,566 行 | 2 |
 | `magpie-loomy-auth` | 611 | 9 文件 / 1,905 行 | 4 |
@@ -189,7 +189,7 @@ node scripts/probe-vision.mjs <provider/model> …
 | 文件 | 里面写什么 | 为什么单独拎出来 |
 |---|---|---|
 | [`src/http.mjs`](./src/http.mjs) | `CODES` / `errorResponse` / `errorText` / `retryAfter` / `isLoginBroken` | 统一错误出口与保守登录失效判定；401 模型错误、403 权限/WAF 不杀账号 |
-| [`src/status.mjs`](./src/status.mjs) | `classifyRefusal` / `rewriteRefusal` / `upstreamText` | 只读 400/422 clone；余额/渠道/模型/限流才改写，SSE 与 schema 错误原样放行 |
+| [`src/status.mjs`](./src/status.mjs) | `classifyRefusal` / `rewriteRefusal` / `upstreamText` | 只读 400/422 clone；超时→504、暂不可用→503，余额/渠道/模型/限流各自分流；SSE 与 schema 原样放行 |
 | [`src/credential.mjs`](./src/credential.mjs) | `rawCredentialOf` / `fingerprint` / `credentialKindOf` / `uidOf` | 凭据种类只看 cached → metadata → shape；厂商 shape/API 注入，不进通用层 |
 | [`src/oauth-device.mjs`](./src/oauth-device.mjs) | `requestDeviceCode` / `pollDeviceToken` / `refreshAccessToken` | RFC 8628 标准设备码状态机；slow_down +5 秒、总 deadline、abort、刷新不误判失效 |
 | [`src/checkin.mjs`](./src/checkin.mjs) | `billKey` / `isPositiveGrant` / `reconcileCheckin` | 前后账单差集区分 claimed/done；缺 before 保守，不重复计算一次性奖励 |

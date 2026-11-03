@@ -55,6 +55,7 @@ import { usage as buildUsage, usageWindow } from "./src/quota.mjs"
 import { createRefreshLock } from "./src/refresh-lock.mjs"
 import { createUsageCache } from "./src/usage-cache.mjs"
 import { rewriteRefusal } from "./src/status.mjs"
+import { uidOf } from "./src/credential.mjs"
 
 // ── 配置 ──────────────────────────────────────────────────────────────
 
@@ -371,7 +372,7 @@ export const XxxAuthPlugin = async (_ctx, _options) => {
       if (!auth) return { error: "未登录", windows: [] }
 
       // 只缓存有凭据身份的账号；匿名调用本来就不会打到上游。
-      const usageKey = auth.uid ?? auth.accountId ?? auth.refresh ?? auth.access ?? auth.key
+      const usageKey = uidOf(auth)
       if (!usageKey) return { error: "未登录", windows: [] }
 
       let u
@@ -442,7 +443,8 @@ export const XxxAuthPlugin = async (_ctx, _options) => {
       const auth = await getAuth()
       if (!auth) return { outcome: "failed", message: "未登录" }
 
-      const account = auth.uid || auth.accountId || auth.refresh || auth.access || auth.key || "anonymous"
+      const account = uidOf(auth)
+      if (!account) return { outcome: "failed", message: "未登录" }
       const key = `${provider?.id || PROVIDER}\n${account}`
       return checkinLock.run(key, async () => {
         try {

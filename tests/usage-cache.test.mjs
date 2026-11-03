@@ -151,25 +151,41 @@ test("readSWR 立即返回过期成功值，同 key 只有一个后台刷新", a
   assert.equal(calls, 1)
 })
 
-test("readSWR 后台失败保留 stale，不留下 pending 或未处理拒绝", async () => {
+test("readSWR 后台失败记 failTtlMs，三次 stale 读取只算一次且过期才重试", async () => {
   let at = 0
-  const cache = createUsageCache({ ttlMs: 5, now: () => at })
+  const cache = createUsageCache({ ttlMs: 5, failTtlMs: 20, now: () => at })
   const oldValue = { version: "old" }
   await cache.readSWR("s", async () => oldValue)
 
   at = 6
-  const gate = deferred()
-  assert.equal(await cache.readSWR("s", () => gate.promise), oldValue)
-  await settle()
-  assert.equal(cache.pending, 1)
-  gate.reject(new Error("refresh failed"))
+  let calls = 0
+  const compute = async () => {
+    calls += 1
+    throw new Error("refresh failed")
+  }
+  assert.equal(await cache.readSWR("s", compute), oldValue)
   await settle()
   assert.equal(cache.pending, 0)
+  assert.equal(calls, 1)
 
-  // 失败项没有覆盖旧成功值；这次仍先给 stale，再由成功刷新替换它。
-  const newValue = { version: "new" }
-  assert.equal(await cache.readSWR("s", async () => newValue), oldValue)
+  // 后台任务已失败落地；failTtlMs 内继续返回旧成功值，不能重复触发失败计算。
+  assert.equal(await cache.readSWR("s", compute), oldValue)
+  assert.equal(await cache.readSWR("s", compute), oldValue)
   await settle()
+  assert.equal(calls, 1)
+  assert.equal(cache.pending, 0)
+
+  // 失败 TTL 过期后才允许刷新；本次仍先给 stale，成功后替换旧值。
+  at = 26
+  const newValue = { version: "new" }
+  let retries = 0
+  assert.equal(await cache.readSWR("s", async () => {
+    retries += 1
+    return newValue
+  }), oldValue)
+  await settle()
+  assert.equal(retries, 1)
+  assert.equal(calls, 1)
   assert.equal(cache.pending, 0)
   assert.equal(await cache.readSWR("s", async () => "不应执行"), newValue)
 })

@@ -129,6 +129,69 @@ test("error 消费后持续重放，reader reject 后不再 read", async () => {
   assert.equal(readCalls, 1)
 })
 
+for (const count of [2, 3]) {
+  test(`${count} 个并发 read 在 done 时全部结束，后续 read 仍重放`, async () => {
+    const pending = deferred()
+    let readCalls = 0
+    const reader = createStreamReader({
+      read() {
+        readCalls += 1
+        return pending.promise
+      },
+    })
+
+    const waiting = Array.from({ length: count }, () => reader.read())
+    pending.resolve({ done: true, value: undefined })
+    assert.deepEqual(
+      await Promise.all(waiting),
+      Array.from({ length: count }, () => ({ done: true, value: undefined })),
+    )
+    assert.deepEqual(await reader.read(), { done: true, value: undefined })
+    assert.equal(readCalls, 1)
+  })
+
+  test(`${count} 个并发 read 在 error 时全部拒绝，后续 read 仍重放`, async () => {
+    const pending = deferred()
+    const failure = new Error(`读取失败（${count} 个等待者）`)
+    let readCalls = 0
+    const reader = createStreamReader({
+      read() {
+        readCalls += 1
+        return pending.promise
+      },
+    })
+
+    const waiting = Array.from({ length: count }, () => reader.read())
+    pending.reject(failure)
+    const results = await Promise.allSettled(waiting)
+    assert.ok(results.every((result) => result.status === "rejected" && result.reason === failure))
+    await assert.rejects(reader.read(), (error) => error === failure)
+    assert.equal(readCalls, 1)
+  })
+}
+
+test("终态广播前先按序交付已排队 chunk", async () => {
+  const pending = [deferred(), deferred()]
+  let readCalls = 0
+  const reader = createStreamReader({
+    read() {
+      return pending[readCalls++].promise
+    },
+  })
+
+  const first = reader.read()
+  pending[0].resolve({ done: false, value: "首块" })
+  const second = reader.read()
+  const third = reader.read()
+  assert.deepEqual(await first, { done: false, value: "首块" })
+  assert.equal(readCalls, 2)
+
+  pending[1].resolve({ done: true, value: undefined })
+  assert.deepEqual(await second, { done: true, value: undefined })
+  assert.deepEqual(await third, { done: true, value: undefined })
+  assert.equal(readCalls, 2)
+})
+
 test("cancel 转发 reason、拒绝等待者并忽略迟到块", async () => {
   const pending = deferred()
   const reason = new Error("关闭来源")

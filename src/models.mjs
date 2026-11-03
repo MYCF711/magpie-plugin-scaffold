@@ -209,8 +209,9 @@ const STATIC_METADATA = ["limit", "capabilities", "api"]
 
 /**
  * 按相同 id 给 live 条目补静态元数据，输出仍只包含 live 中的模型。
- * 字段级继承、不做深合并：live 已给出 limit/capabilities 时不会被 fallback
- * 的子字段扩写，避免把上下文或能力权限猜大；未知模型也不会拿第一条兜底。
+ * live 已给出 capabilities 时，只补齐 input/output 的模态键，且 live 的显式
+ * 布尔值优先；其它 capabilities 子字段和 limit 仍不做深合并，避免猜大权限。
+ * 未知模型也不会拿第一条兜底。
  */
 export function mergeModelMetadata(live, fallback) {
   const fallbackById = new Map()
@@ -222,7 +223,20 @@ export function mergeModelMetadata(live, fallback) {
     const merged = { ...record }
     if (!base) return merged
     for (const key of STATIC_METADATA) {
-      if (merged[key] === undefined && base[key] !== undefined) merged[key] = base[key]
+      if (key === "capabilities" && merged[key] !== undefined && base[key] !== undefined) {
+        const capabilities = { ...merged[key] }
+        for (const modality of ["input", "output"]) {
+          const fallbackModalities = base[key]?.[modality]
+          if (fallbackModalities === undefined) continue
+          const liveModalities = merged[key]?.[modality]
+          capabilities[modality] = liveModalities === undefined
+            ? fallbackModalities
+            : { ...fallbackModalities, ...liveModalities }
+        }
+        merged[key] = capabilities
+      } else if (merged[key] === undefined && base[key] !== undefined) {
+        merged[key] = base[key]
+      }
     }
     return merged
   })
