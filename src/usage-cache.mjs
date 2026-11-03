@@ -57,6 +57,32 @@ export function createUsageCache({
     return removed
   }
 
+  function start(key, compute, { preserveStale = false } = {}) {
+    const pending = inflight.get(key)
+    if (pending) return pending
+
+    let task = Promise.resolve()
+      .then(compute)
+      .then(
+        (value) => {
+          entries.set(key, { ok: true, value, expiresAt: now() + ttlMs })
+          return value
+        },
+        (error) => {
+          // SWR 已有成功旧值时，刷新失败不能用失败项覆盖它；普通 read 仍缓存失败 5 秒。
+          if (!preserveStale) {
+            entries.set(key, { ok: false, error, expiresAt: now() + failTtlMs })
+          }
+          throw error
+        },
+      )
+      .finally(() => {
+        if (inflight.get(key) === task) inflight.delete(key)
+      })
+    inflight.set(key, task)
+    return task
+  }
+
   return {
     /**
      * 读一个 key 的额度；未命中就执行 compute。
@@ -73,27 +99,77 @@ export function createUsageCache({
         return Promise.reject(hit.error)
       }
 
-      const pending = inflight.get(key)
-      if (pending) return pending
+      return start(key, compute)
+    },
 
-      let task = Promise.resolve()
-        .then(compute)
-        .then(
+    /**
+     * stale-while-revalidate：成功旧值过期后也立即返回，并在后台按 key 单飞刷新。
+     * 没有成功旧值时等待计算；timeoutMs / signal 只限制等待时间，不取消共享计算。
+     */
+    readSWR(key, compute, { timeoutMs, signal } = {}) {
+      assertKey(key)
+      if (typeof compute !== "function") throw new TypeError("usage cache 的 compute 必须是函数")
+      if (timeoutMs !== undefined) assertNonNegative("readSWR timeoutMs", timeoutMs)
+      if (signal !== undefined && (
+        typeof signal?.addEventListener !== "function" || typeof signal?.removeEventListener !== "function"
+      )) {
+        throw new TypeError("usage cache 的 signal 必须是 AbortSignal")
+      }
+
+      // 不能像 read 一样先 sweep：过期成功项正是 SWR 要返回的 stale。
+      const hit = entries.get(key)
+      if (hit && hit.expiresAt > now()) {
+        if (hit.ok) return Promise.resolve(hit.value)
+        return Promise.reject(hit.error)
+      }
+
+      const stale = hit?.ok ? hit : undefined
+      if (!stale && signal?.aborted) {
+        return Promise.reject(signal.reason ?? new Error("usage cache 读取已中止"))
+      }
+
+      const task = start(key, compute, { preserveStale: Boolean(stale) })
+      if (stale) {
+        // 后台失败由这里兜底，既保留旧成功值，也避免无人等待时产生 unhandled rejection。
+        void task.catch(() => {
+          const current = entries.get(key)
+          if (current && !current.ok) entries.set(key, stale)
+        })
+        return Promise.resolve(stale.value)
+      }
+
+      if (timeoutMs === undefined && signal === undefined) return task
+      return new Promise((resolve, reject) => {
+        let timer
+        const cleanup = () => {
+          if (timer !== undefined) clearTimeout(timer)
+          signal?.removeEventListener("abort", onAbort)
+        }
+        const onAbort = () => {
+          cleanup()
+          reject(signal.reason ?? new Error("usage cache 读取已中止"))
+        }
+        signal?.addEventListener("abort", onAbort, { once: true })
+        if (timeoutMs !== undefined) {
+          timer = setTimeout(() => {
+            cleanup()
+            const error = new Error(`usage cache 读取超过 ${timeoutMs}ms`)
+            error.name = "TimeoutError"
+            reject(error)
+          }, timeoutMs)
+        }
+        // 即使等待已超时/中止，这里仍接收共享计算的最终结果，保证 rejection 有人处理。
+        task.then(
           (value) => {
-            entries.set(key, { ok: true, value, expiresAt: now() + ttlMs })
-            return value
+            cleanup()
+            resolve(value)
           },
           (error) => {
-            // 失败也缓存，但只缓存 failTtlMs；错误对象原样交给等待者。
-            entries.set(key, { ok: false, error, expiresAt: now() + failTtlMs })
-            throw error
+            cleanup()
+            reject(error)
           },
         )
-        .finally(() => {
-          if (inflight.get(key) === task) inflight.delete(key)
-        })
-      inflight.set(key, task)
-      return task
+      })
     },
 
     /** 清一个 key（或全部）的缓存；不动 in-flight，避免把同一次刷新复制成两次。 */

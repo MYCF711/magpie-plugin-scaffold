@@ -139,6 +139,18 @@ test("chat.headers 只给本 provider 的请求加头", async () => {
   assert.deepEqual(other.headers, {})
 })
 
+test("auth.usage 接入 SWR，并给无旧值读取设置上限", () => {
+  const source = readFileSync(new URL("../index.mjs", import.meta.url), "utf8")
+  assert.match(source, /usageCache\.readSWR\(String\(usageKey\), \(\) => fetchUsage\(auth\), \{ timeoutMs: 10_000 \}\)/)
+})
+
+test("auth.checkin 按账号走 single-flight，且不回放成功结果", () => {
+  const source = readFileSync(new URL("../index.mjs", import.meta.url), "utf8")
+  assert.match(source, /const checkinLock = createRefreshLock\(\{ replayMs: 0 \}\)/)
+  assert.match(source, /return checkinLock\.run\(key, async \(\) =>/)
+  assert.match(source, /const key = `\$\{provider\?\.id \|\| PROVIDER\}\\n\$\{account\}`/)
+})
+
 test("auth.refresh 走 refresh lock，而不是裸调 exchangeRefresh", () => {
   // 模板里的 exchangeRefresh 仍是 TODO，无法注入桩；用源码契约锁住接线本身。
   // 模块行为由 tests/refresh-lock.test.mjs 锁，这里只防止未来重构把闸拆掉。

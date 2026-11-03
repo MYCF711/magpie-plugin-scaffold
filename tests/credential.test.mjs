@@ -1,0 +1,101 @@
+import test from "node:test"
+import assert from "node:assert/strict"
+
+import {
+  rawCredentialOf,
+  fingerprint,
+  metadataOf,
+  credentialKindOf,
+  uidOf,
+} from "../src/credential.mjs"
+
+test("rawCredentialOf 按 access → key → token 读取并 trim", () => {
+  assert.equal(rawCredentialOf({ access: "  access-token  ", key: "key-token", token: "fallback" }), "access-token")
+  assert.equal(rawCredentialOf({ access: "", key: " key-token ", token: "fallback" }), "key-token")
+  assert.equal(rawCredentialOf({ token: " fallback " }), "fallback")
+  assert.equal(rawCredentialOf({ key: 123 }), "123")
+})
+
+test("rawCredentialOf 对缺失 auth 或凭据返回空串", () => {
+  assert.equal(rawCredentialOf(), "")
+  assert.equal(rawCredentialOf(null), "")
+  assert.equal(rawCredentialOf({ access: null, key: "", token: 0 }), "")
+})
+
+test("fingerprint 返回稳定的 12 位摘要，不泄漏原始 token", () => {
+  const raw = "secret-token-that-must-not-leak"
+  const value = fingerprint(raw)
+  assert.match(value, /^[0-9a-f]{12}$/)
+  assert.equal(value, fingerprint(raw))
+  assert.notEqual(value, fingerprint("another-secret-token"))
+  assert.equal(value.includes(raw), false)
+  assert.equal(fingerprint(""), "e3b0c44298fc")
+})
+
+test("metadataOf 保留对象 metadata，对无效值返回新空对象", () => {
+  const metadata = { kind: "cookie", userId: "user-1" }
+  assert.equal(metadataOf({ metadata }), metadata)
+  assert.deepEqual(metadataOf(), {})
+  assert.deepEqual(metadataOf({ metadata: null }), {})
+  assert.deepEqual(metadataOf({ metadata: "kind=cookie" }), {})
+  assert.notEqual(metadataOf(), metadataOf())
+})
+
+test("credentialKindOf 优先 cached.kind，且不再调用 shape detector", () => {
+  let calls = 0
+  const detector = () => {
+    calls += 1
+    return "shape"
+  }
+  const auth = { access: "raw", metadata: { kind: "metadata" } }
+  assert.equal(credentialKindOf(auth, { kind: "cached" }, detector), "cached")
+  assert.equal(calls, 0)
+})
+
+test("credentialKindOf 其次使用 metadata.kind，仍不调用 shape detector", () => {
+  let calls = 0
+  const detector = () => {
+    calls += 1
+    return "shape"
+  }
+  assert.equal(credentialKindOf({ metadata: { kind: "metadata" } }, null, detector), "metadata")
+  assert.equal(calls, 0)
+})
+
+test("credentialKindOf 最后调用厂商 shape detector，并兼容两种返回形状", () => {
+  const seen = []
+  assert.equal(credentialKindOf({ access: " raw " }, null, (raw) => {
+    seen.push(raw)
+    return "key"
+  }), "key")
+  assert.equal(credentialKindOf({ access: "raw" }, {}, () => ({ kind: "cookie", shape: {} })), "cookie")
+  assert.deepEqual(seen, ["raw"])
+})
+
+test("credentialKindOf 对无探测器或空探测结果返回 unknown", () => {
+  assert.equal(credentialKindOf({ access: "raw" }), "unknown")
+  assert.equal(credentialKindOf({ access: "raw" }, null, () => "unknown"), "unknown")
+  assert.equal(credentialKindOf({ access: "raw" }, null, () => ({ kind: "" })), "unknown")
+  assert.equal(credentialKindOf({ access: "raw" }, null, () => null), "unknown")
+})
+
+test("uidOf 按 record.userId → metadata.userId → auth.uid 选择身份", () => {
+  const auth = {
+    access: "raw-token",
+    uid: "auth-uid",
+    metadata: { userId: "metadata-user" },
+  }
+  assert.equal(uidOf(auth, { userId: "record-user" }), "record-user")
+  assert.equal(uidOf(auth), "metadata-user")
+  assert.equal(uidOf({ access: "raw-token", uid: "auth-uid", metadata: {} }), "auth-uid")
+})
+
+test("uidOf 回退到凭据指纹，空凭据返回空串且不泄漏 token", () => {
+  const raw = "super-secret-raw-token"
+  const uid = uidOf({ access: raw })
+  assert.equal(uid, fingerprint(raw))
+  assert.match(uid, /^[0-9a-f]{12}$/)
+  assert.equal(uid.includes(raw), false)
+  assert.equal(uidOf({}), "")
+  assert.equal(uidOf(), "")
+})

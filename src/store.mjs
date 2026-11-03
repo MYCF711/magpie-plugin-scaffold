@@ -18,8 +18,9 @@
 //   或者只存「是否已失效」这类派生事实。
 
 import { readFileSync, writeFileSync, mkdirSync, renameSync, rmSync, readdirSync } from "node:fs"
+import { randomUUID } from "node:crypto"
 import { homedir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 
 /** 插件前缀 —— 派生仓库改成自己的包名短名，避免和别人撞文件 */
 const PREFIX = "plugin-store"
@@ -52,17 +53,44 @@ export function readJson(file, fallback = null) {
 /**
  * 原子写。**必须走这条** —— 直接 `writeFileSync` 写到一半被关机，
  * 下次启动读到半截 JSON，`JSON.parse` 抛错，然后整个钩子炸掉。
- * 先写 `.tmp` 再 `rename`，rename 在同一分区上是原子的。
+ * 临时文件与目标同目录、同分区，进程号加随机值避免并发写互相覆盖；
+ * 写完后 rename 原子替换，失败时清理临时文件并保留旧文件。
  */
 export function writeJson(file, value) {
+  let tmp = null
   try {
-    mkdirSync(cacheDir(), { recursive: true })
-    const tmp = `${file}.tmp`
-    writeFileSync(tmp, JSON.stringify(value))
+    mkdirSync(dirname(file), { recursive: true, mode: 0o700 })
+    tmp = `${file}.${process.pid}.${randomUUID()}.tmp`
+    writeFileSync(tmp, JSON.stringify(value), { mode: 0o600, flag: "wx" })
     renameSync(tmp, file)
     return true
   } catch {
+    if (tmp) {
+      try {
+        rmSync(tmp, { force: true })
+      } catch {
+        // 清理失败不改变原写入结果，也不影响主流程
+      }
+    }
     return false // 缓存写不进去不该影响主流程
+  }
+}
+
+/** 按指定时区生成日期与时间；非法时区由 Intl 明确抛出 RangeError。 */
+export function calendar(now, timeZone) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now).map((part) => [part.type, part.value]))
+  return {
+    day: `${parts.year}-${parts.month}-${parts.day}`,
+    time: `${parts.hour}:${parts.minute}`,
+    hour: Number(parts.hour),
   }
 }
 

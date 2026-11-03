@@ -239,6 +239,127 @@ test("foldOpenAI：纯文本且没有 finish_reason → 缺省 stop", async () =
   assert.equal(completion.usage, undefined)
 })
 
+test("foldOpenAI：tool_call 的 id / 参数先于名字仍按 index 合并", async () => {
+  const completion = await foldOpenAI([
+    {
+      choices: [
+        {
+          index: 0,
+          delta: { tool_calls: [{ index: 0, id: "call_early", function: { arguments: '{"city":"' } }] },
+        },
+      ],
+    },
+    {
+      choices: [
+        {
+          index: 0,
+          delta: { tool_calls: [{ index: 0, function: { name: "get_weather", arguments: '杭州"}' } }] },
+        },
+      ],
+    },
+  ])
+  assert.deepEqual(completion.choices[0].message.tool_calls, [
+    { id: "call_early", type: "function", function: { name: "get_weather", arguments: '{"city":"杭州"}' } },
+  ])
+  assert.equal(completion.choices[0].finish_reason, "tool_calls")
+})
+
+test("foldOpenAI：整轮只有无名调用时抛 502，usage 不算答案", async () => {
+  await assert.rejects(
+    () =>
+      foldOpenAI([
+        {
+          choices: [
+            {
+              index: 0,
+              delta: {
+                tool_calls: [
+                  { index: 0, id: "call_nameless", function: { arguments: "{}" } },
+                  { index: 1, id: "call_blank", function: { name: "   ", arguments: "{}" } },
+                ],
+              },
+              finish_reason: "tool_calls",
+            },
+          ],
+        },
+        { choices: [], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } },
+      ]),
+    (error) => {
+      assert.ok(error instanceof Error)
+      assert.equal(error.status, 502)
+      assert.equal(error.code, "upstream_error")
+      assert.equal(error.nameless, true)
+      return true
+    },
+  )
+})
+
+test("foldOpenAI：文本加无名调用保留文本并改为 stop，原始 length 不变", async () => {
+  const events = [
+    { choices: [{ index: 0, delta: { content: "保留这段答案" } }] },
+    {
+      choices: [
+        {
+          index: 0,
+          delta: { tool_calls: [{ index: 0, id: "call_nameless", function: { arguments: "{}" } }] },
+          finish_reason: "tool_calls",
+        },
+      ],
+    },
+  ]
+  const completion = await foldOpenAI(events)
+  assert.equal(completion.choices[0].message.content, "保留这段答案")
+  assert.equal(completion.choices[0].message.tool_calls, undefined)
+  assert.equal(completion.choices[0].finish_reason, "stop")
+
+  const lengthCompletion = await foldOpenAI([
+    events[0],
+    { choices: [{ index: 0, delta: events[1].choices[0].delta, finish_reason: "length" }] },
+  ])
+  assert.equal(lengthCompletion.choices[0].finish_reason, "length")
+})
+
+test("foldOpenAI：有效调用加无名调用只保留有效调用", async () => {
+  const completion = await foldOpenAI([
+    {
+      choices: [
+        {
+          index: 0,
+          delta: {
+            tool_calls: [
+              { index: 0, id: "call_valid", function: { name: "get_weather", arguments: "{}" } },
+              { index: 1, id: "call_nameless", function: { arguments: '{"lost":true}' } },
+            ],
+          },
+          finish_reason: "tool_calls",
+        },
+      ],
+    },
+  ])
+  assert.deepEqual(completion.choices[0].message.tool_calls, [
+    { id: "call_valid", type: "function", function: { name: "get_weather", arguments: "{}" } },
+  ])
+  assert.equal(completion.choices[0].finish_reason, "tool_calls")
+})
+
+test("foldOpenAI：只有 reasoning 加无名调用不抛错", async () => {
+  const completion = await foldOpenAI([
+    { choices: [{ index: 0, delta: { reasoning_content: "保留推理过程" } }] },
+    {
+      choices: [
+        {
+          index: 0,
+          delta: { tool_calls: [{ index: 0, id: "call_nameless", function: { arguments: "{}" } }] },
+          finish_reason: "tool_calls",
+        },
+      ],
+    },
+  ])
+  assert.equal(completion.choices[0].message.reasoning_content, "保留推理过程")
+  assert.equal(completion.choices[0].message.tool_calls, undefined)
+  assert.equal(completion.choices[0].finish_reason, "stop")
+})
+
 test("foldOpenAI：接受 openAIEvents 异步生成器；usage 帧 choices 为空也能保留", async () => {
   const text =
     'data: {"id":"chatcmpl-2","model":"m","choices":[{"index":0,"delta":{"content":"ok"}}]}\n\n' +

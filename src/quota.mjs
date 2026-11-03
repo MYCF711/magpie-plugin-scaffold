@@ -39,9 +39,15 @@ export class QuotaShapeError extends Error {
 }
 
 const TIME_KEYS = ["resetsAt", "runsOutAt", "until"]
+const OFFSET_PATTERN = /^[+-](?:[01]\d|2[0-3]):[0-5]\d$/
+const ZONELESS_DATE_PATTERN = /^(\d{4})[-/](\d{2})[-/](\d{2})[ T](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/
 
-/** 把厂商给的时间（ISO / 秒 / 毫秒时间戳 / Date）统一成 ISO 字符串。解析不了就抛。 */
-export function toIso(value, field = "time") {
+/** 把厂商给的时间（ISO / 秒 / 毫秒时间戳 / Date）统一成 ISO 字符串。解析不了就抛。
+ *  显式 offset 只用于无 zone 的日期时间；自带 Z / offset 的 ISO 始终保留自己的时区。 */
+export function toIso(value, field = "time", { offset } = {}) {
+  if (offset !== undefined && (typeof offset !== "string" || !OFFSET_PATTERN.test(offset))) {
+    throw new QuotaShapeError(`${field}: offset 必须是 +08:00 / -05:30 这样的 ±HH:mm，收到 ${offset}`)
+  }
   if (value == null) return undefined
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime())) throw new QuotaShapeError(`${field}: 无效的 Date`)
@@ -55,11 +61,37 @@ export function toIso(value, field = "time") {
     return d.toISOString()
   }
   const s = String(value).trim()
+  if (offset !== undefined) {
+    const m = s.match(ZONELESS_DATE_PATTERN)
+    if (m) {
+      // 不能先 Date.parse：无 zone 的字符串会被宿主本地时区吃掉。先校验真实日历，再拼上指定偏移。
+      const year = Number(m[1])
+      const month = Number(m[2])
+      const day = Number(m[3])
+      const hour = Number(m[4])
+      const minute = Number(m[5])
+      const second = Number(m[6] ?? 0)
+      const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
+      const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+      const valid = month >= 1 && month <= 12 && day >= 1 && day <= (days[month - 1] ?? 0) &&
+        hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59 && second >= 0 && second <= 59
+      if (!valid) throw new QuotaShapeError(`${field}: "${s}" 不是有效日期`)
+      const fraction = m[7] ? `.${m[7]}` : ""
+      const d = new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6] ?? "00"}${fraction}${offset}`)
+      if (Number.isNaN(d.getTime())) throw new QuotaShapeError(`${field}: "${s}" 不是有效日期`)
+      return d.toISOString()
+    }
+    const hasDateTimePrefix = /^\d{4}[-/]\d{2}[-/]\d{2}[ T]\d{2}:\d{2}/.test(s)
+    const hasOwnZone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(s)
+    // V8 会宽松吞掉某些尾部垃圾；看似无 zone 日期时间但匹配不完整时不能交给它猜。
+    if (hasDateTimePrefix && !hasOwnZone) throw new QuotaShapeError(`${field}: "${s}" 不是有效日期`)
+  }
   // 先原样试（ISO），再试「2026-10-28 23:59:59」这种厂商原样格式
   const direct = Date.parse(s)
   if (!Number.isNaN(direct)) return new Date(direct).toISOString()
   const m = s.match(/^(\d{4})[-/](\d{2})[-/](\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/)
-  if (m) {
+  // 显式 offset 时不走这个宽松补解析，避免畸形尾部又落回宿主本地时区。
+  if (offset === undefined && m) {
     const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6] ?? 0))
     if (!Number.isNaN(d.getTime())) return d.toISOString()
   }

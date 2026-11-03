@@ -54,6 +54,7 @@
 import { usage as buildUsage, usageWindow } from "./src/quota.mjs"
 import { createRefreshLock } from "./src/refresh-lock.mjs"
 import { createUsageCache } from "./src/usage-cache.mjs"
+import { rewriteRefusal } from "./src/status.mjs"
 
 // ── 配置 ──────────────────────────────────────────────────────────────
 
@@ -127,6 +128,8 @@ export const XxxAuthPlugin = async (_ctx, _options) => {
   // 同一 refresh_token 的并发续期合并成一次，成功后 60 秒内回放结果。
   // 键必须是凭据身份（refresh_token），不能用 provider id —— 同渠道多账号会串结果。
   const refreshLock = createRefreshLock({ replayMs: 60_000 })
+  // 登录补任务与每日签到可能同时触发；同账号共享同一 Promise，不回放成功结果。
+  const checkinLock = createRefreshLock({ replayMs: 0 })
 
   // 额度卡片会被频繁刷新：成功 60 秒、失败 5 秒，同 key 并发合并。
   // key 用凭据身份，不能用 provider id —— 同渠道多账号会串额度。
@@ -319,7 +322,7 @@ export const XxxAuthPlugin = async (_ctx, _options) => {
           for (const [k, v] of incoming) {
             const lower = k.toLowerCase()
             // 这几个必须由我们决定
-            if (["authorization", "host", "content-length", "user-agent"].includes(lower)) continue
+            if (["authorization", "x-api-key", "x-goog-api-key", "host", "content-length", "user-agent"].includes(lower)) continue
             headers[k] = v
           }
 
@@ -342,7 +345,8 @@ export const XxxAuthPlugin = async (_ctx, _options) => {
           // 这个 401 是别的事 → X-Magpie-Sign-In: kept
           // 已续期 → X-Magpie-Sign-In: renewed
 
-          return res
+          // 只分类 400/422 的明确余额/渠道/模型/限流错误；SSE 与其它响应原样返回。
+          return rewriteRefusal(res)
         },
       }
     },
@@ -372,7 +376,7 @@ export const XxxAuthPlugin = async (_ctx, _options) => {
 
       let u
       try {
-        u = await usageCache.read(String(usageKey), () => fetchUsage(auth)) // TODO
+        u = await usageCache.readSWR(String(usageKey), () => fetchUsage(auth), { timeoutMs: 10_000 }) // TODO
       } catch (e) {
         // 上游失败 → 让卡片显示原因。抛出去 magpie 只会记成「读取失败」，用户看不到原因。
         return { error: String(e?.message ?? e), windows: [] }
@@ -438,37 +442,41 @@ export const XxxAuthPlugin = async (_ctx, _options) => {
       const auth = await getAuth()
       if (!auth) return { outcome: "failed", message: "未登录" }
 
-      try {
-        const r = await doCheckin(auth) // TODO
+      const account = auth.uid || auth.accountId || auth.refresh || auth.access || auth.key || "anonymous"
+      const key = `${provider?.id || PROVIDER}\n${account}`
+      return checkinLock.run(key, async () => {
+        try {
+          const r = await doCheckin(auth) // TODO
 
-        // 厂商没有签到功能
-        if (!r.supported) {
-          return { outcome: "inactive", message: `${PROVIDER_NAME} 无每日签到` }
-        }
-
-        // 今天已经签过
-        if (r.alreadyToday) {
-          return { outcome: "done", message: "今天已签到", streak: r.streakDays }
-        }
-
-        // 厂商要验证码 —— 永远不要去解
-        if (r.needsCaptcha) {
-          return {
-            outcome: "captcha",
-            message: "厂商要求验证码，请到官方 App 里手动签到",
+          // 厂商没有签到功能
+          if (!r.supported) {
+            return { outcome: "inactive", message: `${PROVIDER_NAME} 无每日签到` }
           }
-        }
 
-        // 刚签到成功
-        return {
-          outcome: "claimed",
-          credit: r.credit,
-          streak: r.streakDays,
-          message: r.message,
+          // 今天已经签过
+          if (r.alreadyToday) {
+            return { outcome: "done", message: "今天已签到", streak: r.streakDays }
+          }
+
+          // 厂商要验证码 —— 永远不要去解
+          if (r.needsCaptcha) {
+            return {
+              outcome: "captcha",
+              message: "厂商要求验证码，请到官方 App 里手动签到",
+            }
+          }
+
+          // 刚签到成功
+          return {
+            outcome: "claimed",
+            credit: r.credit,
+            streak: r.streakDays,
+            message: r.message,
+          }
+        } catch (e) {
+          return { outcome: "failed", message: String(e?.message ?? e) }
         }
-      } catch (e) {
-        return { outcome: "failed", message: String(e?.message ?? e) }
-      }
+      })
     },
   },
 

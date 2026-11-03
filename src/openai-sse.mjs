@@ -369,7 +369,21 @@ export async function foldOpenAI(events, { id, model } = {}) {
     }
   }
 
-  const sortedCalls = [...calls.entries()].sort(([a], [b]) => a - b).map(([, value]) => value)
+  const allCalls = [...calls.entries()].sort(([a], [b]) => a - b).map(([, value]) => value)
+  // id / arguments 可以先到并留在原槽位；只有流结束时仍无有效名字的调用才丢弃。
+  const sortedCalls = allCalls.filter((call) => call.function.name.trim() !== "")
+  const nameless = allCalls.length - sortedCalls.length
+  const hasContent = content.join("").length > 0
+  const hasReasoning = reasoning.join("").length > 0
+  if (nameless > 0 && !hasContent && !hasReasoning && sortedCalls.length === 0) {
+    // usage 只是计量信息，不能让一整轮没有答案的响应被当成成功。
+    const error = new Error("上游工具调用缺少有效的 function.name，且整轮没有其它答案")
+    error.status = 502
+    error.code = "upstream_error"
+    error.nameless = true
+    throw error
+  }
+
   const message = {
     role: "assistant",
     content: content.length > 0 ? content.join("") : sortedCalls.length > 0 ? null : "",
@@ -386,7 +400,12 @@ export async function foldOpenAI(events, { id, model } = {}) {
       {
         index: 0,
         message,
-        finish_reason: finish ?? (sortedCalls.length > 0 ? "tool_calls" : "stop"),
+        finish_reason:
+          nameless > 0 && sortedCalls.length === 0
+            ? finish === "length"
+              ? "length"
+              : "stop"
+            : finish ?? (sortedCalls.length > 0 ? "tool_calls" : "stop"),
       },
     ],
   }

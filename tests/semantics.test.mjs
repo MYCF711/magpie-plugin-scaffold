@@ -15,7 +15,7 @@ import assert from "node:assert/strict"
 import { buildModels, priceOf, isUsable, defaultEntry } from "../src/models.mjs"
 import { ApiError, asModelError, read } from "../src/api.mjs"
 import { withUsage, singleShotToSSE, normalizeUsage } from "../src/chat.mjs"
-import { usage, usageWindow } from "../src/quota.mjs"
+import { QuotaShapeError, toIso, usage, usageWindow } from "../src/quota.mjs"
 
 // 在测试里显式写出来：倍率系数是实测值，改了必须连测试一起改
 const MULT_BASE = 2000
@@ -200,6 +200,40 @@ test("quota: 厂商原样时间 / 秒级时间戳 → 统一成 ISO", () => {
   assert.equal(usageWindow({ name: "a", used: 1, resetsAt: "2026-10-28 23:59:59" }).resetsAt, new Date(2026, 9, 28, 23, 59, 59).toISOString())
   assert.equal(usageWindow({ name: "a", used: 1, resetsAt: 1793000000 }).resetsAt, new Date(1793000000 * 1000).toISOString())
   assert.throws(() => usageWindow({ name: "a", used: 1, resetsAt: "昨天" }), /无法解析/)
+})
+
+test("quota: 显式 offset 让无 zone 日期得到确定 instant，负偏移也生效", () => {
+  const input = "2026-10-28 23:59:59"
+  assert.equal(toIso(input, "time", { offset: "+08:00" }), "2026-10-28T15:59:59.000Z")
+  assert.equal(toIso(input, "time", { offset: "-05:30" }), "2026-10-29T05:29:59.000Z")
+  assert.equal(toIso("2026/10/28T23:59", "time", { offset: "+08:00" }), "2026-10-28T15:59:00.000Z")
+  // 不传 offset 时仍按原来的宿主本地时间解析
+  assert.equal(toIso(input), new Date(2026, 9, 28, 23, 59, 59).toISOString())
+})
+
+test("quota: 自带 Z / offset 的 ISO 不被显式 offset 覆盖", () => {
+  assert.equal(toIso("2026-10-28T23:59:59Z", "time", { offset: "+08:00" }), "2026-10-28T23:59:59.000Z")
+  assert.equal(toIso("2026-10-28T23:59:59+09:30", "time", { offset: "-05:30" }), "2026-10-28T14:29:59.000Z")
+  assert.equal(toIso("2026-10-28T23:59:59+0930", "time", { offset: "+08:00" }), "2026-10-28T14:29:59.000Z")
+})
+
+test("quota: 秒 / 毫秒时间戳不受 offset 影响", () => {
+  const ms = 1793000000000
+  assert.equal(toIso(ms / 1000, "time", { offset: "+08:00" }), new Date(ms).toISOString())
+  assert.equal(toIso(ms, "time", { offset: "-05:30" }), new Date(ms).toISOString())
+})
+
+test("quota: 非法 offset / 日期 / 空串抛 QuotaShapeError，null 仍表示未提供", () => {
+  for (const offset of ["+8:00", "08:00", "+24:00", "+08:60", "UTC", "", null]) {
+    assert.throws(() => toIso("2026-10-28 23:59:59", "time", { offset }), QuotaShapeError)
+  }
+  for (const input of ["2026-02-30 12:00:00", "2026-13-01 12:00:00", "2026-10-28 24:00:00", "2026-10-28 23:60:00", "2026-10-28 23:59:60", "2026-10-28 23:59:59 junk"]) {
+    assert.throws(() => toIso(input, "time", { offset: "+08:00" }), QuotaShapeError)
+  }
+  assert.throws(() => toIso("", "time", { offset: "+08:00" }), QuotaShapeError)
+  assert.throws(() => toIso("   ", "time", { offset: "+08:00" }), QuotaShapeError)
+  assert.equal(toIso(null, "time", { offset: "+08:00" }), undefined)
+  assert.equal(toIso(undefined, "time", { offset: "+08:00" }), undefined)
 })
 
 test("quota: 钱包型（balance）不能再给 used / amount / limit", () => {

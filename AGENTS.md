@@ -63,7 +63,7 @@ PR 是 GitHub 对受保护分支的技术要求（直推报 `GH006`），批准�
 |---|---|---|---|
 | 16 | 加了第二个账号，第一个账号的数据变了 / 串号 | 一切按账号落盘的东西，文件名必须带账号（`<plugin>-<siteId>__<account>.json`）；**不要用模块级变量存 per-account 状态** —— 宿主是同一个进程跑所有账号 | [`src/hooks/models.mjs`](HOOKS.md) 的 `inScope` |
 | 17 | 接口抖一下，列表整个空掉；或某个模型缺价格，用户选了报错 | **部分成功有三态**，方向要各自选对：① 整个接口失败 → 退回上次快照（不要返回空表）② 接口成功但单条缺字段 → **不列**（不猜）③ 登录失效 → 抛 `signIn: "expired"` | [`src/models.mjs`](./src/models.mjs) 的 `buildModels` |
-| 18 | 越改越乱，`index.mjs` 涨到几百行，改一个钩子要读全篇 | 成熟形态是**`index.mjs` 只做九项钩子的装配，实现全在 `src/`**。实测四个真实插件的 `index.mjs` 是 80~715 行，而 `src/` 是 1.4k~3.7k 行 —— 本模板现在是 index 558 行 / `src/` 21 文件 3,900+ 行（已不是「单文件 78 行」） | 本文件「五、长大之后」 |
+| 18 | 越改越乱，`index.mjs` 涨到几百行，改一个钩子要读全篇 | 成熟形态是**`index.mjs` 只做九项钩子的装配，实现全在 `src/`**。实测四个真实插件的 `index.mjs` 是 80~715 行，而 `src/` 是 1.4k~3.7k 行 —— 本模板现在是 index 567 行 / `src/` 27 文件 5,071 行（已不是「单文件 78 行」） | 本文件「五、长大之后」 |
 
 还有两条是 **magpie 0.1.1763 重新提取契约后才发现**的（2026-10-28）：
 
@@ -80,6 +80,12 @@ PR 是 GitHub 对受保护分支的技术要求（直推报 `GH006`），批准�
 | 27 | **卡片上的账号名是一串看不懂的 ID**（`iam::01a1642a…:user:hw0615…`、`urn:…`、uuid），用户以为是「显示乱码」 | `accountId` 是**名字**，不是身份：手机号（`maskPhone` 对去掉国家码后 ≥11 位的号码打码 `138****8000`；短号返回空串不显示）→ 昵称/邮箱 → **空串**（宿主回退供应商名）。内部 ID 只进 `uid`。**URN 写进 `accountId` 极难改回** —— 续期返回值是合并、插件落盘又多保留旧值，所以续期路径也要重算一遍 | HOOKS 八的「`accountId` 是名字，`uid` 是身份」· `src/account-name.mjs` 的 `resolveAccount` |
 | 28 | 卡片标题写 `华为云 HUAWEI` 之后，`magpie plugin update` 报 `unrecognised dependency format: 华为云 HUAWEI` | `package.json.name` 同时是 bun 依赖键，**必须是 slug、不能有空格**；显示名写 `package.json.magpie.name`（可带空格），provider/registry 同步。旧安装按 UPDATING 的「旧版带空格依赖键」改键 + 目录 + lock，不用 rm+add | README「包名是 slug；显示名写 magpie.name」· UPDATING 迁移 |
 | 29 | 仓库里写了真手机号 / 邮箱 / 本机路径，把那次提交删掉就以为没事了 | **历史里那份还在**：`git log -p`、下载任意旧 commit 都能看到。提交前跑 `node scripts/privacy-scan.mjs`（0 = 干净）；已经 push 过的要 `git filter-repo --replace-text` 重写全部历史再强推，作者邮箱顺手换 `…@users.noreply.github.com`（`git log` 会聚合作者，真邮箱=公开 QQ 号/手机号）。**改前改后 `git rev-parse HEAD^{tree}` 必须一致** —— 一致才说明「用户装到的东西没变」，只是 SHA 变了 | 本文件「八、脱敏」 |
+| 30 | 登录后额度正常、模型通道却空；或两种登录方式互相串凭据 | 凭据种类只按 **运行时缓存 → `metadata.kind` → 形状探测** 判断，不按 `auth.type` 猜；uid 取不到厂商 id 时用凭据指纹，不把 token 当账号名 | `src/credential.mjs` · `tests/credential.test.mjs` |
+| 31 | 非流折叠后出现 `function.name: ""`，客户端保存了不可调用的工具 | 参数/id 可先到，但流末仍无名的 tool_call 必须丢弃；若整轮只有它就抛 `status=502 / nameless=true`，有文本或命名调用则保留原答案 | `src/openai-sse.mjs` · `tests/openai-sse.test.mjs` |
+| 32 | 空闲超时后下一段首块消失；或额度接口一抖卡片就没数 | reader 超时只摘等待者，在飞块入队；usage 用 SWR 返回旧成功值并后台单飞，无旧值才做有界等待 | `src/stream-reader.mjs` · `src/usage-cache.mjs` |
+| 33 | 同一条厂商时间在 CI 与本地差 8 小时 | 无 zone 时间先给显式 `offset` 再转 ISO；不能让 `Date.parse` 先按宿主本地时区吃掉；自带 Z/offset 不覆盖 | `src/quota.mjs` 的 `toIso` · `tests/semantics.test.mjs` |
+| 34 | 登录补任务和每日签到撞在一起，重复领奖或重复上报 | 同账号 single-flight 共享同一 Promise，`replayMs:0` 不回放成功；签到上报用前后账单差集，缺 before 时保守 `done` | `index.mjs` · `src/checkin.mjs` |
+| 35 | live 新模型继承了第一个模型的 1M 窗口/看图能力，或静态表把无权限模型补回来 | 只按相同 id 合并静态元数据；未知模型不猜，目录失败才回快照，live 缺项不补回 | `src/models.mjs` · `tests/models-adapters.test.mjs` |
 
 ---
 
@@ -169,7 +175,7 @@ node scripts/probe-vision.mjs <provider/model> …
 
 | 仓库 | `index.mjs` | `src/` | `tests/` |
 |---|---|---|---|
-| 本模板 | 558 行 | 20 文件 / 3,716 行 | 16 |
+| 本模板 | 567 行 | 27 文件 / 5,071 行 | 26 |
 | `magpie-magicrew-auth` | **86** | 27 文件 / 7,773 行 | 17 |
 | `magpie-officeace` | 383 | 8 文件 / 1,566 行 | 2 |
 | `magpie-loomy-auth` | 611 | 9 文件 / 1,905 行 | 4 |
@@ -177,22 +183,28 @@ node scripts/probe-vision.mjs <provider/model> …
 
 结论：**`index.mjs` 只做装配，实现全在 `src/`** —— 最成熟的那个（magicrew）index 只有 86 行。
 
-已经备好 21 个 `src/` 模块（前四块四个插件里 4/4 都有；`store` 只有 magicrew 独立成文件，
-另两个各自实现了等价逻辑；其余是 2026-10-29～30 从 magicrew / 社区 MIT 包抽出的通用协议）：
+已经备好 27 个 `src/` 模块（前四块四个插件里 4/4 都有；其余来自社区与当前真实启用插件的择优回收，
+2026-11-03 的 17 项启用清单、哈希对照与排除边界见 [RECYCLING.md](./RECYCLING.md)）：
 
 | 文件 | 里面写什么 | 为什么单独拎出来 |
 |---|---|---|
+| [`src/http.mjs`](./src/http.mjs) | `CODES` / `errorResponse` / `errorText` / `retryAfter` / `isLoginBroken` | 统一错误出口与保守登录失效判定；401 模型错误、403 权限/WAF 不杀账号 |
+| [`src/status.mjs`](./src/status.mjs) | `classifyRefusal` / `rewriteRefusal` / `upstreamText` | 只读 400/422 clone；余额/渠道/模型/限流才改写，SSE 与 schema 错误原样放行 |
+| [`src/credential.mjs`](./src/credential.mjs) | `rawCredentialOf` / `fingerprint` / `credentialKindOf` / `uidOf` | 凭据种类只看 cached → metadata → shape；厂商 shape/API 注入，不进通用层 |
+| [`src/oauth-device.mjs`](./src/oauth-device.mjs) | `requestDeviceCode` / `pollDeviceToken` / `refreshAccessToken` | RFC 8628 标准设备码状态机；slow_down +5 秒、总 deadline、abort、刷新不误判失效 |
+| [`src/checkin.mjs`](./src/checkin.mjs) | `billKey` / `isPositiveGrant` / `reconcileCheckin` | 前后账单差集区分 claimed/done；缺 before 保守，不重复计算一次性奖励 |
+| [`src/stream-reader.mjs`](./src/stream-reader.mjs) | `createStreamReader` / `read` / `cancel` | 空闲超时不取消在飞 read、不丢迟到块；done/error 重放且只在有等待者时拉取 |
 | [`src/refresh-lock.mjs`](./src/refresh-lock.mjs) | `createRefreshLock` / `run` / `clear` / `sweep` | 一次性 refresh_token 的并发闸：同 key 合并、成功回放 60 秒、失败可重试；键必须是凭据身份 |
 | [`src/oauth-pkce.mjs`](./src/oauth-pkce.mjs) | `generatePkce` / `randomState` / `startLoopback` | OAuth PKCE S256 + 127.0.0.1 loopback：state/Host 校验、错误 path 404 不结束、错误 state 400 可重试、超时/abort/close |
 | [`src/model-context.mjs`](./src/model-context.mjs) | `createModelContext` / `contextOf` / `clear` / `size` | 查 `~/.cache/magpie/models.json` 的真实上下文；查不到返回 fallback / undefined，不猜 |
 | [`src/openai-sse.mjs`](./src/openai-sse.mjs) | `parseSse` / `readSseEvents` / `openAIEvents` / `foldOpenAI` | SSE 帧解析 + 非流折叠；CRLF / 多行 data / BOM / UTF-8 跨块 / 32 MiB / tool_calls 分片 / usage 帧 |
-| [`src/usage-cache.mjs`](./src/usage-cache.mjs) | `createUsageCache` / `read` / `clear` / `publicUsage` / `exhausted` | 额度卡片频繁刷新：成功 60 秒 / 失败 5 秒、同 key 并发合并；无读数时 `exhausted` 必须放行 |
+| [`src/usage-cache.mjs`](./src/usage-cache.mjs) | `createUsageCache` / `read` / `readSWR` / `publicUsage` / `exhausted` | 成功 60 秒 / 失败 5 秒；stale 立即返回 + 后台单飞，无旧值有界等待；无读数时 `exhausted` 放行 |
 | [`src/request-rewrite.mjs`](./src/request-rewrite.mjs) | `rewriteJsonBody` / `ensureStreamUsage` / `clampMaxTokens` / `stripModelPrefix` / `stripHopHeaders` | identity 快路径；改 body 后必须去掉 `content-length` / `content-encoding`；工具 schema 不动 |
 | [`src/tool-schema.mjs`](./src/tool-schema.mjs) | `truncateToolName` / `truncateToolNames` / `loosenToolSchema` / `adaptToolList` / `rewriteToolSchema` / `createToolSchemaAdapter` | 工具名超长截断（保持唯一）+ 工具 schema 兼容改写（`additionalProperties` 非布尔→`true`、删 `items:{}`、`items` 子树摊平且不留空 `{}`）；**默认关闭、只作显式 adapter** —— 会放宽用户 schema，与 `request-rewrite.mjs` 的「工具 schema 绝不改」是两套取舍，别同时挂 |
 | [`src/api.mjs`](./src/api.mjs) | `headersFor` / `read` / `get` / `asModelError` / `asSignInExpired` | 错误语义只在一处定义 —— 401 与 404 混用会打死整个账号 |
-| [`src/models.mjs`](./src/models.mjs) | `isUsable` / `priceOf` / `buildModels` / `defaultEntry` | 三态降级 + `free` 三分支，错法都长得像「正常」 |
+| [`src/models.mjs`](./src/models.mjs) | `buildModels` / `assignSlugs` / `upstreamModelId` / `mergeModelMetadata` | 三态降级 + slug/code 映射；只按同 id 继承元数据，未知模型不猜、不补回权限表 |
 | [`src/chat.mjs`](./src/chat.mjs) | `passThrough` / `withUsage` / `singleShotToSSE` / `normalizeUsage` | 流式三坑：读干流、漏 `include_usage`、`stream:false` 不被接受 |
-| [`src/store.mjs`](./src/store.mjs) | `fileOf` / `readJson` / `writeJson` + 快照 / 登录态 / 一次性标记三件套 | 只写 `~/.cache/magpie`、文件名带账号、原子写、可整目录删 |
+| [`src/store.mjs`](./src/store.mjs) | `fileOf` / `readJson` / `writeJson` / `calendar` + 快照 / 登录态 / 标记 | 只写 `~/.cache/magpie`；独立临时名 + 0600/0700 + 原子替换；日键按厂商时区 |
 | [`src/quota.mjs`](./src/quota.mjs) | `usageWindow` / `usage` / `toIso` / `QuotaShapeError` | **把「写错不报错、但 GUI 和智能路由会坏」的五类窗口写法变成运行时错误** —— 见下方的表 |
 | [`src/invite.mjs`](./src/invite.mjs) | `createInviteStore` / `inviteHint` / `resolveInvite` / `makeInviteMethod` | 邀请码只能在登录 URL 上带、事后补不了；而 `prompts` 是静态数组，串不起「填码 → 主登录」—— 只有 `ask()` 能 |
 | [`src/desktop-import.mjs`](./src/desktop-import.mjs) | `hasDesktopLogin` / `decryptChromiumV10` / `importDesktopLogin` | 厂商有桌面客户端时，这是**唯一不弹浏览器**的登录路；DPAPI + AES-GCM 的边界（v11/v20 解不开）必须写在代码里 |
@@ -235,6 +247,7 @@ node scripts/probe-vision.mjs <provider/model> …
 | 文件 | 管什么 | 什么时候读 |
 |---|---|---|
 | [GUIDE](./GUIDE.md) | **说明书主线**：30 分钟，拿模板 → 改身份 → config → auth → models → usage/checkin → 自检 → 打分 → 发布 | **第一次做插件时，从头读** |
+| [RECYCLING](./RECYCLING.md) | 真实启用插件清单、通用代码来源、已有模块哈希对照与回收/排除边界 | 要从另一个插件搬代码进模板时先读 |
 | [OFFICIAL-SOURCES](./OFFICIAL-SOURCES.md) | **官方 22 个锚点 → 本仓库的映射**；每条结论的官方出处 + 版本基线 + 我们补的 8 条 | 想知道「这条规矩官方有没有写」时 |
 | [SCORING](./SCORING.md) | 100 分怎么算、80 分卡在哪、`node scripts/score.mjs` | 交付前自评时 |
 | [README](./README.md) | 这个模板的设计原则：最小交付面、九项清单、三条铁律、常见坑 | 开工前 |

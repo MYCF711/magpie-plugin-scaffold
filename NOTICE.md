@@ -23,6 +23,14 @@
     refresh 单飞 + 60 秒回放（`src/refresh-lock.mjs`）
   - `packages/workbuddy`（https://github.com/magpie-community/plugins/tree/main/packages/workbuddy）：
     refresh 单飞 / 短回放结构（`src/refresh-lock.mjs`）
+  - `packages/qoder`：参数先于名字到达的 tool_call 缓冲，以及流末无名调用不向外发送的边界（`src/openai-sse.mjs`）
+  - `packages/raccoon`：签到前后账单按稳定 ID 求差、一次性奖励防双计（`src/checkin.mjs`）
+
+## sabercomo/magpie-workbuddy-plus
+
+- 仓库：https://github.com/sabercomo/magpie-workbuddy-plus
+- 许可：MIT
+- 吸收内容：Retry-After 秒数 / HTTP-date / 有界退避（`src/http.mjs`）；独立临时名、权限位与 `Intl` 时区日键（`src/store.mjs`）
 
 ## MYCF711 自有 MIT 插件
 
@@ -36,5 +44,17 @@
   - `src/oauth.mjs`：`beginOAuth` / PKCE S256 / 127.0.0.1 随机端口回调（`src/oauth-pkce.mjs`）
 - `magpie-loomy-auth` — https://github.com/MYCF711/magpie-loomy-auth
   - `tests/mount.test.mjs`：入口唯一函数导出 / 九钩子 / config / loader / usage 的挂载测试结构（`tests/mount.test.mjs`）
+  - live models 按相同 id 继承静态能力、未知模型不套用第一条的边界（`src/models.mjs`）
+- `magpie-cnb-auth` / `magpie-opc-auth`
+  - 公共 HTTP 外壳、异构错误文本与保守 401/403 判定（`src/http.mjs`）；凭据读取、指纹与种类优先级（`src/credential.mjs`）
+  - CNB 的 RFC 8628 设备码申请、轮询、slow_down 与刷新语义（`src/oauth-device.mjs`）
+- `magpie-trustoken-auth` — https://github.com/MYCF711/magpie-trustoken-auth
+  - 只读 400/422 clone 的错误分类与 Response 改写、响应头失效处理（`src/status.mjs`）
+- `magpie-intern-ai` — https://github.com/MYCF711/magpie-intern-ai
+  - 无 zone 的厂商时间按显式 offset 解析（`src/quota.mjs`）
+- `magpie-alysis-auth` — https://github.com/MYCF711/magpie-alysis-auth
+  - live models 的已知 / 未知条目分支与能力继承边界（`src/models.mjs`）
+- `magpie-wps-lingxi` — https://github.com/providers-aaaa/magpie-wps-lingxi（MIT，KevinFX-code and contributors）
+  - 空闲超时只摘除等待者、在飞数据块进入队列且 done/error 可重放（`src/stream-reader.mjs`）；usage 旧值立即返回并后台单飞刷新（`src/usage-cache.mjs`）
 
 以上项目的版权归各自作者所有，按 MIT 许可使用。本项目自身同样以 MIT 许可发布，完整许可正文见 `LICENSE`。
