@@ -149,6 +149,7 @@ CI 在功能分支与 PR 上跑合规、语义测试和 `npm pack --dry-run`（`
 ## 目录
 
 - [说明书主线](./GUIDE.md) —— **30 分钟，从官方指导文件到 80 分插件；第一次做插件从这份开始**
+- [在用插件回收记录](./RECYCLING.md) —— **17 个真实启用项、通用代码来源与择优/排除边界**
 - [官方引用索引](./OFFICIAL-SOURCES.md) —— **官方 22 个锚点逐条映射到本仓库；每条结论都能追到官方原文和版本**
 - [80 分评分卡](./SCORING.md) —— **100 分怎么算、80 分卡在哪、`node scripts/score.mjs` 一条命令跑出来**
 - [给 AI 的入口](./AGENTS.md) —— **按「你在哪一步」给阅读顺序，外加十几条静默出错的坑（症状→判据→出处）**
@@ -279,11 +280,18 @@ package.json    → 版本、许可证、repository 链接（卡片上自动显�
 
 | 模块 | 解决什么 | 一个必须知道的实测 |
 |---|---|---|
+| [`src/http.mjs`](./src/http.mjs) | 公共请求头、OpenAI 错误 Response、异构错误摘要、保守 401/403 判定、Retry-After | 401 纯模型错误不杀账号；403 只有明确登录文本才算 expired；429 等待钳制在 1–60 秒 |
+| [`src/status.mjs`](./src/status.mjs) | 400/422 的余额 / 超时(504) / 暂不可用(503) / 渠道 / 模型 / 限流分类与安全改写 | 只读 clone；200/SSE 原对象返回且零 pull；schema 与上下文过长不换号 |
+| [`src/credential.mjs`](./src/credential.mjs) | 凭据读取、SHA-256 指纹、种类识别与 uid | 种类顺序 cached → metadata → shape；不要按 `auth.type` 猜 Cookie 还是 API Key |
+| [`src/oauth-device.mjs`](./src/oauth-device.mjs) | RFC 8628 设备码申请、轮询、刷新 | `slow_down` 后续间隔 +5 秒；总预算取 maxWait/expires_in 较小值；网络失败不冒充登录失效 |
+| [`src/checkin.mjs`](./src/checkin.mjs) | 签到前后账单差集对账、一次性奖励防双计 | 没有 before 快照时保守 `done`，不能把历史账单算成本次新奖励 |
+| [`src/stream-reader.mjs`](./src/stream-reader.mjs) | 通用 reader 的空闲超时、abort、结束/错误重放 | 超时只摘除等待者；在飞 `read()` 的数据块必须排队，不能丢首块 |
 | [`src/refresh-lock.mjs`](./src/refresh-lock.mjs) | 一次性 refresh_token 的并发闸：同 key 合并 in-flight、成功回放 60 秒、失败不缓存 | 键必须是**凭据身份**（refresh_token / account），不能用 provider id —— 否则同渠道多账号会共享一次刷新结果 |
 | [`src/oauth-pkce.mjs`](./src/oauth-pkce.mjs) | OAuth 2.0 PKCE（S256）+ 本机 127.0.0.1 loopback 回调 | state 必须恰好出现一次且匹配；错误 path 404、错误 state 400 都**不结束**等待；超时 / abort / close 必须 reject |
 | [`src/model-context.mjs`](./src/model-context.mjs) | 查 magpie 自己的 `~/.cache/magpie/models.json` 拿真实上下文窗口 | 查不到返回调用方 fallback，否则 `undefined` —— **不猜**；填 256K 而实际 1M 会让 agent 提前压缩 |
-| [`src/openai-sse.mjs`](./src/openai-sse.mjs) | OpenAI 兼容 SSE 解析 / 非流折叠：CRLF、多行 data、BOM、`[DONE]`、UTF-8 跨块、32 MiB 上限 | 只解析与折叠，不默认改写请求；`foldOpenAI` 合并 tool_calls 分片并保留 `choices: []` 的 usage 帧 |
-| [`src/usage-cache.mjs`](./src/usage-cache.mjs) | 按凭据 key 缓存 `usage()`：成功 60 秒 / 失败 5 秒、同 key 并发合并；`publicUsage` / `exhausted` | 失败缓存 60 秒会让用户点重试也没反应；无窗口/无余额读数时 `exhausted` 必须放行，不能把好号挡住 |
+| [`src/models.mjs`](./src/models.mjs) | 模型过滤/降级、稳定 slug ↔ 上行 code、同 id 静态元数据合并 | 未知模型不继承第一条能力，也不把静态权限表补回 live 列表 |
+| [`src/openai-sse.mjs`](./src/openai-sse.mjs) | OpenAI 兼容 SSE 解析 / 非流折叠：CRLF、多行 data、BOM、`[DONE]`、UTF-8 跨块、32 MiB 上限 | 合并 tool_calls 分片并保留 usage；流末仍无名的调用不向外发送，整轮只有它时给 502 |
+| [`src/usage-cache.mjs`](./src/usage-cache.mjs) | 按凭据 key 缓存 `usage()`：成功 60 秒 / 失败 5 秒、同 key 并发合并、stale-while-revalidate | 旧成功值可立即返回并后台单飞刷新；失败保留 stale，无旧值时有界等待，不串账号 |
 | [`src/request-rewrite.mjs`](./src/request-rewrite.mjs) | JSON 请求体改写管道：identity 快路径、`ensureStreamUsage`、`clampMaxTokens`、`stripModelPrefix`、`stripHopHeaders` | 改 body 后不去掉 `content-length` / `content-encoding` 会截断/解码失败；工具 schema 的 `additionalProperties:false` 绝不能碰 |
 | [`src/tool-schema.mjs`](./src/tool-schema.mjs) | 工具名超长截断（保持唯一）+ 工具 schema 兼容改写（`additionalProperties` 非布尔→`true`、删 `items:{}`、`items` 子树摊平且不留空 `{}`） | **默认关闭、只作显式 adapter**：会放宽模型看到的工具约束；`request-rewrite.mjs` 的「工具 schema 不动」铁律不变，两者不要同时挂 |
 | [`src/rotation-captcha.mjs`](./src/rotation-captcha.mjs) | 旋转图片验证码：角度编码、WAF cookie、取图→判角→提交重试 | `/captcha/generate` 回的 `set-cookie: acw_tc=…` 必须带回 verify，否则 `2000 客户端信息不匹配`（Node fetch 默认没有 cookie 罐） |
@@ -382,7 +390,7 @@ rm -rf .git && git init    # 换掉历史
 ### 方式三：一条命令生成（身份自动改对）
 
 ```bash
-npx --yes github:MYCF711/magpie-plugin-scaffold#v0.3.6 create \
+npx --yes github:MYCF711/magpie-plugin-scaffold#v0.3.8 create \
   --dir my-provider \
   --provider huawei \
   --name "华为云 HUAWEI" \
@@ -409,14 +417,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: MYCF711/magpie-plugin-scaffold/.github/actions/check@v0.3.6
+      - uses: MYCF711/magpie-plugin-scaffold/.github/actions/check@v0.3.8
         with:
           target: .
 ```
 
 这个复合动作直接跑动作仓库里的 `scripts/check.mjs`，不下载 npm 包、不装依赖、不写你的目录。
-本地等价命令：`npx --yes github:MYCF711/magpie-plugin-scaffold#v0.3.6 check .`。
-上面的 `#v0.3.6` / `@v0.3.6` 是写这份文档时的最新 Release；固定 tag 能让行为可复现，
+本地等价命令：`npx --yes github:MYCF711/magpie-plugin-scaffold#v0.3.8 check .`。
+上面的 `#v0.3.8` / `@v0.3.8` 是写这份文档时的最新 Release；固定 tag 能让行为可复现，
 想跟随最新可以换成 `#main`（Action 的 `@main` 同理，但固定 tag 更安全）。
 
 ### 建好仓库后：四件 check 查不到的事

@@ -3,6 +3,20 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.3.8 — 2026-11-03
+
+**从当前真实启用的 magpie 插件回收通用协议：HTTP / OAuth Device / 流读取 / 签到 / live models / 缓存**
+
+- 新增 `RECYCLING.md`：以 `plugins.json` 为真源盘点 17 个实际启用项，记录版本、来源、已覆盖模块、择优理由与明确不回收的厂商业务
+- 新增 `src/http.mjs`：统一错误响应、异构错误摘要、保守 401/403 判定与 Retry-After；新增 `src/status.mjs`：只读 400/422 clone 的分类与安全 Response 改写
+- 新增 `src/credential.mjs`：凭据读取、指纹、cached → metadata → shape 的种类识别与 uid；新增 `src/oauth-device.mjs`：RFC 8628 设备码申请、轮询与刷新
+- 新增 `src/checkin.mjs`：前后账单差集对账；新增 `src/stream-reader.mjs`：空闲超时不丢在飞数据块，支持 abort / done / error 重放
+- `src/models.mjs`：新增稳定 slug/code 映射与同 id 元数据合并；`src/openai-sse.mjs`：不再折出无名 tool_call，整轮只有无名调用时给可重试 502
+- `src/store.mjs` / `src/invite.mjs`：独立临时名、0600/0700、原子替换与厂商时区日键；邀请存储复用同一写原语
+- `src/quota.mjs`：无 zone 时间支持显式 offset；`src/usage-cache.mjs`：新增 stale-while-revalidate；`index.mjs`：签到按账号 single-flight
+- `src/api.mjs`：不再把任意 400/422 当模型 404，也不再把所有 403 当登录失效；全部新增与修改路径都有离线语义测试
+- 审查加固：流终态向所有等待者广播；设备轮询 deadline 覆盖在飞请求；usage/checkin 不再用可重名 accountId 作 key；补齐中文模型 401、400/422 的 503/504、reasoning-only 无名调用、partial capabilities、SWR failTTL 与 refresh-only OAuth 回归
+
 ## 0.3.7 — 2026-11-02
 
 **新增 ERROR-CODES.md：错误码规范 + 可执行检查，约束「每条错误都带 status + code」**

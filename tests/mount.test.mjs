@@ -139,6 +139,40 @@ test("chat.headers 只给本 provider 的请求加头", async () => {
   assert.deepEqual(other.headers, {})
 })
 
+test("usage/checkin 的账号 key 用 uid 或凭据指纹，不用可重名的 accountId", () => {
+  const source = readFileSync(new URL("../index.mjs", import.meta.url), "utf8")
+  assert.match(source, /const usageKey = uidOf\(auth\)/)
+  assert.match(source, /const account = uidOf\(auth\)/)
+  assert.doesNotMatch(source, /auth\.uid \?\? auth\.accountId/)
+  assert.doesNotMatch(source, /auth\.uid \|\| auth\.accountId/)
+})
+
+test("refresh-only OAuth 不会被 usage/checkin 的账号 key 误判为未登录", async () => {
+  const plugin = await XxxAuthPlugin({ client: {} })
+  const getAuth = async () => ({ type: "oauth", refresh: "refresh-only-credential", accountId: "duplicate-display-name" })
+
+  const usage = await plugin.auth.usage(getAuth, { id: "xxx" })
+  assert.notEqual(usage.error, "未登录")
+  assert.match(usage.error, /TODO/)
+
+  const checkin = await plugin.auth.checkin(getAuth, { id: "xxx" })
+  assert.equal(checkin.outcome, "failed")
+  assert.notEqual(checkin.message, "未登录")
+  assert.match(checkin.message, /TODO/)
+})
+
+test("auth.usage 接入 SWR，并给无旧值读取设置上限", () => {
+  const source = readFileSync(new URL("../index.mjs", import.meta.url), "utf8")
+  assert.match(source, /usageCache\.readSWR\(String\(usageKey\), \(\) => fetchUsage\(auth\), \{ timeoutMs: 10_000 \}\)/)
+})
+
+test("auth.checkin 按账号走 single-flight，且不回放成功结果", () => {
+  const source = readFileSync(new URL("../index.mjs", import.meta.url), "utf8")
+  assert.match(source, /const checkinLock = createRefreshLock\(\{ replayMs: 0 \}\)/)
+  assert.match(source, /return checkinLock\.run\(key, async \(\) =>/)
+  assert.match(source, /const key = `\$\{provider\?\.id \|\| PROVIDER\}\\n\$\{account\}`/)
+})
+
 test("auth.refresh 走 refresh lock，而不是裸调 exchangeRefresh", () => {
   // 模板里的 exchangeRefresh 仍是 TODO，无法注入桩；用源码契约锁住接线本身。
   // 模块行为由 tests/refresh-lock.test.mjs 锁，这里只防止未来重构把闸拆掉。

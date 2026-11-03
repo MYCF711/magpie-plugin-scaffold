@@ -151,3 +151,93 @@ export function buildModels(live, points, entry = defaultEntry) {
 
   return { models: out, pointsOk, droppedUnknownPrice }
 }
+
+// ── live models 通用适配层 ──────────────────────────────────────────
+
+/** 上游标识优先取 code；没有 code 的上游通常直接把 id 当请求标识 */
+const upstreamCodeOf = (record) => record?.code ?? record?.id
+
+/**
+ * 给 live models 分配稳定且唯一的展示 id。
+ * 同一个基础 id 按出现顺序得到原值、-2、-3；已占用的 slug 也会跳过。
+ * 返回新数组和新条目，code 始终保留真正发给上游的标识。
+ */
+export function assignSlugs(records, { idOf = upstreamCodeOf, codeOf = upstreamCodeOf } = {}) {
+  const counts = new Map()
+  const used = new Set()
+  return Array.from(records ?? [], (record) => {
+    const code = codeOf(record)
+    const base = String(idOf(record) ?? code ?? "")
+    let count = (counts.get(base) ?? 0) + 1
+    let slug = count === 1 ? base : `${base}-${count}`
+    while (used.has(slug)) {
+      count++
+      slug = `${base}-${count}`
+    }
+    counts.set(base, count)
+    used.add(slug)
+    return { ...record, id: slug, code }
+  })
+}
+
+/**
+ * 建立 slug/code 双向索引。
+ * bySlug 是「展示 id → 上游 code」；byCode 是「上游 code → 展示 id」。
+ * 两者都是 Map；code 重复时，反向索引保留出现顺序中的首个展示 id。
+ */
+export function makeModelIndex(records, keyOf = upstreamCodeOf) {
+  const bySlug = new Map()
+  const byCode = new Map()
+  for (const record of records ?? []) {
+    const slug = record?.id
+    const code = keyOf(record)
+    if (slug == null || code == null) continue
+    bySlug.set(slug, code)
+    if (!byCode.has(code)) byCode.set(code, slug)
+  }
+  return { bySlug, byCode }
+}
+
+/** 已知展示 id 翻译成上游 code；未知 id 原样返回，便于调用方自行处理 */
+export function upstreamModelId(id, records) {
+  const { bySlug } = makeModelIndex(records)
+  return bySlug.has(id) ? bySlug.get(id) : id
+}
+
+// 只继承宿主需要的静态描述；价格、名称和账号可见范围都以 live 为准
+const STATIC_METADATA = ["limit", "capabilities", "api"]
+
+/**
+ * 按相同 id 给 live 条目补静态元数据，输出仍只包含 live 中的模型。
+ * live 已给出 capabilities 时，只补齐 input/output 的模态键，且 live 的显式
+ * 布尔值优先；其它 capabilities 子字段和 limit 仍不做深合并，避免猜大权限。
+ * 未知模型也不会拿第一条兜底。
+ */
+export function mergeModelMetadata(live, fallback) {
+  const fallbackById = new Map()
+  for (const record of fallback ?? []) {
+    if (record?.id != null && !fallbackById.has(record.id)) fallbackById.set(record.id, record)
+  }
+  return Array.from(live ?? [], (record) => {
+    const base = fallbackById.get(record?.id)
+    const merged = { ...record }
+    if (!base) return merged
+    for (const key of STATIC_METADATA) {
+      if (key === "capabilities" && merged[key] !== undefined && base[key] !== undefined) {
+        const capabilities = { ...merged[key] }
+        for (const modality of ["input", "output"]) {
+          const fallbackModalities = base[key]?.[modality]
+          if (fallbackModalities === undefined) continue
+          const liveModalities = merged[key]?.[modality]
+          capabilities[modality] = liveModalities === undefined
+            ? fallbackModalities
+            : { ...fallbackModalities, ...liveModalities }
+        }
+        merged[key] = capabilities
+      } else if (merged[key] === undefined && base[key] !== undefined) {
+        merged[key] = base[key]
+      }
+    }
+    return merged
+  })
+}

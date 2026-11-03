@@ -10,15 +10,17 @@
 //   ③ 每个请求都带超时（AbortSignal.timeout），没有超时的 fetch 会挂死整张卡片
 
 import { BASE } from "./context.mjs"
+import { isLoginBroken } from "./http.mjs"
 
 /** 上游给的业务错误。带上 status 与 code，调用方才能分流。 */
 export class ApiError extends Error {
-  constructor(message, { status = 0, code = "", url = "" } = {}) {
+  constructor(message, { status = 0, code = "", url = "", body } = {}) {
     super(message)
     this.name = "ApiError"
     this.status = status
     this.code = code
     this.url = url
+    this.body = body
   }
 }
 
@@ -66,6 +68,7 @@ export async function read(res, url = "") {
       status: res.status,
       code: String(body?.code ?? ""),
       url,
+      body,
     })
   }
   // TODO: 有的厂商 200 里还有业务码（`code: 1000` 表示成功）。不是成功值就抛。
@@ -100,7 +103,7 @@ export async function get(path, auth, { timeout = TIMEOUT.short, method = "GET",
 export function asModelError(e, modelId = "") {
   if (!(e instanceof ApiError)) return e
   const looksLikeModel = /model|模型|not found|不存在|no access|未开通/i.test(String(e.message))
-  if (looksLikeModel || e.status === 400 || e.status === 422) {
+  if (looksLikeModel) {
     return Object.assign(new ApiError(e.message, { status: 404, code: e.code, url: e.url }), {
       modelId,
     })
@@ -116,7 +119,7 @@ export function asSignInExpired(message = "登录已失效") {
   return Object.assign(new Error(message), { signIn: "expired" })
 }
 
-/** 上游 401/403 到底是不是「登录失效」，看这句话就够了 */
+/** 上游 401/403 必须带明确登录语义才算失效；模型权限 / WAF 403 不误杀账号。 */
 export function isAuthFailure(e) {
-  return e instanceof ApiError && (e.status === 401 || e.status === 403)
+  return e instanceof ApiError && isLoginBroken(e.status, e.body ?? e.message)
 }

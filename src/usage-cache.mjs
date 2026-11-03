@@ -42,6 +42,9 @@ export function createUsageCache({
 
   /** @type {Map<string, { ok: boolean, value?: unknown, error?: unknown, expiresAt: number }>} */
   const entries = new Map()
+  /** SWR 后台失败单独短缓存，不能用失败项覆盖 entries 里的成功 stale。 */
+  /** @type {Map<string, { error: unknown, expiresAt: number }>} */
+  const failures = new Map()
   /** @type {Map<string, Promise<unknown>>} */
   const inflight = new Map()
 
@@ -54,7 +57,43 @@ export function createUsageCache({
         removed += 1
       }
     }
+    for (const [key, failure] of failures) {
+      if (failure.expiresAt <= at) {
+        failures.delete(key)
+        removed += 1
+      }
+    }
     return removed
+  }
+
+  function start(key, compute, { preserveStale = false } = {}) {
+    const pending = inflight.get(key)
+    if (pending) return pending
+
+    let task = Promise.resolve()
+      .then(compute)
+      .then(
+        (value) => {
+          failures.delete(key)
+          entries.set(key, { ok: true, value, expiresAt: now() + ttlMs })
+          return value
+        },
+        (error) => {
+          // SWR 失败单独记 failTtl，旧成功值继续作为 stale 返回；普通 read 语义不变。
+          if (preserveStale) {
+            failures.set(key, { error, expiresAt: now() + failTtlMs })
+          } else {
+            failures.delete(key)
+            entries.set(key, { ok: false, error, expiresAt: now() + failTtlMs })
+          }
+          throw error
+        },
+      )
+      .finally(() => {
+        if (inflight.get(key) === task) inflight.delete(key)
+      })
+    inflight.set(key, task)
+    return task
   }
 
   return {
@@ -73,37 +112,92 @@ export function createUsageCache({
         return Promise.reject(hit.error)
       }
 
-      const pending = inflight.get(key)
-      if (pending) return pending
+      return start(key, compute)
+    },
 
-      let task = Promise.resolve()
-        .then(compute)
-        .then(
+    /**
+     * stale-while-revalidate：成功旧值过期后也立即返回，并在后台按 key 单飞刷新。
+     * 没有成功旧值时等待计算；timeoutMs / signal 只限制等待时间，不取消共享计算。
+     */
+    readSWR(key, compute, { timeoutMs, signal } = {}) {
+      assertKey(key)
+      if (typeof compute !== "function") throw new TypeError("usage cache 的 compute 必须是函数")
+      if (timeoutMs !== undefined) assertNonNegative("readSWR timeoutMs", timeoutMs)
+      if (signal !== undefined && (
+        typeof signal?.addEventListener !== "function" || typeof signal?.removeEventListener !== "function"
+      )) {
+        throw new TypeError("usage cache 的 signal 必须是 AbortSignal")
+      }
+
+      // 不能像 read 一样先 sweep：过期成功项正是 SWR 要返回的 stale。
+      const hit = entries.get(key)
+      if (hit && hit.expiresAt > now()) {
+        if (hit.ok) return Promise.resolve(hit.value)
+        return Promise.reject(hit.error)
+      }
+
+      const stale = hit?.ok ? hit : undefined
+      if (!stale && signal?.aborted) {
+        return Promise.reject(signal.reason ?? new Error("usage cache 读取已中止"))
+      }
+
+      if (stale) {
+        const failure = failures.get(key)
+        if (failure?.expiresAt > now()) return Promise.resolve(stale.value)
+        if (failure) failures.delete(key)
+      }
+
+      const task = start(key, compute, { preserveStale: Boolean(stale) })
+      if (stale) {
+        // 后台失败由这里兜底，既保留旧成功值，也避免无人等待时产生 unhandled rejection。
+        void task.catch(() => {})
+        return Promise.resolve(stale.value)
+      }
+
+      if (timeoutMs === undefined && signal === undefined) return task
+      return new Promise((resolve, reject) => {
+        let timer
+        const cleanup = () => {
+          if (timer !== undefined) clearTimeout(timer)
+          signal?.removeEventListener("abort", onAbort)
+        }
+        const onAbort = () => {
+          cleanup()
+          reject(signal.reason ?? new Error("usage cache 读取已中止"))
+        }
+        signal?.addEventListener("abort", onAbort, { once: true })
+        if (timeoutMs !== undefined) {
+          timer = setTimeout(() => {
+            cleanup()
+            const error = new Error(`usage cache 读取超过 ${timeoutMs}ms`)
+            error.name = "TimeoutError"
+            reject(error)
+          }, timeoutMs)
+        }
+        // 即使等待已超时/中止，这里仍接收共享计算的最终结果，保证 rejection 有人处理。
+        task.then(
           (value) => {
-            entries.set(key, { ok: true, value, expiresAt: now() + ttlMs })
-            return value
+            cleanup()
+            resolve(value)
           },
           (error) => {
-            // 失败也缓存，但只缓存 failTtlMs；错误对象原样交给等待者。
-            entries.set(key, { ok: false, error, expiresAt: now() + failTtlMs })
-            throw error
+            cleanup()
+            reject(error)
           },
         )
-        .finally(() => {
-          if (inflight.get(key) === task) inflight.delete(key)
-        })
-      inflight.set(key, task)
-      return task
+      })
     },
 
     /** 清一个 key（或全部）的缓存；不动 in-flight，避免把同一次刷新复制成两次。 */
     clear(key) {
       if (key === undefined) {
         entries.clear()
+        failures.clear()
         return
       }
       assertKey(key)
       entries.delete(key)
+      failures.delete(key)
     },
 
     /** 清理过期项，返回条数（诊断用） */

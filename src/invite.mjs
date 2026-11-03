@@ -31,9 +31,10 @@
 // 就在登录成功时把拿到的码写回策略（滚动）；查不到就只能靠用户首次填一次。
 // ⇒ 两种都支持：`policy.source` 记 'used'（滚动来的）/ 'chosen'（手填的）。
 
-import { readFileSync, writeFileSync, mkdirSync, renameSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
+
+import { readJson, writeJson } from "./store.mjs"
 
 function cacheDir() {
   return join(homedir(), ".cache", "magpie")
@@ -49,12 +50,8 @@ export function createInviteStore(prefix) {
   const file = join(cacheDir(), `${prefix}-invite.json`)
 
   function readPolicy() {
-    try {
-      const v = JSON.parse(readFileSync(file, "utf8"))
-      return v && typeof v === "object" ? v : null
-    } catch {
-      return null
-    }
+    const v = readJson(file, null)
+    return v && typeof v === "object" ? v : null
   }
 
   /** 当前要用的码（可能空串）。 */
@@ -88,14 +85,8 @@ export function createInviteStore(prefix) {
       if (s) next[k] = s
       else if (prev && prev.code === c && prev[k]) next[k] = prev[k]
     }
-    try {
-      mkdirSync(cacheDir(), { recursive: true })
-      const tmp = `${file}.tmp`
-      writeFileSync(tmp, JSON.stringify(next, null, 1), "utf8")
-      renameSync(tmp, file)
-    } catch {
-      // cache 写失败不影响登录（规矩 ③：这里的东西全都可删）
-    }
+    // 与 store 共用独立临时名 + 原子替换；写失败不影响登录。
+    writeJson(file, next)
   }
 
   return { file, read, readExtra, write }
