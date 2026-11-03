@@ -3,6 +3,15 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.3.9 — 2026-11-04
+
+**新增 `src/catalog-union.mjs` 与 `scripts/app-icon.mjs`：多目录模型合并 + 从客户端安装包取官方应用图标**
+
+- `src/catalog-union.mjs`：`catalogRows`（认三种目录形状、嵌套 `model` 内层优先）/ `isChatLike`（别名、补全、输出 ≤256、`text-to-image` 挡在聊天列表外）/ `mergeCatalogs`（主目录优先、补集补 id 与促销表、两份都读不到要抛）。起因是厂商的「客户端配置」更新慢、「控制台」那份带完整分角色元数据 —— 只读一份的后果不是报错，是插件里的模型比网页上少几个、倍率还是旧的
+- `scripts/app-icon.mjs`：从 Windows 客户端 exe 的 PE 资源 `RT_ICON` 里取官方应用图标（16~256 多档），`--data-uri` 直接出 magpie 的 `icon` 字段值。**按资源树取而不是按 PNG 签名扫** —— 安装包里的界面插图也是 PNG，扫签名取到的会是插图；实测 WorkBuddy 5.9.3 取出的 256 档 sha256 与手工提取逐字节一致
+- `AGENTS.md`：坑表新增第 36 条（卡片图标是圆的 —— magpie 画在圆角方框里，官网 favicon 常是正圆）与第 37 条（两份模型目录）；第三节命令加 `app-icon.mjs`；第五节模块表加一行，规模更新为 index 569 行 / `src/` 28 文件 5,331 行 / 28 个测试
+- `tests/catalog-union.test.mjs`（9 项）、`tests/app-icon.test.mjs`（4 项）；两套逻辑已在 `MYCF711/magpie-workbuddy` 0.1.5 与 `Ghandi/workbuddy-pro` 的 PR !1 里跑过
+
 ## 0.3.8 — 2026-11-03
 
 **从当前真实启用的 magpie 插件回收通用协议：HTTP / OAuth Device / 流读取 / 签到 / live models / 缓存**
