@@ -5,14 +5,15 @@
 import { createHash } from "node:crypto"
 
 /**
- * 读取原始凭据，优先级为 access → key → token → refresh，并去掉首尾空白。
+ * 读取原始凭据，优先级为 access → key → token，并去掉首尾空白。
+ * refresh 只用于 uidOf 的身份指纹，不在这里冒充可调用上游的访问凭据。
  *
- * @param {{access?: *, key?: *, token?: *, refresh?: *}} [auth] magpie 的 auth 对象
+ * @param {{access?: *, key?: *, token?: *}} [auth] magpie 的 auth 对象
  * @returns {string} 没有凭据时返回空串
  */
 export function rawCredentialOf(auth) {
   if (!auth) return ""
-  for (const candidate of [auth.access, auth.key, auth.token, auth.refresh]) {
+  for (const candidate of [auth.access, auth.key, auth.token]) {
     const value = String(candidate || "").trim()
     if (value) return value
   }

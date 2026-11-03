@@ -9,13 +9,13 @@ import {
   uidOf,
 } from "../src/credential.mjs"
 
-test("rawCredentialOf 逐候选 trim，按 access → key → token → refresh 选首个非空值", () => {
+test("rawCredentialOf 逐候选 trim，按 access → key → token 选首个非空值", () => {
   assert.equal(rawCredentialOf({ access: "  access-token  ", key: "key-token", token: "fallback" }), "access-token")
   assert.equal(rawCredentialOf({ access: "", key: " key-token ", token: "fallback" }), "key-token")
   assert.equal(rawCredentialOf({ access: " \t\n", key: " key-token ", token: "fallback" }), "key-token")
   assert.equal(rawCredentialOf({ access: "  ", key: "\r\n", token: " fallback " }), "fallback")
   assert.equal(rawCredentialOf({ token: " fallback " }), "fallback")
-  assert.equal(rawCredentialOf({ access: " ", refresh: " refresh-only " }), "refresh-only")
+  assert.equal(rawCredentialOf({ access: " ", refresh: " refresh-only " }), "", "refresh 不能冒充访问凭据")
   assert.equal(rawCredentialOf({ key: 123 }), "123")
 })
 
