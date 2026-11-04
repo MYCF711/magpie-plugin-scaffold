@@ -1,0 +1,46 @@
+# dependabot.yml —— 本仓库零运行时依赖，所以只管两件事：
+#   1) GitHub Actions 的版本漂移（现在 checkout@v4 已经落后到 v7）
+#   2) 万一哪天引入了依赖，不用另配一份文件
+#
+# 成熟项目的默认做法：更新 PR 不自动合并，但保持每周一批、可读、可回滚。
+version: 2
+
+updates:
+  # ---- GitHub Actions ----
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 5
+    groups:
+      # 一次升一整批，避免五个 PR 抢同一条 CI 队列
+      actions-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    labels:
+      - "dependencies"
+      - "chore"
+    commit-message:
+      prefix: "chore(actions)"
+    reviewers:
+      - "MYCF711"
+
+  # ---- npm（当前无依赖，留着以备不时之需） ----
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 3
+    versioning-strategy: "increase-if-necessary"
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "chore(deps)"
+    reviewers:
+      - "MYCF711"

@@ -13,7 +13,7 @@
 //   · 三个版本跳着发，中间两个没 tag ⇒ 用户不知道中间改了什么
 // 这些都不报错，只是「用户永远拿不到新版」。这和写完就不管是同一种后果。
 //
-// 它只看 git 与 package.json / CHANGELOG，不需要网络。
+// 它只依赖 git 与 package.json / CHANGELOG；只有「⑥ 需要全量 tag 列表」时才会走网络。
 
 import { readFileSync, existsSync } from "node:fs"
 import { join, resolve } from "node:path"
@@ -24,8 +24,8 @@ const results = []
 const ok = (cond, name, note, fix) => results.push({ level: cond ? "pass" : "fail", name, note, fix })
 const warn = (cond, name, note, fix) => results.push({ level: cond ? "pass" : "warn", name, note, fix })
 
-function git(args) {
-  const r = spawnSync("git", args, { cwd: ROOT, encoding: "utf8", timeout: 30000 })
+function git(args, { timeout = 30000 } = {}) {
+  const r = spawnSync("git", args, { cwd: ROOT, encoding: "utf8", timeout })
   if (r.status !== 0) return null
   return (r.stdout ?? "").trim()
 }
@@ -48,10 +48,14 @@ if (!warn(isGit, "是 git 仓库", "维护依赖版本历史；没有 git 就只
   report()
 }
 
+// 浅克隆：`git tag` 只会带回 HEAD 附近的 tag，拿它做全量对账会大面积误报。
+// 唯一可靠的修法是 unshallow，或者改问远程要 tag 列表（见 ⑥）。
+const isShallow = isGit && existsSync(join(ROOT, ".git", "shallow"))
+
 // ── ② 有没有发布过 ──────────────────────────────────────────────────
 
 const lastTag = git(["describe", "--tags", "--abbrev=0", "--match", "v*"])
-const tags = (git(["tag", "--list", "v*", "--sort=-v:refname"]) ?? "").split("\n").filter(Boolean)
+const localTags = (git(["tag", "--list", "v*", "--sort=-v:refname"]) ?? "").split("\n").filter(Boolean)
 
 if (!warn(!!lastTag, "至少打过一次 tag", "没有 tag ⇒ GitHub 右侧永远写着「暂无发布版本」，用户看不到改了什么", "git tag v" + version + " && git push origin v" + version)) {
   report()
@@ -61,7 +65,7 @@ if (!warn(!!lastTag, "至少打过一次 tag", "没有 tag ⇒ GitHub 右侧永�
 // 「发了新版本但没打 tag」是最常见的一种：本地全对，用户拿不到。
 
 const currentTag = `v${version}`
-ok(tags.includes(currentTag),
+ok(localTags.includes(currentTag),
    `当前版本 ${version} 有 tag（${currentTag}）`,
    "版本号改了但没打 tag ⇒ 用户看 Release 是空的；npm 有、git 源没有",
    `git tag ${currentTag} && git push origin ${currentTag}`)
@@ -99,29 +103,71 @@ ok(changelog.includes(version),
    "没有更新日志 ⇒ 用户不知道升上去改了什么，出问题也没法回滚到「哪个版本是好的」",
    `在 CHANGELOG.md 顶部加「## ${version} — <日期>」一节`)
 
-// ── ⑥ 跳版本：中间版本没 tag ─────────────────────────────────────────
-// 比如 0.1.16 → 0.1.20，中间三个版本只 commit 没 tag。用户拿不到中间任何一版，
-// 也没法说清「我在哪个版本上遇到的 bug」。
+// ── ⑥ CHANGELOG 与 tag 双向对账 ──────────────────────────────────────
+// 旧版写的是「查 from → to 之间有没有跳版」，判据本身是错的：
+//   lastTag 取的是「最近的 tag」，刚发完版时 from === to，整段空跑，
+//   于是一律报「✓ 没有跳过版本」—— 历史里有多少个版本没打 tag 都看不见。
+//
+// 换成更根本的判据：CHANGELOG 里列出的每个版本都该有 tag（否则用户拿不到），
+// 每个 tag 也都该有 CHANGELOG 节（否则 release.yml 抽不到正文、会建空 Release）。
 
 function parseSemver(s) {
   const m = String(s).match(/^v?(\d+)\.(\d+)\.(\d+)$/)
   return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null
 }
-const from = parseSemver(lastTag ?? "")
-const to = parseSemver(currentTag)
-if (from && to) {
-  const missing = []
-  // 只枚举同一 minor 下的中间 patch（跨 minor 的跳版是正常的）
-  if (from[0] === to[0] && from[1] === to[1] && to[2] - from[2] > 1) {
-    for (let p = from[2] + 1; p < to[2]; p++) {
-      const t = `v${from[0]}.${from[1]}.${p}`
-      if (!tags.includes(t)) missing.push(t)
+const verKey = (s) => parseSemver(s)?.[0] * 1e6 + parseSemver(s)?.[1] * 1e3 + parseSemver(s)?.[2]
+
+/** 全量 tag：优先问远程（浅克隆也能拿全），失败退回本地 */
+function allTags() {
+  const remote = git(["ls-remote", "--tags", "origin"], { timeout: 30000 })
+  if (remote) {
+    const set = new Set()
+    for (const line of remote.split("\n")) {
+      const m = line.match(/refs\/tags\/(v\d+\.\d+\.\d+)(\^\{\})?$/)
+      if (m) set.add(m[1])
     }
+    if (set.size > 0) return { tags: [...set], source: "远程 origin" }
   }
-  warn(missing.length === 0,
-       "没有跳过版本（中间每个版本都打了 tag）",
-       `这几个版本只 commit 没打 tag：${missing.join(" / ")} —— 用户拿不到中间任何一版，也说不清自己在哪版上出的问题`,
-       "补 tag：git tag <tag> <commit>（补历史版本是可以的，不改代码）")
+  return { tags: localTags, source: isShallow ? "本地（浅克隆，可能不全）" : "本地" }
+}
+
+/** CHANGELOG 里出现过的版本（`## 0.3.9 — 2026-11-04`） */
+function changelogVersions() {
+  const out = []
+  const re = /^##\s+v?(\d+\.\d+\.\d+)/gm
+  let m
+  while ((m = re.exec(changelog))) out.push(m[1])
+  return out
+}
+
+if (changelog) {
+  const { tags: all, source } = allTags()
+  const tagSet = new Set(all.map((t) => t.replace(/^v/, "")))
+  const clSet = new Set(changelogVersions())
+
+  const noTag = [...clSet].filter((v) => !tagSet.has(v)).sort((a, b) => verKey(b) - verKey(a))
+  const noSection = [...tagSet].filter((v) => !clSet.has(v)).sort((a, b) => verKey(b) - verKey(a))
+
+  // 当前版本是 fail（这次发布就不完整），历史欠账是 warn（列出来，但不堵门）
+  const nowMissing = noTag.includes(version)
+  warn(!nowMissing,
+       `当前版本 ${version} 在 CHANGELOG 与 tag 之间对得上`,
+       `CHANGELOG 写了 ${version} 但 tag 列表里没有 —— 用户看 Release 是空的`,
+       `git tag v${version} && git push origin v${version}`)
+
+  const historicNoTag = noTag.filter((v) => v !== version)
+  warn(historicNoTag.length === 0,
+       `历史版本都打过 tag（共 ${all.length} 个 tag / ${clSet.size} 节 CHANGELOG）`,
+       `${historicNoTag.length} 个版本有 CHANGELOG 节但没有 tag：${historicNoTag.join(" / ")}\n` +
+       `  （tag 来源：${source}${isShallow && source.includes("本地") ? " —— 浅克隆看不到全部 tag，先 git fetch --unshallow 再判断" : ""}）\n` +
+       `  用户拿不到这些版本，也说不清自己在哪版上出的问题`,
+       "补历史 tag：git tag v<版本> <commit> && git push origin --tags（补 tag 不改代码、不需要重发）")
+
+  warn(noSection.length === 0,
+       "每个 tag 都有 CHANGELOG 节",
+       `${noSection.length} 个 tag 在 CHANGELOG 里找不到对应章节：${noSection.join(" / ")}\n` +
+       `  release.yml 用 awk 从 CHANGELOG 抽 Release 正文，抽不到会直接 exit 1`,
+       "补章节，或在 UPDATING.md 里写明这些版本是「无正文的补发 tag」")
 }
 
 // ── 输出 ──────────────────────────────────────────────────────────────

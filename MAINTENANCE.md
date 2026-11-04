@@ -9,8 +9,8 @@
 |---|---|
 | 仓库 | `MYCF711/magpie-plugin-scaffold` |
 | npm 包名 | `magpie-plugin-scaffold` |
-| 当前版本 | `0.3.8`（已发布） |
-| 定位 | magpie 供应商插件脚手架：九钩子模板 + 27 个通用 `src/` 模块 + 35 条坑表 + 评分卡 + 受控发布脚本 |
+| 当前版本 | `0.3.9`（已发布） |
+| 定位 | magpie 供应商插件脚手架：九钩子模板 + 28 个通用 `src/` 模块 + 35 条坑表 + 评分卡 + 受控发布脚本 |
 | 本批来源 | 当前 magpie 真实启用的 17 个插件；清单与取舍见 `RECYCLING.md` |
 
 ## 二、当前状态（2026-11-03）
@@ -23,10 +23,10 @@
 
 | 资产 | 数量 |
 |---|---:|
-| `src/` 模块 | 27 个 / 5,171 行 |
-| `tests/` | 26 个 / 301 条（`node --test` 全过） |
-| `HOOKS.md` | 21 章字段级钩子契约 |
-| AGENTS.md 坑表 | 35 条 |
+| `src/` 模块 | 28 个 / 5,331 行 |
+| `tests/` | 28 个 / 314 条（`node --test` 全过） |
+| `HOOKS.md` | 19 章字段级钩子契约 |
+| AGENTS.md 坑表 | 38 条 |
 
 本批新增 `http` / `status` / `credential` / `oauth-device` / `checkin` / `stream-reader`，
 并增强 `models` / `openai-sse` / `store` / `quota` / `usage-cache` / `api` / `invite` 与入口的
