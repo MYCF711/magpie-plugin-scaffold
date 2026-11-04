@@ -342,6 +342,26 @@ node scripts/privacy-scan.mjs --staged   # 提交前只扫暂存区
 printf '#!/bin/sh\nexec node scripts/privacy-scan.mjs --staged\n' > .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
 ```
 
+### 8.3b 本地钩子：把 CI 的前置条件挪到推送之前
+
+只挂脱敏还不够 —— CI 的五步（check / test / docs / privacy / pack）本地漏跑任何一步，推送后就是红一次、一封邮件、一轮返工。一条命令装两个钩子：
+
+```bash
+node scripts/install-hooks.mjs
+```
+
+| 钩子 | 什么时候跑 | 跑什么 | 实测 |
+|---|---|---|---|
+| `pre-commit` | 每次 `git commit` | `privacy-scan --staged`（只扫暂存） | 毫秒级 |
+| `pre-push` 快档 | 每次 `git push` | `check` + `privacy-scan` | 0~1 秒 |
+| `pre-push` 全档 | **合入点**：推 `main` / `git push -u` 首次推新分支 / `PLUGIN_FULL=1` | 快档 + `npm test` + `check-docs` + `pack --dry-run` | 约 3~5 秒 |
+
+钩子模板在 `scripts/hooks/`（改模板后重跑 `install-hooks.mjs`，别手改 `.git/hooks/` 里的副本）。逃生门只跳过这一次：`PLUGIN_SKIP_HOOK=1 git push`。
+
+**为什么分级**：分支是测试版通道，WIP 迭代会推很多次；把「只有合入点才等 3~5 秒」和「每次推送都等」分开，钩子才不会被绕过。派生项目长大后 `npm test` 会变慢，这条分级的价值才显出来。
+
+**CI 的触发面**（`.github/workflows/ci.yml`）默认是 `push: branches: ["**"]` —— 模板自己要跑自测，所以对全部分支生效。派生仓库嫌分支推送太吵，可以把它收窄成 `[main]`：PR 仍然会跑 `rules`，只是不再为每次 WIP 推送消耗 runner 和通知。
+
 ### 8.4 已经 push 上去了怎么办
 
 按这个顺序，别跳步：
