@@ -34,6 +34,13 @@ jobs:
       - name: 语义测试
         run: npm test
 
+      - name: 文档时新性
+        # 版本号 / 台账数字 / 相对链接 / 标题条数 —— 写死就会过期，过期就别绿。
+        # 红了跑一次 `node scripts/check-docs.mjs --sync`，把版本号对齐再提交。
+        run: node scripts/check-docs.mjs
+      - name: 脱敏扫描
+        # 脚本早就有，缺的只是这一行 —— 没有它，泄密不会让 PR 变红。
+        run: node scripts/privacy-scan.mjs
       - name: 打包面预演
         run: npm pack --dry-run
 
