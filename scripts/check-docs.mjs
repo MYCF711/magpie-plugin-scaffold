@@ -90,8 +90,11 @@ const SYNC = process.argv.includes("--sync")
 
 ;(() => {
   // 只认两种**紧贴着仓库名**的形态，别的一律不碰：
-  //   A. `magpie-plugin-scaffold#v0.3.9` / `magpie-plugin-scaffold@v0.3.9`
-  //   B. `magpie-plugin-scaffold/.github/actions/check@v0.3.9`（uses: 里的 action 引用）
+  //   A. `magpie-plugin-scaffold#vX.Y.Z` / `magpie-plugin-scaffold@vX.Y.Z`
+  //   B. `magpie-plugin-scaffold/.github/actions/check@vX.Y.Z`（uses: 里的 action 引用）
+  //
+  // 示例里故意写 `vX.Y.Z` 而不是某个具体版本：写具体版本的话，这段注释自己就会被
+  // 本检查判成「过期版本号」，每次发版都要连脚本一起改 —— 那正好是它在抓的病。
   //
   // 早先版本用「文件里提到仓库名 ⇒ 全文都查」做门，结果把自己写的
   //   `ossf/scorecard-action@v2.4.0`
@@ -123,10 +126,13 @@ const SYNC = process.argv.includes("--sync")
       let replaced = text
       for (const re of PATTERNS) {
         re.lastIndex = 0
-        replaced = replaced.replace(re, (all, ...g) => {
-          const ver = g[g.length - 1]
-          return ver === VERSION ? all : all.replace(`v${ver}`, `v${VERSION}`)
-        })
+        // 两个模式都以 `vX.Y.Z` 结尾，只对齐末尾那一截就行。
+        // 别把回调参数当「捕获组数组」用：replace 的回调在捕获组之后还追加
+        // (offset, string)，于是 `g[g.length - 1]` 拿到的是**整篇原文**而不是版本号 ——
+        // 早先这么写的时候，--sync 每次都替换不了任何东西，却照样报「已经是当前版本」。
+        replaced = replaced.replace(re, (all) =>
+          all.endsWith(`v${VERSION}`) ? all : all.replace(/v\d+\.\d+\.\d+$/, `v${VERSION}`),
+        )
       }
       if (replaced !== text) {
         writeFileSync(join(ROOT, f), replaced)
