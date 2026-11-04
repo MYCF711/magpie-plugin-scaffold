@@ -425,7 +425,7 @@ jobs:
 
 这个复合动作直接跑动作仓库里的 `scripts/check.mjs`，不下载 npm 包、不装依赖、不写你的目录。
 本地等价命令：`npx --yes github:MYCF711/magpie-plugin-scaffold#v0.3.9 check .`。
-上面的 `#v0.3.9` / `@v0.3.9` 是写这份文档时的最新 Release；固定 tag 能让行为可复现，
+上面引用里的 tag 是写这份文档时的最新 Release；固定 tag 能让行为可复现，
 想跟随最新可以换成 `#main`（Action 的 `@main` 同理，但固定 tag 更安全）。
 
 ### 建好仓库后：四件 check 查不到的事

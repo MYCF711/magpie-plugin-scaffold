@@ -87,31 +87,48 @@ const SKIP_VERSION_CHECK = [
 const SYNC = process.argv.includes("--sync")
 
 ;(() => {
-  const RE = /([#@])v(\d+\.\d+\.\d+)/g
-  const selfRef = (text) => text.includes("magpie-plugin-scaffold")
+  // 只认两种**紧贴着仓库名**的形态，别的一律不碰：
+  //   A. `magpie-plugin-scaffold#v0.3.9` / `magpie-plugin-scaffold@v0.3.9`
+  //   B. `magpie-plugin-scaffold/.github/actions/check@v0.3.9`（uses: 里的 action 引用）
+  //
+  // 早先版本用「文件里提到仓库名 ⇒ 全文都查」做门，结果把自己写的
+  //   `ossf/scorecard-action@v2.4.0`
+  // 误判成「文档版本号过期」，PR 第一次跑就红了。这种文件级的粗判据不能用：
+  // 一个 workflow 里只要出现一次仓库名，整个文件里的所有版本号都会被牵连。
+  const PATTERNS = [
+    /magpie-plugin-scaffold([#@])v(\d+\.\d+\.\d+)/g,
+    /magpie-plugin-scaffold\/[^\s@]*@v(\d+\.\d+\.\d+)/g,
+  ]
   const bad = []
   const synced = []
 
   for (const f of FILES.filter(isText)) {
     if (SKIP_VERSION_CHECK.some((s) => f === s || f.startsWith(s))) continue
     const text = read(f)
-    if (!selfRef(text)) continue
-
-    RE.lastIndex = 0
-    let m
     const hits = []
-    while ((m = RE.exec(text))) {
-      if (m[2] === VERSION) continue
-      const line = text.slice(0, m.index).split("\n").length
-      hits.push({ line, raw: m[0], from: m[2] })
+    for (const re of PATTERNS) {
+      re.lastIndex = 0
+      let m
+      while ((m = re.exec(text))) {
+        if (m[m.length - 1] === VERSION) continue
+        const line = text.slice(0, m.index).split("\n").length
+        hits.push({ line, raw: m[0], from: m[m.length - 1] })
+      }
     }
     if (hits.length === 0) continue
 
     if (SYNC) {
-      const replaced = text.replace(RE, (all, sig, ver) => (ver === VERSION ? all : `${sig}v${VERSION}`))
+      let replaced = text
+      for (const re of PATTERNS) {
+        re.lastIndex = 0
+        replaced = replaced.replace(re, (all, ...g) => {
+          const ver = g[g.length - 1]
+          return ver === VERSION ? all : all.replace(`v${ver}`, `v${VERSION}`)
+        })
+      }
       if (replaced !== text) {
         writeFileSync(join(ROOT, f), replaced)
-        synced.push(...hits.map((h) => `${f}:${h.line}  ${h.raw} → ${h.raw[0]}v${VERSION}`))
+        synced.push(...hits.map((h) => `${f}:${h.line}  ${h.raw} → 已对齐 ${VERSION}`))
       }
     } else {
       bad.push(...hits.map((h) => `${f}:${h.line}  ${h.raw}  ≠  ${VERSION}`))
