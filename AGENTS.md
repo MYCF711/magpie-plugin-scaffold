@@ -112,6 +112,12 @@ node --test
 #   六条全不报错，但后果同一个：用户永远拿不到新版。发布前必跑。
 node scripts/check-maintenance.mjs
 
+# action 版本 —— 本仓库不装依赖机器人，这件事写在协议里
+#   平台上的依赖机器人只扫 .github/workflows/**，**扫不到 .github/actions/*/action.yml**
+#   里的 uses —— 而这条恰好是复合 action 自己的运行时依赖。
+#   0 = 都在最新 major；2 = 有落后（打印 文件:行号）；1 = 查不到（网络 / 限流：等于没判断，不是「没问题」）
+GITHUB_TOKEN=$(gh auth token) node scripts/check-actions.mjs
+
 # 显示名（magpie.name，中文 + English）与 npm 包名不同时发布
 #   模板自带 scripts/publish-npm.mjs（PUBLISH_AS = magpie-plugin-scaffold）；
 #   派生仓库由 create.mjs 生成自己的 PUBLISH_AS。

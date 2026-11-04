@@ -63,7 +63,9 @@ function trackedFiles() {
   }
 }
 
-const FILES = trackedFiles()
+// `git ls-files` 会包含「已经从工作区删掉但还没 git rm」的文件 —— 那些读不到，直接排除。
+// 不排除的话，删一个文件、还没提交就跑去检查，脚本会 ENOENT 崩掉（而不是报出真实的文档问题）。
+const FILES = trackedFiles().filter((f) => existsSync(join(ROOT, f)))
 const isText = (f) => /\.(md|mjs|js|json|yml|yaml|py|sh)$/.test(f)
 const read = (f) => readFileSync(join(ROOT, f), "utf8").replace(/\r\n/g, "\n")
 
