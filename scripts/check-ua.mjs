@@ -66,6 +66,19 @@ function lineOf(src, index) {
 }
 
 /** 文件里有没有**非本机**的 http(s) 地址：只打 127.0.0.1 / localhost 的文件不算「打上游」。 */
+/** 把紧跟其后的 `+ "…"` 逐段接上：跨行拼接的 UA 是一条值，不是两条残句。 */
+function joinConcatenated(src, endIdx, first) {
+  let out = first
+  let i = endIdx
+  for (;;) {
+    const m = /^\s*\+\s*([`"'])([\s\S]*?)\1/.exec(src.slice(i))
+    if (!m) break
+    out += m[2]
+    i += m[0].length
+  }
+  return out
+}
+
 function hasRemoteUrl(src) {
   const urls = src.match(/https?:\/\/[^\s"'`)]+/g) ?? []
   return urls.some((u) => !/^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(?::\d+|:\$\{[^}]*\})?(?:[/?#]|$)/i.test(u))
@@ -90,7 +103,10 @@ export function scanUserAgents(root) {
       re.lastIndex = 0
       let m
       while ((m = re.exec(src)) !== null) {
-        const value = m[2].replace(/\$\{[^}]*\}/g, "").trim()
+        // `"…AppleWebKit/537.36 " + "(KHTML, like Gecko) Chrome/… Safari/537.36"`
+        // 这种跨行拼接要接回来再判，否则会把完整 Chrome UA 误判成残句。
+        const joined = joinConcatenated(src, m.index + m[0].length, m[2])
+        const value = joined.replace(/\$\{[^}]*\}/g, "").trim()
         sawUA = true
         found.push({ value, line: lineOf(src, m.index) })
       }

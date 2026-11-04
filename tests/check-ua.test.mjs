@@ -84,6 +84,18 @@ test("完整 Chrome UA 与官方 App UA 都算合规", () => {
   rmSync(dir, { recursive: true, force: true })
 })
 
+test("跨行拼接的 UA 接回来再判，不算残句", () => {
+  const dir = fixture({
+    "src/ua.mjs": [
+      'export const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "',
+      '  + "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"',
+      "",
+    ].join("\n"),
+  })
+  assert.deepEqual(failsOf(dir), [])
+  rmSync(dir, { recursive: true, force: true })
+})
+
 test("注释里的示例不算违规", () => {
   const dir = fixture({
     "src/api.mjs": [
