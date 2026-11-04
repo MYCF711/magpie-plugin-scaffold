@@ -70,6 +70,7 @@
     "release": "node scripts/release.mjs",
     "score": "node scripts/score.mjs",
     "maintenance": "node scripts/check-maintenance.mjs",
+    "check:actions": "node scripts/check-actions.mjs",
     "publish:npm": "node scripts/publish-npm.mjs"
   }
 }
