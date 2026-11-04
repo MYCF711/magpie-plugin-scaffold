@@ -3,6 +3,14 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.3.12 — 2026-11-04
+
+**修：`pre-push` 误拦 tag 推送（0.3.11 实装当天真卡过一次）**
+
+- `scripts/hooks/pre-push`：这一批 ref 全是 `refs/tags/*` 时直接放行。tag 推送是发布动作，`release.mjs` 已经跑过 check / test / pack，钩子再跑一遍既重复、又会在 `npm test` 偶发波动时把 tag 钉死
+- 现象：`node scripts/release.mjs --yes` 里 `tag v0.3.11 … 失败`，本地 tag 有、远端没有，而脚本只打印一句"Release 交给 release.yml"，看起来像已经发了
+- 判据：`git ls-remote --tags <remote> | grep v<版本>` —— 远端没有这个 tag 就是没发；混合推送（分支 + tag）仍按分支规则跑门禁
+
 ## 0.3.11 — 2026-11-04
 
 **本地钩子一条命令装好：提交前脱敏 + 推送前分级门禁**

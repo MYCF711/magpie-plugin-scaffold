@@ -19,12 +19,24 @@ full=0
 [ "${PLUGIN_FULL:-0}" = "1" ] && full=1
 zero=0000000000000000000000000000000000000000
 push_main=0
+refs_need_gate=0
 while read local_ref local_sha remote_ref remote_sha; do
+  # 只推 tag = 发布动作，不是分支推送。release.mjs 已经把 check / test / pack 跑过一遍，
+  # 这里再跑一次既重复、又会在偶发波动时把 tag 卡住（2026-11-04 实装时真卡过一次）。
+  case "$local_ref" in
+    refs/tags/*) continue;;
+  esac
+  refs_need_gate=1
   case "$remote_ref" in
     refs/heads/main|refs/heads/master) push_main=1; full=1;;
   esac
   [ "$remote_sha" = "$zero" ] && full=1
 done
+
+if [ "$refs_need_gate" = "0" ]; then
+  echo "pre-push: 只推 tag（发布动作），跳过门禁 —— release.mjs 已经跑过 check / test / pack" >&2
+  exit 0
+fi
 
 root=$(git rev-parse --show-toplevel) || exit 1
 cd "$root" || exit 1
