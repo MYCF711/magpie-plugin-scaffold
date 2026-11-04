@@ -3,6 +3,7 @@ import assert from "node:assert/strict"
 
 import {
   CODES,
+  OFFICIAL_UA,
   baseHeaders,
   jsonResponse,
   errorResponse,
@@ -24,11 +25,14 @@ test("CODES 提供稳定且不可变的错误码词表", () => {
   }, TypeError)
 })
 
-test("baseHeaders 提供占位 UA，并允许调用方覆盖默认头", () => {
+test("baseHeaders 用官方端点 UA 作默认值，并允许调用方覆盖默认头", () => {
+  // 默认值必须是**官方客户端**的 UA：`<包名>/<版本号>` 会被上游网关按
+  // 「第三方客户端」拦成 403 TM.00000001（文案是「网络繁忙」）。见 README「3. User-Agent」。
   assert.deepEqual(baseHeaders(), {
-    "user-agent": "magpie-plugin/0.0.0",
+    "user-agent": OFFICIAL_UA,
     accept: "application/json",
   })
+  assert.ok(!OFFICIAL_UA.startsWith("magpie"))
   assert.deepEqual(baseHeaders({ "user-agent": "vendor/1.2", accept: "text/event-stream", origin: "https://example.com" }), {
     "user-agent": "vendor/1.2",
     accept: "text/event-stream",

@@ -88,6 +88,7 @@ PR 是 GitHub 对受保护分支的技术要求（直推报 `GH006`），批准�
 | 35 | live 新模型继承了第一个模型的 1M 窗口/看图能力，或静态表把无权限模型补回来 | 只按相同 id 合并静态元数据；未知模型不猜，目录失败才回快照，live 缺项不补回 | `src/models.mjs` · `tests/models-adapters.test.mjs` |
 | 36 | **卡片上的图标是个圆的**，四角露出深色底，和旁边别的插件不齐 | magpie 把图标画在**圆角方框**里；官网 favicon 常是「品牌徽标」，WorkBuddy 那份 `logo.svg` 里 `rect rx="20"`（40 宽画布）就是正圆。真正的**应用图标**在客户端安装包里 —— Windows exe 的 PE 资源 `RT_ICON` 存着 16~256 多档 PNG，256 那档拖出来就是官方原图：`node scripts/app-icon.mjs <installer.exe> --data-uri`。判据：**别只看 favicon**；两处都要写（`auth.icon` 与 `package.json` 的 `magpie.icon`，见 HOOKS 九之三） | `scripts/app-icon.mjs` · HOOKS 九之三 |
 | 37 | **插件里的模型比厂商网页上少几个，或者倍率 / 上下文不对** | 厂商常有**两份目录**：客户端读的那份（如 `/v3/config`）更新慢，控制台 / 网页那份带完整的分角色元数据。用 [`src/catalog-union.mjs`](./src/catalog-union.mjs) 合并：控制台那份作**主目录**（同 id 用它），配置那份补它没有的 id 和促销表；`auto` / 补全 / 过小输出 / 生成图这些非聊天行过滤掉。**两份都读不到要抛**（调用方回退上次快照），返回 `[]` 会被宿主当成「这家没有模型」 | `src/catalog-union.mjs` · 本文件坑 17 |
+| 38 | **上游偶发或固定回 403 `TM.00000001`（文案是「网络繁忙，请稍后重试」），重试和换账号都没用**；或者某个 provider 换到新网络 / 新账号后就不通 | 每个打上游的 `fetch` 都**显式**带 `User-Agent`，值是**该服务官方客户端**的 UA —— 绝不写 `<包名>/<版本号>`，也绝不让宿主的 `magpie/<version>` 透传（插件不设 UA 时它就这么上去）。官方是网页就用完整 Chrome UA；有 App / CLI 客户端就用那个客户端的 UA。判据：`node scripts/check-ua.mjs` 退出 0（`npm run check` 也卡这一条） | README「3. User-Agent 常常是硬校验」· `scripts/check-ua.mjs` |
 
 ---
 
@@ -98,6 +99,12 @@ PR 是 GitHub 对受保护分支的技术要求（直推报 `GH006`），批准�
 node scripts/check.mjs              # 检查当前目录（严格：占位符会失败）
 node scripts/check.mjs ../my-plugin # 检查别的仓库
 npm run check:template              # 仅脚手架自身：允许「未命名」占位符
+
+# 出站 User-Agent —— 0 = 合规，2 = 有违规（打印 文件:行 + 值 + 修法）
+#   上游按 `<product>/<version>` 认「第三方客户端」回 403 TM.00000001（文案是「网络繁忙」）；
+#   而插件不显式设 UA 时，宿主会把 `magpie/<version>` 原样透传上去。坑表第 38 条。
+node scripts/check-ua.mjs .
+node scripts/check-ua.mjs ../my-plugin
 
 # 打包面预演：README / CHANGELOG / docs 在不在包里
 npm pack --dry-run
