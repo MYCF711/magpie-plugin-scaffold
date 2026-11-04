@@ -3,6 +3,17 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.3.10 — 2026-11-04
+
+**新增 `scripts/check-ua.mjs`：出站 User-Agent 必须是官方客户端 UA**
+
+- `scripts/check-ua.mjs`：扫 `index.mjs` + `src/`，查四类 —— 自产品名形态（`magpie/…`、`magpie-xxx/<ver>`、`alysis-magpie/…`）、运行时默认（`node` / `Bun/…` / `undici`）、**截断的 Mozilla 残句**（缺 `(KHTML, like Gecko) Chrome/… Safari/537.36`）、以及「打非本机上游却没设 UA」（这一类是警告）。注释里的示例不算违规；`tests/` 与 `scripts/` 不扫（夹具与打 GitHub API 的请求是故意的）。`npm run check` 一起卡这条
+- 起因是一条会静默出错的链路：上游网关按 `<product>/<version>` 形态认出「第三方客户端」，回 `403 {"error_code":"TM.00000001","error_msg":"网络繁忙，请稍后重试"}` —— **文案说网络繁忙**，用户重试 / 换号全没用。而 magpie 给插件的请求带 `User-Agent: magpie/<version>`，插件不显式设 UA 就把它透传上去，一样命中。实测（同一签名、同一请求体，只换 UA，交替 3 轮）：`<产品名>/0.2.1-rc.2` 带不带 `(+url)` 都 403，`<产品名>`（无版本号）/ `curl/8.7.1` / 不发 UA 都 200
+- `src/http.mjs`：`baseHeaders()` 的默认 UA 从 `magpie-plugin/0.0.0` 换成新增的 `OFFICIAL_UA`（完整合法 Chrome UA）；`src/api.mjs` 的 `headersFor()` 同改。**模板本身就在教坏值** —— 派生仓库照抄 `magpie-plugin/0.0.0` 的已有先例（alysis / monkeycode 都中过）
+- `src/tempmail-client.mjs`：两处 `fetch` 补 `user-agent`
+- `AGENTS.md`：坑表新增第 38 条（403 `TM.00000001` 查 UA）；`README` 的「3. User-Agent 常常是硬校验」扩成四个小节（为什么会静默出事 / 宿主透传那一半 / 官方 UA 三条取法 / 判据）；`CHECKLIST.md` A 表加第 19 条
+- `tests/check-ua.test.mjs`（11 项）；`npm run check:ua` 一条命令自查
+
 ## 0.3.9 — 2026-11-04
 
 **新增 `src/catalog-union.mjs` 与 `scripts/app-icon.mjs`：多目录模型合并 + 从客户端安装包取官方应用图标**

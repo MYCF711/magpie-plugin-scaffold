@@ -758,10 +758,68 @@ magpie-bun install
 
 ### 3. User-Agent 常常是硬校验
 
-很多厂商校验客户端身份。照抄官方客户端的 User-Agent 形状，
-不要用自己的包名。
+很多厂商校验客户端身份。**照抄官方客户端的 User-Agent**，不要用自己的包名，
+也不要留运行时默认值。
 
 例：CodeBuddy 不是 `CodeBuddyIDE/<version>` 形状就返回 10085（拒绝服务）。
+
+#### 3.1 为什么这条会静默出事
+
+上游网关会按 **`<product>/<version>`** 这个形态识别「第三方客户端」，命中就回
+
+```
+403 {"error_code":"TM.00000001","error_msg":"网络繁忙，请稍后重试"}
+```
+
+**文案说的是「网络繁忙」** —— 用户会去重试、去换账号、去看上游状态页，全都修不好；
+你在日志里也只看到 403，看不出是 UA 的锅。
+
+实测（同一 AK/SK、同一签名、同一请求体，只换 `User-Agent`，交替 3 轮）：
+
+| User-Agent | 结果 |
+|---|---|
+| `<产品名>/0.2.1-rc.2 (+https://github.com/…/…)` | **403** `TM.00000001` |
+| `<产品名>/0.2.1-rc.2` | **403** `TM.00000001` |
+| `<产品名>`（无版本号） | 200 |
+| `curl/8.7.1` / `Mozilla/5.0` / 不发 UA | 200 |
+
+#### 3.2 还有一半在宿主那边：不设 UA = 透传 `magpie/<version>`
+
+magpie 给插件的请求带 `User-Agent: magpie/<version>`（插件型 provider 一律改写成它）。
+**插件不显式设 UA，就把它原样转给上游** —— 那同样是 `<product>/<version>` 形态，一样命中。
+
+所以规矩是两条，缺一都不算过：
+
+1. 每个打上游的 `fetch` **显式**带 `User-Agent`；
+2. 值是**该服务官方客户端**的 UA。
+
+`loader` 的 `fetch` 包装里，`"user-agent"` 必须在**跳过名单**里（否则客户端传来的 UA 会穿透），
+再由插件自己补上官方值。
+
+#### 3.3 官方 UA 怎么取（按优先级）
+
+| # | 情形 | 取什么 |
+|---|---|---|
+| ① | 仓库 / 抓包里已经有过官方 UA | **逐字节照抄**，别改版本号，别「顺手美化」 |
+| ② | 厂商有 App / CLI / Electron 客户端 | 那个客户端自己的 token：`WorkBuddy/<app> … CLI/<ver>`、`aipy-pro/2.1.1 … Electron/34.3.3`、`Loomy\|Desktop\|Electron\|macOS`、`okhttp/4.12.0`、`cnb-cli/<ver>` |
+| ③ | 官方就是网页（Cookie / 网页会话） | **完整合法**的 Chrome UA：`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36` |
+
+③ 必须是**完整**的一条 —— 截断的 `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36`
+（缺 `(KHTML, like Gecko) Chrome/… Safari/537.36`）是残句，等于自报「不是浏览器」。
+模板里把它固化成了 `src/http.mjs` 的 `OFFICIAL_UA`，派生仓库直接引用、按需覆盖。
+
+#### 3.4 判据
+
+```bash
+node scripts/check-ua.mjs        # 0 = 合规；2 = 有违规（打印 文件:行 + 值 + 修法）
+node scripts/check-ua.mjs ../my-plugin
+```
+
+`npm run check` 也卡这一条。它查四类：自产品名形态（`magpie/…`、`magpie-xxx/<ver>`、
+`alysis-magpie/…`）、运行时默认（`node` / `Bun/…` / `undici`）、截断的 Mozilla、
+以及「打非本机上游却没设 UA」（这一类是警告：静态拼不出来的，在 CHECKLIST A 表人工确认）。
+
+查不到的：UA 在运行期才拼出来、或从配置读的 —— 那部分只能靠 A 表那条人工过一遍。
 
 ### 4. 一次性 refresh_token 必须串行
 

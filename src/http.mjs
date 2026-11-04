@@ -23,14 +23,29 @@ export const CODES = Object.freeze({
 })
 
 /**
- * 构造公共请求头。默认 UA 只是占位；调用方可用 extra 显式覆盖任意默认值。
+ * 官方网页客户端的 User-Agent —— 完整合法的 Chrome UA，**不是** `<包名>/<版本号>`。
+ *
+ * 上游网关按 `<product>/<version>` 形态识别「第三方客户端」，命中即回
+ * `403 {"error_code":"TM.00000001","error_msg":"网络繁忙，请稍后重试"}` ——
+ * 报错说的是「网络繁忙」，看不出是 UA 的锅。而宿主给插件的请求带
+ * `User-Agent: magpie/<version>`，插件不显式设就把它透传上去，同样命中。
+ *
+ * 厂商有 App / CLI 客户端时，把这一个常量换成那个客户端的 UA
+ * （`WorkBuddy/<app> … CLI/<ver>`、`aipy-pro/…`、`Loomy|Desktop|Electron|macOS`），
+ * 别在这里留 `<包名>/<version>`。判据：`node scripts/check-ua.mjs` 退出 0。
+ */
+export const OFFICIAL_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+
+/**
+ * 构造公共请求头。UA 默认取 {@link OFFICIAL_UA}；调用方可用 extra 显式覆盖任意默认值。
  *
  * @param {Record<string, string>} [extra] 额外请求头，同名项优先
  * @returns {Record<string, string>}
  */
 export function baseHeaders(extra = {}) {
   return {
-    "user-agent": "magpie-plugin/0.0.0",
+    "user-agent": OFFICIAL_UA,
     accept: "application/json",
     ...extra,
   }

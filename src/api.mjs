@@ -10,7 +10,7 @@
 //   ③ 每个请求都带超时（AbortSignal.timeout），没有超时的 fetch 会挂死整张卡片
 
 import { BASE } from "./context.mjs"
-import { isLoginBroken } from "./http.mjs"
+import { OFFICIAL_UA, isLoginBroken } from "./http.mjs"
 
 /** 上游给的业务错误。带上 status 与 code，调用方才能分流。 */
 export class ApiError extends Error {
@@ -34,12 +34,17 @@ export const TIMEOUT = { short: 10_000, long: 120_000 }
  *   Bearer <token>                     多数 OpenAI 兼容网关
  *   + organization-code: <org>         有的网关不带这个头直接 500（不是 401）
  *   + 自定义 UA / Origin               有的网关缺 Origin 偶发 403
+ *
+ * ⚠ UA 写成 `<包名>/<版本号>`（模板早期是 `magpie-plugin/0.0.0`）会被上游网关按
+ * 「第三方客户端」拦成 `403 TM.00000001`（文案是「网络繁忙」）。厂商有 App / CLI
+ * 客户端就换成那个客户端的 UA，官方是网页就用 `OFFICIAL_UA`（完整 Chrome UA）。
+ * 判据：`node scripts/check-ua.mjs` 退出 0。
  */
 export function headersFor(auth = {}) {
   const h = {
     "content-type": "application/json",
     accept: "application/json",
-    "user-agent": "magpie-plugin/0.0.0", // TODO: 换成真实 UA，有的厂商硬校验它
+    "user-agent": OFFICIAL_UA, // 厂商有 App / CLI 客户端时换成那个 UA
   }
   if (auth.token) h.authorization = `Bearer ${auth.token}`
   // TODO: 需要组织码 / 租户头的话在这里加

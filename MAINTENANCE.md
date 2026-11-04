@@ -9,16 +9,16 @@
 |---|---|
 | 仓库 | `MYCF711/magpie-plugin-scaffold` |
 | npm 包名 | `magpie-plugin-scaffold` |
-| 当前版本 | `0.3.9`（已发布） |
-| 定位 | magpie 供应商插件脚手架：九钩子模板 + 28 个通用 `src/` 模块 + 35 条坑表 + 评分卡 + 受控发布脚本 |
+| 当前版本 | `0.3.10`（未发布） |
+| 定位 | magpie 供应商插件脚手架：九钩子模板 + 28 个通用 `src/` 模块 + 38 条坑表 + 评分卡 + 受控发布脚本 |
 | 本批来源 | 当前 magpie 真实启用的 17 个插件；清单与取舍见 `RECYCLING.md` |
 
-## 二、当前状态（2026-11-03）
+## 二、当前状态（2026-11-04）
 
 ```text
-分支        main（PR #25 已合并，merge commit eb97523）
-版本        0.3.8；tag v0.3.8；npm magpie-plugin-scaffold@0.3.8
-工作区      clean；.mirror.json / node.json 只在本地 exclude，不属于发布面
+分支        main（0.3.9 已发布）
+版本        0.3.10（工作区，未 bump tag / 未发 npm）
+本批新增    scripts/check-ua.mjs（出站 UA 规定）· AGENTS 坑表第 38 条 · README「3. User-Agent」四小节 · CHECKLIST A-19
 ```
 
 | 资产 | 数量 |
@@ -32,10 +32,11 @@
 并增强 `models` / `openai-sse` / `store` / `quota` / `usage-cache` / `api` / `invite` 与入口的
 SWR、签到 single-flight、400/422 分类接线。没有回收厂商域名、凭据形状、业务码、模型权限表或站点任务。
 
-已验证：
+已验证（0.3.10）：
 
-- `node --test`：301 通过 / 0 失败；
-- `npm run check:template`：38 通过 / 0 失败（模板占位名 warning 是既有预期）；
+- `node --test`：312 通过 / 0 失败（新增 `tests/check-ua.test.mjs` 11 项）；
+- `npm run check:template`：40 通过 / 0 失败（模板占位名 warning 是既有预期）；
+- `npm run check:ua`：退出 0（模板 `src/http.mjs` 的 `OFFICIAL_UA` 生效，旧 `magpie-plugin/0.0.0` 已清）；
 - `npm run check:errors`：退出 0；
 - `npm pack --dry-run`：91 个文件，`RECYCLING.md` 与新增模块/测试均在包内；
 - `git diff --check`：退出 0；`privacy-scan`：PASS；

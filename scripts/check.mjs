@@ -17,6 +17,7 @@ import { readFileSync, existsSync, statSync, readdirSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
 import { scanErrorCodes } from "./check-error-codes.mjs"
+import { scanUserAgents } from "./check-ua.mjs"
 
 const ARGS = process.argv.slice(2)
 const TEMPLATE_MODE = ARGS.includes("--template")
@@ -511,6 +512,24 @@ if (existsSync(entryJson) && pkg?.name) {
      "错误出口都带 status + code，且 code 在 ERROR-CODES 词表内",
      bad.length ? bad.map((r) => `${r.file}:${r.line} ${r.rule} ${r.message}`).join("；") : "",
      "ERROR-CODES.md §4（R1-R9）· §6 有最小实现模板")
+}
+
+{
+  // 出站 User-Agent（README「3. User-Agent 常常是硬校验」+ AGENTS 坑表第 38 条）。
+  // 为什么值得一条断言：上游网关按 `<product>/<version>` 认「第三方客户端」，回
+  // `403 TM.00000001`，文案却是「网络繁忙」—— 用户会去重试、去换号，都修不好；
+  // 而宿主给插件的请求带 `magpie/<version>`，插件不显式设 UA 就把它透传上去。
+  const rows = scanUserAgents(ROOT)
+  const bad = rows.filter((r) => r.level === "fail")
+  const silent = rows.filter((r) => r.level === "warn")
+  ok(bad.length === 0,
+     "出站请求的 User-Agent 是官方客户端 UA（不是自产品名 / 运行时默认 / 截断 Mozilla）",
+     bad.length ? bad.map((r) => `${r.file}:${r.line} ${r.value} —— ${r.message}`).join("；") : "",
+     "README「3. User-Agent 常常是硬校验」· 单独跑：node scripts/check-ua.mjs")
+  warn(silent.length === 0,
+       "每个打上游的文件都显式带了 User-Agent（不显式 = 透传 magpie/<version>）",
+       silent.length ? silent.map((r) => r.file).join("；") : "",
+       "在该请求的 headers 里带官方客户端 UA；静态拼不出来的，CHECKLIST A 表人工确认")
 }
 
 // ── 输出 ──────────────────────────────────────────────────────────────
