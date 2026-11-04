@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 从一个已验证的模板起一个新插件 —— 不可变部分照抄，身份三处自动改掉。
 //
-//   npx --yes github:MYCF711/magpie-plugin-scaffold#v0.3.10 create \
+//   npx --yes github:MYCF711/magpie-plugin-scaffold#v0.3.11 create \
 //     --dir my-plugin --provider huawei --name "华为云 HUAWEI" --package huawei-auth \
 //     --base https://api.huawei.example/v1
 //
@@ -256,12 +256,13 @@ function main() {
       `  包名       ${packageName}（bun 依赖键 / npm 名）`,
       `  基址       ${base}`,
       "",
-      "接下来五件事（都在 GUIDE.md 里）：",
+      "接下来六件事（都在 GUIDE.md 里）：",
       "  1. 实现 index.mjs 底部的五个 TODO（startLoginFlow / exchangeRefresh / fetchUsage / doCheckin / fetchLiveModels）",
       "  2. 改 package.json 的 description 与 magpie.icon",
       "  3. 填 README.md（照 README-TEMPLATE.md）",
       "  4. 跑 node scripts/check.mjs，退出码必须是 0",
-      "  5. 起分支 → PR 等 rules 绿 → 合并 → tag/Release（UPDATING.md）",
+      "  5. git init 之后跑 node scripts/install-hooks.mjs —— 提交前脱敏、推送前分级门禁",
+      "  6. 起分支 → PR 等 rules 绿 → 合并 → tag/Release（UPDATING.md）",
       "",
     ].join("\n"),
   )

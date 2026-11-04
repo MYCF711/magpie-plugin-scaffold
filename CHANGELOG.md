@@ -3,6 +3,17 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.3.11 — 2026-11-04
+
+**本地钩子一条命令装好：提交前脱敏 + 推送前分级门禁**
+
+- 新增 `scripts/install-hooks.mjs` 与 `scripts/hooks/`：`node scripts/install-hooks.mjs` 一次装两个钩子 —— `pre-commit` 跑 `privacy-scan --staged`（毫秒级），`pre-push` 跑快档 `check` + `privacy-scan`（实测 0~1 秒）
+- `pre-push` **按合入点分级**：只有在推 `main`、`git push -u` 首次推一个新分支、或显式 `PLUGIN_FULL=1` 时，才加跑 `npm test` / `check-docs` / `pack --dry-run`（实测约 3~5 秒）。WIP 分支的后续推送只过快档 —— 派生项目长大后测试会变慢，分级是让钩子不被绕过的前提
+- 逃生门 `PLUGIN_SKIP_HOOK=1 git push` 只跳过**这一次**，不是永久关闭
+- `scripts/create.mjs`：输出的「接下来」从五件事变六件，第 5 条是 `git init` 之后跑 `install-hooks.mjs`
+- `AGENTS.md`：新增 §8.3b（钩子表 / 为什么分级 / CI 触发面的收窄办法）；§8.3 的 pre-commit 一行命令保留为「只想挂脱敏」的简化路径
+- 起因：`ci.yml` 的五步（check / test / docs / privacy / pack）在本地没有任何东西兜底，漏跑任意一步就是「推上去才发现红」+ 一封 Actions 失败邮件。实测模板全套本地不到 5 秒，没有理由留到 CI 才发现
+
 ## 0.3.10 — 2026-11-04
 
 **新增 `scripts/check-ua.mjs`：出站 User-Agent 必须是官方客户端 UA**
