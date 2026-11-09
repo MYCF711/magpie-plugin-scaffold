@@ -34,6 +34,9 @@
 import { homedir } from "node:os"
 import { join } from "node:path"
 
+import { BASE } from "./context.mjs"
+import { OFFICIAL_UA } from "./http.mjs"
+import { assertTrustedUrl, trustedUrlOf, UntrustedUrlError } from "./origin.mjs"
 import { readJson, writeJson } from "./store.mjs"
 
 function cacheDir() {
@@ -154,4 +157,337 @@ export function makeInviteMethod({ label, mainMethod, followUps = [], pick, save
   function invitePrompt() {
     return { type: "text", key: inviteKey, message: "邀请码", placeholder: inviteHint("") }
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 邀请登录协议层（只接登录 URL 参数）
+// ═══════════════════════════════════════════════════════════════════
+//
+// 厂商带邀请的入口**不是** OAuth `authorize` 的参数，而是 Web 登录页的一个
+// 顶层查询参数：
+//
+//   <登录页路径>?next=<完整授权 URL>&<状态参数名>=<状态值>
+//
+// `authorize` 上的未知参数只会被折进 `next` 里，而登录页不读 `next` 里的
+// 状态参数（实测过，别指望「多传一个参数」）。状态值要从公开分享页
+// `GET <分享前缀><code>` 的 HTML 里取。
+//
+// 安全边界（这是本模块唯一新增的请求）：
+//   · 只在调用方明确给了 code 时才抓一次分享页；空码 / 非法码**零请求**
+//   · 匿名 GET：不带 Authorization、不带 x-desktop-* 设备头
+//   · 同 origin（`trustedUrlOf`）、官方 UA、Accept text/html、redirect:manual、10s 超时
+//   · 失败只回 `{state:"", reason}`，**不阻塞登录**
+//   · 登录路径（`ask` / `authorize` / `callback`）**永不**自动调厂商的
+//     「绑定邀请 / 查自己的邀请码」写面 —— 那些属于账号自己的数据，是别的模块的事
+//
+// ⚠ 厂商相关值全部集中在下面这一段，**派生仓库只改这一段就够**。
+//   端点 origin 由 `src/context.mjs` 的 `BASE` 决定，这里只放站点路径与参数名。
+//   每个值都写了「不换会怎样」—— 这几条写错都不报错，只是邀请静默失效。
+//   一组自洽的默认值已经能跑通测试；占位提醒只在注释里，不写成跑不起来的 `<...>`。
+//
+// 没有邀请功能的厂商：**不要**把本模块接进登录流程，也不要在 `index.mjs` 声明
+// 对应的 `auth.options`；让 `src/invite-source.mjs` 的 `resolve()` 永远返回
+// `kind:"none"` 即可，不需要删文件。
+
+/** 登录页路径（`/oauth/authorize` 307 的目标）。⚠ 派生后按你的厂商改：不换会 404，邀请永远不生效。 */
+export const INVITE_LOGIN_PATH = "/login"
+
+/** 注册页路径（分享页里的注册链接也可能带状态参数）。⚠ 派生后按你的厂商改：没有独立注册页就写成和登录页一样。 */
+export const INVITE_REGISTER_PATH = "/register"
+
+/**
+ * 公开分享页前缀：`<BASE 的 origin><分享前缀><code>`，例如 `/r/`。
+ * ⚠ 派生后按你的厂商改：不换会抓到 404 → `reason:"http_error"`，邀请静默不生效。
+ * ⚠ 这是**站点路径**（网页），不是 API 路径：按 URL 语义解析到 BASE 的 origin 根，
+ *   所以 BASE 带 `/v1` 这类前缀时也会被丢掉。厂商的网页在另一个域名时，这套协议层不适用。
+ */
+export const INVITE_SHARE_PREFIX = "/r/"
+
+/** 邀请状态参数名（登录页上那个 `?…=`）。⚠ 派生后按你的厂商改：不换上游直接忽略 → 邀请静默失效。 */
+export const REFERRAL_STATE_PARAM = "referral_state"
+
+/** 状态值前缀，只认这一族（默认 `rs1.`）。⚠ 派生后按你的厂商改：不换所有 state 都被判非法、邀请永远带不上。 */
+export const REFERRAL_STATE_PREFIX = "rs1."
+
+/** 分享页 GET 的超时（毫秒）。⚠ 派生后按你的厂商改：太小会频繁 timeout，太大会拖慢登录。 */
+export const INVITE_FETCH_TIMEOUT_MS = 10_000
+
+/**
+ * 邀请码白名单（同时也是分享页 code 的白名单）。
+ * ⚠ 按你的厂商的码字符集改：放宽会引入路径注入面，收紧会把真码拒掉。
+ */
+export const REFERRAL_CODE_RE = /^[A-Za-z0-9._-]{1,200}$/
+
+/** 转义正则里的元字符（前缀 / 路径都是从常量拼进正则的，派生者改成 `a+b` 也不会炸） */
+function escapeRegExp(text) {
+  return String(text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+/** 状态参数会出现在哪些页面的链接里（`parseReferralState` 只认这两条路径） */
+const INVITE_LINK_PATHS = Object.freeze([INVITE_LOGIN_PATH, INVITE_REGISTER_PATH])
+
+/** 分享页 href 的白名单：只认上面那两条路径（`https://…`、`//host/…` 都不算） */
+const REFERRAL_LINK_RE = new RegExp(
+  `^(?:${INVITE_LINK_PATHS.map(escapeRegExp).join("|")})(?:[?#]|$)`,
+  "i",
+)
+
+/** 状态值白名单：由 `REFERRAL_STATE_PREFIX` 派生，改前缀就够，这里不用动 */
+export const REFERRAL_STATE_RE = new RegExp(`^${escapeRegExp(REFERRAL_STATE_PREFIX)}[A-Za-z0-9._-]+$`)
+
+/**
+ * 协议层「接线图」：把上面那批厂商相关值收在一处，派生仓库改这里一处就够。
+ * 冻结它只是防止运行期被别的模块改写（测试会按它检查常量形状）。
+ */
+export const INVITE_WIRING = Object.freeze({
+  loginPath: INVITE_LOGIN_PATH,
+  registerPath: INVITE_REGISTER_PATH,
+  sharePrefix: INVITE_SHARE_PREFIX,
+  referralStateParam: REFERRAL_STATE_PARAM,
+  referralStatePrefix: REFERRAL_STATE_PREFIX,
+  referralStatePattern: REFERRAL_STATE_RE,
+  codePattern: REFERRAL_CODE_RE,
+  fetchTimeoutMs: INVITE_FETCH_TIMEOUT_MS,
+  linkPaths: INVITE_LINK_PATHS,
+})
+
+/** 非法邀请码。文案**不含**原值（邀请码 / 状态一律不进日志）。 */
+export class InvalidReferralCodeError extends Error {
+  constructor() {
+    super("邀请码不合法：只允许 [A-Za-z0-9._-]{1,200}")
+    this.name = "InvalidReferralCodeError"
+    this.code = "invalid_code"
+  }
+}
+
+/**
+ * 把授权 URL 包进登录页；state 为空 / 非法时**原样返回**授权 URL。
+ *
+ * 关键点：`next` 必须用 `URLSearchParams.set` 编码，解出来要**逐字**等于原授权 URL
+ * （含 `state` / `code_challenge` / `redirect_uri`）。先 encode 再 set 会二次编码。
+ *
+ * base 不可信时同样回退裸授权 URL（宁可邀请不生效，也不把用户带去别的 origin）。
+ *
+ * `next`（= `authorizeUrl`）**也**要过同一道闸：这个导出函数不许变成开放重定向
+ * gadget —— 拿一个外站 URL 当 `next` 塞进可信登录页，用户点完就被带去别处。
+ * 只接受「绝对 https + 可信 origin」；不可信 / 相对 / 畸形一律原样返回。
+ *
+ * @param {{base?: string, authorizeUrl: string, referralState: string}} o
+ * @returns {string}
+ */
+export function buildInviteLoginUrl({ base = BASE, authorizeUrl, referralState } = {}) {
+  const target = String(authorizeUrl ?? "")
+  const state = String(referralState ?? "").trim()
+  if (!REFERRAL_STATE_RE.test(state)) return target
+
+  // 先校验 next（必须是可信 origin 上的绝对 https URL），否则绝不包装。
+  // 注意这里用 assertTrustedUrl 而不是 trustedUrlOf：相对路径不是「完整授权 URL」。
+  try {
+    assertTrustedUrl(target)
+  } catch {
+    return target
+  }
+
+  let login
+  try {
+    // 按调用方给的 base 解析，但**信任锚始终是插件自己的 BASE**：
+    // 不能拿 `trustedUrlOf(path, { base })`（那等于「自己信自己」）。
+    login = new URL(INVITE_LOGIN_PATH, String(base))
+    trustedUrlOf(login.toString())
+  } catch {
+    return target
+  }
+  login.searchParams.set("next", target)
+  login.searchParams.set(REFERRAL_STATE_PARAM, state)
+  return login.toString()
+}
+
+/** 解 HTML 实体：分享页把 `&` 写成 `&amp;`（也容忍数字实体） */
+function decodeHtmlEntities(value) {
+  return String(value ?? "").replace(/&#x([0-9a-f]+);|&#(\d+);|&(amp|quot|apos|#39);/gi, (m, hex, dec, name) => {
+    if (hex) {
+      const n = Number.parseInt(hex, 16)
+      return Number.isFinite(n) && n <= 0x10ffff ? String.fromCodePoint(n) : ""
+    }
+    if (dec) {
+      const n = Number.parseInt(dec, 10)
+      return Number.isFinite(n) && n <= 0x10ffff ? String.fromCodePoint(n) : ""
+    }
+    switch (String(name).toLowerCase()) {
+      case "amp":
+        return "&"
+      case "quot":
+        return '"'
+      case "apos":
+      case "#39":
+        return "'"
+      default:
+        return m
+    }
+  })
+}
+
+/**
+ * 从分享页 HTML 里取**第一个合法**的状态值。
+ *
+ * 只认登录 / 注册页的 href（大小写不敏感），其它链接（分享页自己、外站、
+ * 协议相对）一律跳过。参数名大小写不敏感，值必须匹配 `REFERRAL_STATE_RE`；
+ * 畸形值继续往后找，一个都没有就返回空串。
+ *
+ * ⚠ 不打印、不回显任何值：调用方拿到的只有「合法状态」或空串。
+ *
+ * @param {string} html
+ * @returns {string}
+ */
+export function parseReferralState(html) {
+  const source = typeof html === "string" ? html : ""
+  if (!source) return ""
+
+  const wanted = REFERRAL_STATE_PARAM.toLowerCase()
+  // 属性名大小写不敏感（`HREF=`），值可有单 / 双引号或无引号
+  const hrefRe = /(?:\s|^)href\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'<>`]+))/gi
+  let m
+  while ((m = hrefRe.exec(source)) !== null) {
+    const href = decodeHtmlEntities(m[1] ?? m[2] ?? m[3] ?? "").trim()
+    // 只认相对路径的登录 / 注册页；`https://…/login`、`//host/login` 都不算
+    if (!REFERRAL_LINK_RE.test(href)) continue
+
+    let url
+    try {
+      url = new URL(href, "https://referral.invalid")
+    } catch {
+      continue
+    }
+    for (const [key, value] of url.searchParams) {
+      if (key.toLowerCase() !== wanted) continue
+      if (REFERRAL_STATE_RE.test(value)) return value
+    }
+  }
+  return ""
+}
+
+/**
+ * 分享页 URL：`<BASE origin><分享前缀><code>`，code 先过白名单，再过 `trustedUrlOf`（同 origin）。
+ *
+ * @param {string} [base]
+ * @param {string} code
+ * @returns {string}
+ */
+export function referralShareUrl(base = BASE, code) {
+  const c = String(code ?? "").trim()
+  if (!REFERRAL_CODE_RE.test(c)) throw new InvalidReferralCodeError()
+
+  try {
+    // 与 buildInviteLoginUrl 同一套：先按 base 解析，再用 BASE 做信任锚
+    const share = new URL(`${INVITE_SHARE_PREFIX}${c}`, String(base))
+    return trustedUrlOf(share.toString()).toString()
+  } catch (err) {
+    // 错误里不带 code / 原 URL：失败文案只说明「不可信」
+    throw new UntrustedUrlError("分享页 URL 不在可信 origin 上", {
+      reason: err?.reason || "origin",
+    })
+  }
+}
+
+/**
+ * 抓一次公开分享页，取状态值。
+ *
+ * 返回形状固定为 `{state, reason}`：
+ *   · 成功            → `{state:"…", reason:""}`
+ *   · 非法 / 空 code  → `{state:"", reason:"invalid_code"}`（**零 fetch**）
+ *   · base 不可信     → `{state:"", reason:"untrusted_origin"}`（零 fetch）
+ *   · 3xx（manual）   → `{state:"", reason:"redirect"}`
+ *   · 非 2xx          → `{state:"", reason:"http_error"}`
+ *   · 超时 / 取消     → `{state:"", reason:"timeout"}` / `"aborted"`
+ *   · 网络错误        → `{state:"", reason:"network"}`
+ *   · HTML 里没有     → `{state:"", reason:"no_state"}`
+ *
+ * 任何失败都不抛：调用方回退裸授权 URL，登录继续。
+ *
+ * @param {{base?: string, code: string, fetchImpl?: typeof fetch, signal?: AbortSignal}} o
+ */
+export async function fetchReferralState({ base = BASE, code, fetchImpl = globalThis.fetch, signal } = {}) {
+  const c = String(code ?? "").trim()
+  if (!REFERRAL_CODE_RE.test(c)) return { state: "", reason: "invalid_code" }
+
+  let shareUrl
+  try {
+    shareUrl = referralShareUrl(base, c)
+  } catch {
+    return { state: "", reason: "untrusted_origin" }
+  }
+
+  // 调用方已经取消：不发明请求
+  if (signal?.aborted) return { state: "", reason: "aborted" }
+
+  const controller = new AbortController()
+  let timedOut = false
+  let callerAborted = false
+
+  const onAbort = () => {
+    callerAborted = true
+    try {
+      controller.abort(signal.reason)
+    } catch {
+      controller.abort()
+    }
+  }
+  if (signal?.addEventListener) signal.addEventListener("abort", onAbort, { once: true })
+
+  // 超时用 Promise.race 兜底：即使注入的 fetch 不理会 AbortSignal，10s 也一定返回。
+  // race 会替两边挂上处理器，迟到的 fetch 失败不会变成 unhandled rejection。
+  let rejectTimeout
+  const timeoutPromise = new Promise((_, reject) => {
+    rejectTimeout = reject
+  })
+  const timer = setTimeout(() => {
+    timedOut = true
+    try {
+      controller.abort(new Error("invite_timeout"))
+    } catch {
+      controller.abort()
+    }
+    rejectTimeout(new Error("invite_timeout"))
+  }, INVITE_FETCH_TIMEOUT_MS)
+  if (typeof timer?.unref === "function") timer.unref()
+
+  try {
+    // 匿名 GET：只有官方 UA 与 Accept，**没有** Authorization / x-desktop-*
+    const res = await Promise.race([
+      fetchImpl(shareUrl, {
+        method: "GET",
+        redirect: "manual",
+        headers: { "user-agent": OFFICIAL_UA, accept: "text/html" },
+        signal: controller.signal,
+      }),
+      timeoutPromise,
+    ])
+
+    const status = Number(res?.status ?? 0)
+    if (status >= 300 && status < 400) return { state: "", reason: "redirect" }
+    if (!(status >= 200 && status < 300)) return { state: "", reason: "http_error" }
+
+    const html = await res.text()
+    const state = parseReferralState(html)
+    return state ? { state, reason: "" } : { state: "", reason: "no_state" }
+  } catch {
+    if (timedOut) return { state: "", reason: "timeout" }
+    if (callerAborted) return { state: "", reason: "aborted" }
+    return { state: "", reason: "network" }
+  } finally {
+    clearTimeout(timer)
+    if (signal?.removeEventListener) signal.removeEventListener("abort", onAbort)
+  }
+}
+
+/**
+ * 邀请模式：`off`（默认）或不带码的 `on` 都等于「不带邀请」。
+ * 只在这里表达取舍；真正的 URL 构造仍在 `buildInviteLoginUrl`。
+ *
+ * @param {{enabled?: boolean, referralState?: string}} [policy]
+ * @returns {"on"|"off"}
+ */
+export function inviteModeOf(policy) {
+  if (policy?.enabled !== true) return "off"
+  return REFERRAL_STATE_RE.test(String(policy?.referralState ?? "").trim()) ? "on" : "off"
 }

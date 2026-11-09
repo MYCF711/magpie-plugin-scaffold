@@ -50,6 +50,13 @@ cd my-provider && rm -rf .git && git init
 判据：脚手架自身跑 `npm run check:template` 能过（1 条警告：registry 还是占位）；
 改完身份后跑 `node scripts/check.mjs`，显示名/provider name 还是「未命名」占位符就会失败。
 
+⚠ **要换的不只是「身份」那几项。** 邀请 / 插件选项这两块还带一批**必须替换的常量**：
+邀请状态参数名（默认 `referral_state`）、登录页路径（`/login`）、分享页前缀、状态串前缀（`rs1.`）、
+code 白名单、分享页超时、`auth.options[].key` / `label` / `descriptions` / `placement`、`BASE`、`PROVIDER`。
+逐条「模板默认值 → 改成什么 → 不换会怎样」在 [HOOKS 四之一的「按你的厂商替换」](./HOOKS.md)。
+两条命令就够判断：模板自身 `npm run check:template` **允许**占位符；派生仓库跑严格
+`node scripts/check.mjs` 会因占位符失败 —— 那是提醒你改，不是模板坏了。
+
 ⚠ **`scripts/` 和 `src/` 要一起带走，不能只留 `index.mjs`。**
 `scripts/check.mjs` 是你自己仓库的检查器，`scripts/score.mjs` 打分时读的正是**你自己仓库里的**
 `scripts/check.mjs` —— 删了它，A 层直接 0 分。`src/` 同理：`tests/semantics.test.mjs` import 的就是它。
@@ -131,6 +138,33 @@ const MODELS = [
 没有 method 级的 `validate`；不写 `authorize` 时 magpie 把用户粘的 key **原样保存**。
 所以 `placeholder: "nimbus-…"` 只是**提示**，挡不住用户粘一个 `sk-...` 进来 ——
 要挡就在 `loader` 里自己判断并返回 `{}`（让请求失败），别指望界面拦。
+
+**想让用户能开关某个能力 → 用 `auth.options` + `placement: "top"`：**
+
+```js
+auth: {
+  provider: PROVIDER,
+  options: [
+    {
+      key: "invite_mode",                                   // ^[a-z0-9_-]{1,40}$
+      label: "邀请模式",                                     // ≤60，必填
+      description: "开着挂首选账号的邀请链接；关着挂最近注册那个号的",
+      default: false,
+      placement: "top",                                     // ⚠ 只能是字符串 "top"
+    },
+  ],
+  methods: [ /* … */ ],
+}
+```
+
+- 宿主在**账号下方、Routing 上方**把它画成 Off/On（要 magpie **≥ 0.1.2985**；更旧的版本忽略
+  `placement`，开关落在模型下方，**不报错** —— 所以别在插件里做版本判断）。
+- 插件里用 `ctx.magpie.option(PROVIDER, "invite_mode") === true` 读，而且**在使用点现读**：
+  拨开关只重拉一次模型列表，**不重跑工厂**，构造时缓存的值永远是旧的。
+- `top: true` / `placement: true` / `"bottom"` 全部等于不指定，开关不会上去。
+- 它是 **provider 级策略，不是登录方式**：不要为它新增 `auth.methods[]`。
+
+字段上限、邀请源优先级、以及「`prompts` 为空 ⇒ 手填入口不可达」那个坑：[HOOKS 四之一](./HOOKS.md)。
 
 判据：`node scripts/check.mjs` 的「导出函数返回了钩子」通过；`node --test` 全过。
 
@@ -271,5 +305,7 @@ C 层五项要**逐条在代码里找到判据**，不是「我觉得对」。�
 | 额度条永远 100% / 路由页「剩余额度未知」 | [AGENTS 坑 1、22、24](./AGENTS.md) |
 | 登录莫名失效 | [AGENTS 坑 7](./AGENTS.md) |
 | 改了代码重装没变化 | [AGENTS 坑 10](./AGENTS.md) |
+| 插件选项没出现在顶部 / 拨了没反应 | [AGENTS 坑 39](./AGENTS.md) |
+| 邀请码填了不生效 / 邀请挂错人 | [AGENTS 坑 40](./AGENTS.md) |
 | 市场搜不到 | [AGENTS 坑 15](./AGENTS.md) |
 | 以上都没有 | [HOOKS.md](./HOOKS.md) 按钩子查 · 官方 [`#faq`](https://usemagpie.ai/docs/zh/plugins#faq) |
