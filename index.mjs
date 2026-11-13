@@ -170,6 +170,31 @@ export const XxxAuthPlugin = async (_ctx, _options) => {
     maxConcurrency: 4, // 1-1000
     refreshLead: REFRESH_LEAD_MS,
 
+    // ── provider 级开关：auth.options（可选，下面的示例取消注释就生效）─────
+    //
+    // magpie ≥ 0.1.2985 才认这个字段：旧版**忽略**它（开关不显示，按 `default` 走）。
+    // 所以开关只能用来切换「可选行为」，不能拿它当唯一入口 —— 默认值必须是能用的。
+    //
+    // options: [
+    //   {
+    //     key: "<开关名>",                 // ⚠ 你自己的稳定键名，别跟着文案改
+    //     label: "<面板上的名字>",
+    //     description: "<一句话说清打开后会怎样>",
+    //     default: false,
+    //     placement: "top",                // ≥ 0.1.2985 才置顶；旧版忽略此字段，回退到面板底部
+    //   },
+    // ],
+    //
+    // ⚠ 切换开关**不会重跑插件工厂** —— 工厂只在插件加载时执行一次。
+    //   把选项值在工厂里读成 `const on = …` 会永远停在旧值；必须在使用点实时读：
+    //
+    //     const on = _ctx?.magpie?.option?.(PROVIDER, "<开关名>") === true
+    //
+    //   `_ctx` 就是**插件工厂的第一个参数**（`export async function XxxAuthPlugin(_ctx = {}, _options = {})`），
+    //   契约里写作 `input.magpie.option(provider, key)` —— 是同一个东西，**不是**某个钩子收到的入参。
+    //   宿主在插件函数里能拿到 `_ctx.magpie`；测试里 `_ctx` 可能是 `{}`，必须可选链兜底（读不到 = false）。
+    //   这段示例**只声明不读取**：派生仓库按自己的开关名在使用点去读，别照抄字符串。
+
     // ═══ ② 登录 ═══════════════════════════════════════════════════
     methods: [
       {

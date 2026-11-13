@@ -23,10 +23,10 @@
 
 | 资产 | 数量 |
 |---|---:|
-| `src/` 模块 | 28 个 / 5,331 行 |
-| `tests/` | 29 个 / 326 条（`node --test` 全过） |
-| `HOOKS.md` | 19 章字段级钩子契约 |
-| AGENTS.md 坑表 | 38 条 |
+| `src/` 模块 | 31 个 / 6,737 行 |
+| `tests/` | 32 个 / 404 条（`node --test` 全过） |
+| `HOOKS.md` | 21 章字段级钩子契约 |
+| AGENTS.md 坑表 | 40 条 |
 
 本批新增 `http` / `status` / `credential` / `oauth-device` / `checkin` / `stream-reader`，
 并增强 `models` / `openai-sse` / `store` / `quota` / `usage-cache` / `api` / `invite` 与入口的
