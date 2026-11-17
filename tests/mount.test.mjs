@@ -139,6 +139,44 @@ test("chat.headers 只给本 provider 的请求加头", async () => {
   assert.deepEqual(other.headers, {})
 })
 
+test("auth.options 声明了插件选项栏，且默认置顶（placement: top）", async () => {
+  const plugin = await XxxAuthPlugin({ client: {} })
+  const options = plugin.auth.options
+  assert.ok(Array.isArray(options) && options.length > 0, "模板必须示范 auth.options")
+  assert.ok(options.length <= 16, "optionsOf 最多认 16 条，多的不会显示")
+
+  const keys = new Set()
+  for (const o of options) {
+    assert.match(o.key, /^[a-z0-9_-]{1,40}$/, `key 非法：${o.key}`)
+    assert.ok(!keys.has(o.key), `key 重复：${o.key}（optionsOf 只取第一个）`)
+    keys.add(o.key)
+    assert.equal(typeof o.label, "string")
+    assert.ok(o.label.trim().length > 0 && o.label.length <= 60, `label 会被截断或整条丢掉：${o.label}`)
+    if (o.description !== undefined) assert.ok(o.description.length <= 300)
+    // 默认置顶：漏了这条，选项栏就画在模型列表下面，用户滚不到。
+    assert.equal(o.placement, "top", `${o.key} 必须 placement: "top"（默认置顶）`)
+  }
+})
+
+test("auth.options 的开关真的接到 chat.headers 上：off 不加头，读不到按 default", async () => {
+  const header = `x-${_internal.PROVIDER}-session`
+  const on = await XxxAuthPlugin({ client: {}, magpie: { option: () => true } })
+  const kept = { headers: {} }
+  await on["chat.headers"]({ model: { providerID: _internal.PROVIDER }, sessionID: "sess-1" }, kept)
+  assert.equal(kept.headers[header], "sess-1")
+
+  const off = await XxxAuthPlugin({ client: {}, magpie: { option: (provider, key) => (key === "session-header" ? false : true) } })
+  const skipped = { headers: {} }
+  await off["chat.headers"]({ model: { providerID: _internal.PROVIDER }, sessionID: "sess-1" }, skipped)
+  assert.deepEqual(skipped.headers, {})
+
+  // 旧版 magpie 没有 magpie.option：按 default: true 走，不能因此静默失效
+  const older = await XxxAuthPlugin({ client: {} })
+  const fallback = { headers: {} }
+  await older["chat.headers"]({ model: { providerID: _internal.PROVIDER }, sessionID: "sess-1" }, fallback)
+  assert.equal(fallback.headers[header], "sess-1")
+})
+
 test("usage/checkin 的账号 key 用 uid 或凭据指纹，不用可重名的 accountId", () => {
   const source = readFileSync(new URL("../index.mjs", import.meta.url), "utf8")
   assert.match(source, /const usageKey = uidOf\(auth\)/)
