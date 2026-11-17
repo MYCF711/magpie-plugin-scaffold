@@ -3,6 +3,15 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.3.14 — 2026-11-17
+
+**模板默认带上插件选项栏，并默认置顶（`auth.options` + `placement: "top"`）**
+
+- `index.mjs`：`auth.options` 从注释示例改为**真正启用**的 `session-header` 开关，每条默认 `placement: "top"`；`chat.headers` 在使用点实时读这个开关（旧版 magpie 没有 `magpie.option` 时按 `default: true` 走，不会静默失效）
+- `tests/mount.test.mjs`：锁「每条 `placement === "top"`」「key 合法且不重复 / label ≤60」「开关真的接到 `chat.headers`」「读不到 `magpie.option` 时按默认值走」
+- `README.md`：数据字段表补 `auth.options` 一行
+- 起因：0.3.13 只把契约写进 `HOOKS.md`，模板里仍是注释状态 —— 派生插件照抄出来不会有选项栏；而 `placement` 不写就落在模型列表下面，卡片一长用户滚不到
+
 ## 0.3.13 — 2026-11-09
 
 **文档：把「provider 级开关 / 邀请源 / 签到按钮」三块通用能力写进模板**
