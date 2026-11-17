@@ -3,6 +3,16 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.3.13 — 2026-11-17
+
+**供应商卡片里的插件选项栏：模板默认置顶（`auth.options` 每条 `placement: "top"`）**
+
+- `index.mjs`：`auth` 新增 `options` 示例（`session-header` 开关），每条默认 `placement: "top"`；`chat.headers` 真实读这个开关 —— 关掉就不加头，旧版 magpie 没有 `magpie.option` 时按 `default` 走，不会装不上
+- `HOOKS.md`：新增「九之四、卡片上的插件选项栏（`auth.options`）」—— 字段白名单（`key` / `label` / `description` / `default` / `confirm` / 多语言 / `filtersModels` / `placement`）、截断长度与 16 条上限、`placement` 决定画在账号下面还是模型列表下面（#5269）、插件读法与保存链路、三条静默坑
+- `tests/mount.test.mjs`：锁住「`auth.options` 每条 `placement === "top"`」「key 合法且不重复 / label ≤60」「开关真的接到 `chat.headers`」「读不到 `magpie.option` 时按默认值走」
+- `AGENTS.md` 坑表第 39 条；`CHECKLIST.md` A 表第 20 条；`README` 的数据字段表加一行
+- 起因：`placement` 不写就画在模型列表下面，卡片一长用户根本滚不到；老版本 magpie 一律画在下面，所以这条必须写进模板而不是靠派生仓库自己想起来
+
 ## 0.3.12 — 2026-11-04
 
 **修：`pre-push` 误拦 tag 推送（0.3.11 实装当天真卡过一次）**

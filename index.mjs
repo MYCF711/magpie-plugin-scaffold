@@ -24,6 +24,7 @@
 //   ⑨ accountId / uid                 卡片显示名 + 同名区分
 //      auth.icon / magpie.icon         卡片图标
 //      auth.maxConcurrency             并发数
+//      auth.options                    卡片上的插件选项栏 —— ⚠ 默认 placement: "top"（置顶）
 //
 // ═══════════════════════════════════════════════════════════════════════
 // 三条铁律
@@ -136,7 +137,14 @@ export const XxxAuthPlugin = async (_ctx, _options) => {
   // key 用凭据身份，不能用 provider id —— 同渠道多账号会串额度。
   const usageCache = createUsageCache({ ttlMs: 60_000, failTtlMs: 5_000 })
 
-  // _ctx 是宿主给的上下文：{ client, directory, … }。
+  // 卡片里拨过的开关（`auth.options`）。旧版 magpie 没有 `magpie.option`
+  // 时按 default 走：开关是锦上添花，读不到也不能让插件装不上。
+  const optionOn = (key, byDefault = true) => {
+    const v = _ctx?.magpie?.option?.(PROVIDER, key)
+    return typeof v === "boolean" ? v : byDefault
+  }
+
+  // _ctx 是宿主给的上下文：{ client, directory, magpie, … }。
   // 打日志用 _ctx?.client?.app?.log?.({ service, level, message })。
   //
   // ⚠ 不要往 magpie 的目录里写任何东西（包括它自己的 ~/.cache/magpie/*.json）：
@@ -169,6 +177,37 @@ export const XxxAuthPlugin = async (_ctx, _options) => {
     icon: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjggMTI4Ij48cmVjdCB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCIgcng9IjI4IiBmaWxsPSIjMWYyOTM3Ii8+PHRleHQgeD0iNjQiIHk9Ijg0IiBmb250LXNpemU9IjYwIiBmb250LWZhbWlseT0ic3lzdGVtLXVpLHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiM2MGE1ZmEiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkE8L3RleHQ+PC9zdmc+",
     maxConcurrency: 4, // 1-1000
     refreshLead: REFRESH_LEAD_MS,
+
+    // ═══ 插件选项栏（`auth.options`，不是九项钩子之一）═════════════
+    /**
+     * 供应商卡片里的一排 Off/On 开关（magpie #2038）。用户拨过之后，
+     * 插件用工厂收到的 `magpie.option(PROVIDER, key)` 立刻读到新值 ——
+     * 不用重装、不用重启（读法见上面的 `optionOn`）。
+     *
+     * ⚠ `placement: "top"` 让这一栏画在**账号下面、路由上面**（magpie #5269）：
+     *   不写就画在模型列表下面 —— 卡片一长，用户根本滚不到它。
+     *   本模板默认置顶，派生时保持这一行。
+     *
+     * 字段（越界会被 magpie 的 optionsOf 截断或丢掉，不报错）：
+     *   key           必填，`/^[a-z0-9_-]{1,40}$/`；重复声明时只有第一个生效
+     *   label         必填，≤60 字符（空字符串 = 这条不画）
+     *   description   可选，≤300 —— 开关下面的灰字
+     *   default       可选，`true` 表示默认开
+     *   confirm       可选，≤300 —— 打开前弹确认
+     *   labels / descriptions / confirms  同上文案的多语言表（最多 16 种）
+     *   filtersModels 可选，`true` 表示开着时模型列表会少一些
+     *   placement     可选，`"top"` 置顶；其它值或不写 = 画在模型列表下面
+     * 最多 16 条；白名单外的字段一律丢弃。
+     */
+    options: [
+      {
+        key: "session-header",
+        label: "附带会话头",
+        description: "打开后每个请求带 x-xxx-session；关掉便于对比上游的缓存命中。",
+        default: true,
+        placement: "top", // ⚠ 默认置顶 —— 派生时别删
+      },
+    ],
 
     // ═══ ② 登录 ═══════════════════════════════════════════════════
     methods: [
@@ -533,6 +572,8 @@ export const XxxAuthPlugin = async (_ctx, _options) => {
   "chat.headers": async (input, output) => {
     const id = input?.model?.providerID ?? input?.provider?.info?.id
     if (id !== PROVIDER || !input?.sessionID) return
+    // 卡片开关的用法示例：关掉就不加头（见 auth.options 的 session-header）。
+    if (!optionOn("session-header")) return
     output.headers["x-xxx-session"] = String(input.sessionID).slice(0, 128)
   },
   }

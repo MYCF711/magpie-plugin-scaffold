@@ -102,6 +102,12 @@
             loader 的 `fetch` 包装里 `"user-agent"` 在跳过名单内、由插件补官方值；
             UA 在运行期才拼出来的，人工确认过它拼出来的是官方 UA
       出处：README「3. User-Agent 常常是硬校验」（含 403 TM.00000001 实测表）
+
+□ 20. 插件选项栏默认置顶（`auth.options` 的每条都写 `placement: "top"`）
+      判据：卡片编辑器里这一栏出现在**账号下面、路由上面**（magpie ≥ 含 #5269 的版本）；
+            每项 key 匹配 `/^[a-z0-9_-]{1,40}$/` 且不重复、label ≤60、总条数 ≤16；
+            开着会筛模型的开关带 `filtersModels: true`；`node --test` 有断言锁住 placement
+      出处：HOOKS 九之四
 ```
 
 ---

@@ -957,6 +957,96 @@ git 源**总是**填 `Commit`（已装）和 `Head`（远端最新），npm 源�
 
 ---
 
+## 九之四、卡片上的插件选项栏（`auth.options`）
+
+> 这一节是 **magpie 自有字段**，不在 OpenCode 的插件契约里（OpenCode 没有）。官方文档的钩子清单里也没有它 —— 它属于「数据字段」，和 `auth.icon` / `auth.maxConcurrency` 同一类。
+> 契约源码：`internal/plugin` 里 `optionsOf` 的注释（#2038）；`placement` 见 #5269。实测基线：magpie **0.1.3371**（2026-11-17 从本机二进制提取）。
+
+**`auth.options` 是供应商卡片编辑器里的一排 Off/On 开关。** 用户拨过之后，插件在运行时读到新值，**不用重装、不用重启**。
+
+```js
+auth: {
+  // …
+  options: [
+    {
+      key: "session-header",
+      label: "附带会话头",
+      description: "打开后每个请求带 x-xxx-session。",
+      default: true,
+      placement: "top", // ⚠ 置顶；不写就画在模型列表下面
+    },
+  ],
+}
+```
+
+### `placement`：决定这一栏画在哪（这就是「置顶」）
+
+magpie 把选项栏画在**两个位置之一**，由每条自己的 `placement` 决定，且**逐条分流** —— 同一个插件可以有置顶的，也可以有留在下面的：
+
+| 写什么 | 画在哪 | 出处 |
+|---|---|---|
+| `placement: "top"` | **账号下面、路由（Routing）上面** | #5269 |
+| 不写 / 其它值 | **模型列表下面** | 契约默认 |
+
+- 过滤逻辑是 `(o.placement === "top") === !!top`，渲染顺序固定：先 top 组，后底部组。
+- 「Plugin options」那段说明文字只画在**第一个出现的那组**上（有 top 组就随 top 组，否则随底部组）。
+- **老版本 magpie 一律画在模型列表下面**（它们不认 `placement`）。所以写了 `placement: "top"` 不会让插件在老版本上报错，只是不置顶 —— 新版本才生效。
+- 本模板**默认写 `placement: "top"`**：卡片一长，底部的开关用户根本滚不到。
+
+### 字段白名单（`optionsOf` 只认这些，多写的一个字都不保留）
+
+| 字段 | 必填 | 上限 / 规则 | 作用 |
+|---|---|---|---|
+| `key` | ✓ | `/^[a-z0-9_-]{1,40}$/`；重复 key 只取**第一个** | 插件读值时的键，也是「开关状态」的存储键 |
+| `label` | ✓ | ≤60 字符；空串 = 这条不画 | 开关名字 |
+| `description` | | ≤300 | 开关下面的灰字 |
+| `default` | | `=== true` 才算默认开 | 用户没拨过时的值 |
+| `confirm` | | ≤300 | 从关拨到开时先弹确认 |
+| `labels` / `descriptions` / `confirms` | | 对象，最多 16 种语言，值分别是 60 / 300 / 300 字符 | 窗口语言的同名文案（`{"zh": "…", "ja": "…"}`） |
+| `filtersModels` | | `=== true` | 声明「开着时模型列表会少一些」，编辑器在模型列表下方提示 |
+| `placement` | | 只认 `"top"` | 见上一节 |
+
+- **最多 16 条**，超出的直接不显示。
+- 长度按 `String.trim().slice()` 截断 —— 不报错，只是悄悄少字。
+- 一条 `key` 非法、或 `label` 为空，整条被跳过（**静默**）。
+- `labels` 的多语言只覆盖显示；`label` 本身必须同时保留成字符串，否则老版本 magpie 读不到任何名字。
+
+### 插件怎么读
+
+读的是**插件工厂收到的第一个参数**上的 `magpie.option`（本模板叫 `_ctx`）：
+
+```js
+export const XxxAuthPlugin = async (ctx) => {
+  const optionOn = (key, byDefault = true) => {
+    const v = ctx?.magpie?.option?.(PROVIDER, key) // provider id，不是显示名
+    return typeof v === "boolean" ? v : byDefault
+  }
+  // …
+}
+```
+
+- 第二个参数 `provider` 必须是 **provider id**（`PROVIDER` 常量），不是 `name`。
+- 旧版 magpie 根本没有 `magpie.option` —— 用 `?.` + 默认值兜底，别让它变成「装上就崩」。
+- **值是即时读的**，不是启动时快照：用户拨完开关，下一次调用就拿到新值（#2038 的设计目的就是「不重启也能生效」）。
+
+### 用户拨开关之后发生了什么
+
+1. 编辑器把改动交给 `settings/plugin-option`（按插件自己的 `pid` 存），不是写进插件目录。
+2. **模型会重新列一遍** —— 开关可能改变列出哪些模型（`filtersModels` 就是明说这一点）。
+3. 插件自己不会因此被重启；它下一次 `option(key)` 读到的就是新值。
+
+### 三条坑
+
+| 症状 | 判据 | 出处 |
+|---|---|---|
+| 开关在卡片最底部，用户找不到 | 每条都写 `placement: "top"`（不写 = 模型列表下面，老版本也全在下面） | 本节 · #5269 |
+| 开关打开后模型「少了几个」，用户以为是 bug | 声明 `filtersModels: true` —— 编辑器会在模型列表下说明「只列部分模型」。不声明的话，用户看到的就是「模型丢了」 | 本节 · `pluginFilterNote` |
+| 只填了 `labels`，老版本 magpie 上开关没有名字 | `label` 必须同时给字符串；`labels` 只是多语言补充 | 本节白名单 |
+
+**判据（能当场验）**：`index.mjs` 里 `auth.options` 每项都有 `placement: "top"`，`node --test` 锁住这一条；装进 magpie ≥ 含 #5269 的版本后，卡片编辑器里这一栏出现在**账号下面、路由上面**。
+
+---
+
 ## 十、卡片介绍页（不是钩子）
 
 **magpie 用 npm 包的 README 渲染插件卡片的介绍正文。**

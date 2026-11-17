@@ -63,7 +63,7 @@ PR 是 GitHub 对受保护分支的技术要求（直推报 `GH006`），批准�
 |---|---|---|---|
 | 16 | 加了第二个账号，第一个账号的数据变了 / 串号 | 一切按账号落盘的东西，文件名必须带账号（`<plugin>-<siteId>__<account>.json`）；**不要用模块级变量存 per-account 状态** —— 宿主是同一个进程跑所有账号 | [`src/hooks/models.mjs`](HOOKS.md) 的 `inScope` |
 | 17 | 接口抖一下，列表整个空掉；或某个模型缺价格，用户选了报错 | **部分成功有三态**，方向要各自选对：① 整个接口失败 → 退回上次快照（不要返回空表）② 接口成功但单条缺字段 → **不列**（不猜）③ 登录失效 → 抛 `signIn: "expired"` | [`src/models.mjs`](./src/models.mjs) 的 `buildModels` |
-| 18 | 越改越乱，`index.mjs` 涨到几百行，改一个钩子要读全篇 | 成熟形态是**`index.mjs` 只做九项钩子的装配，实现全在 `src/`**。实测四个真实插件的 `index.mjs` 是 80~715 行，而 `src/` 是 1.4k~3.7k 行 —— 本模板现在是 index 569 行 / `src/` 28 文件 5,331 行（已不是「单文件 78 行」） | 本文件「五、长大之后」 |
+| 18 | 越改越乱，`index.mjs` 涨到几百行，改一个钩子要读全篇 | 成熟形态是**`index.mjs` 只做九项钩子的装配，实现全在 `src/`**。实测四个真实插件的 `index.mjs` 是 80~715 行，而 `src/` 是 1.4k~3.7k 行 —— 本模板现在是 index 610 行 / `src/` 28 文件 5,331 行（已不是「单文件 78 行」） | 本文件「五、长大之后」 |
 
 还有两条是 **magpie 0.1.1763 重新提取契约后才发现**的（2026-10-28）：
 
@@ -89,6 +89,7 @@ PR 是 GitHub 对受保护分支的技术要求（直推报 `GH006`），批准�
 | 36 | **卡片上的图标是个圆的**，四角露出深色底，和旁边别的插件不齐 | magpie 把图标画在**圆角方框**里；官网 favicon 常是「品牌徽标」，WorkBuddy 那份 `logo.svg` 里 `rect rx="20"`（40 宽画布）就是正圆。真正的**应用图标**在客户端安装包里 —— Windows exe 的 PE 资源 `RT_ICON` 存着 16~256 多档 PNG，256 那档拖出来就是官方原图：`node scripts/app-icon.mjs <installer.exe> --data-uri`。判据：**别只看 favicon**；两处都要写（`auth.icon` 与 `package.json` 的 `magpie.icon`，见 HOOKS 九之三） | `scripts/app-icon.mjs` · HOOKS 九之三 |
 | 37 | **插件里的模型比厂商网页上少几个，或者倍率 / 上下文不对** | 厂商常有**两份目录**：客户端读的那份（如 `/v3/config`）更新慢，控制台 / 网页那份带完整的分角色元数据。用 [`src/catalog-union.mjs`](./src/catalog-union.mjs) 合并：控制台那份作**主目录**（同 id 用它），配置那份补它没有的 id 和促销表；`auto` / 补全 / 过小输出 / 生成图这些非聊天行过滤掉。**两份都读不到要抛**（调用方回退上次快照），返回 `[]` 会被宿主当成「这家没有模型」 | `src/catalog-union.mjs` · 本文件坑 17 |
 | 38 | **上游偶发或固定回 403 `TM.00000001`（文案是「网络繁忙，请稍后重试」），重试和换账号都没用**；或者某个 provider 换到新网络 / 新账号后就不通 | 每个打上游的 `fetch` 都**显式**带 `User-Agent`，值是**该服务官方客户端**的 UA —— 绝不写 `<包名>/<版本号>`，也绝不让宿主的 `magpie/<version>` 透传（插件不设 UA 时它就这么上去）。官方是网页就用完整 Chrome UA；有 App / CLI 客户端就用那个客户端的 UA。判据：`node scripts/check-ua.mjs` 退出 0（`npm run check` 也卡这一条） | README「3. User-Agent 常常是硬校验」· `scripts/check-ua.mjs` |
+| 39 | **卡片上的插件选项栏跑到模型列表最底下，用户找不到**；或者同一个开关在老 magpie 上位置不一样 | `auth.options` 的每一条都写 **`placement: "top"`**（magpie #5269 起生效，画在账号下面、路由上面）。不写 = 画在模型列表下面，**老版本一律画在下面**；`placement` 只认 `"top"`。开着会筛模型的开关还要 `filtersModels: true`，否则用户只会看到「模型少了几个」 | HOOKS 九之四 |
 
 ---
 
@@ -198,7 +199,7 @@ node scripts/app-icon.mjs <installer.exe> --size 256 --out icon.png
 
 | 仓库 | `index.mjs` | `src/` | `tests/` |
 |---|---|---|---|
-| 本模板 | 569 行 | 28 文件 / 5,331 行 | 28 |
+| 本模板 | 610 行 | 28 文件 / 5,331 行 | 28 |
 | `magpie-magicrew-auth` | **86** | 27 文件 / 7,773 行 | 17 |
 | `magpie-officeace` | 383 | 8 文件 / 1,566 行 | 2 |
 | `magpie-loomy-auth` | 611 | 9 文件 / 1,905 行 | 4 |
