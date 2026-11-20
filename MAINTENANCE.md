@@ -9,15 +9,15 @@
 |---|---|
 | 仓库 | `MYCF711/magpie-plugin-scaffold` |
 | npm 包名 | `magpie-plugin-scaffold` |
-| 当前版本 | `0.3.15`（功能分支，待 CI / 合入） |
+| 当前版本 | `0.3.15`（main / tag / Release 已发布） |
 | 定位 | magpie 供应商插件脚手架：九钩子模板 + 28 个通用 `src/` 模块 + 38 条坑表 + 评分卡 + 受控发布脚本 |
 | 本批来源 | 当前 magpie 真实启用的 17 个插件；清单与取舍见 `RECYCLING.md` |
 
 ## 二、当前状态（2026-11-20）
 
 ```text
-分支        feat/invite-policy-selector（基线 main 0.3.14 已发布）
-版本        0.3.15（待 PR / CI / 合入）
+分支        main（PR #40 已合入，a523763）
+版本        0.3.15（tag / Release / npm 发布流程已完成）
 本批新增    src/invite-policy.mjs · tests/invite-policy.test.mjs（12 项）· HOOKS 四之一 5b · AGENTS 坑表第 41 条
 ```
 
@@ -39,11 +39,12 @@ latest / 指定 uid / manual，分别记忆；`ask()` 按账号取码，`authori
 - `npm run check:errors`：2 通过 / 0 失败；
 - `node scripts/check-docs.mjs --sync`：9 处版本引用已同步到 0.3.15；
 - `git diff --check`：退出 0；`privacy-scan`：PASS；
-- `npm pack --dry-run`：110 个文件，`src/invite-policy.mjs` 与 `tests/invite-policy.test.mjs` 均在包内；CI / PR / Release 以本轮远端结果为准。
+- `npm pack --dry-run`：110 个文件，`src/invite-policy.mjs` 与 `tests/invite-policy.test.mjs` 均在包内；
+- PR #40 的 rules / action-self-test 全绿；main 的 check / Scorecard / release workflow 全绿；Release `v0.3.15` 非 draft，npm 日志确认 `magpie-plugin-scaffold@0.3.15` 发布。
 
 ## 三、下一步
 
-- 本批：功能分支提交 → PR 必需检查全绿 → 合入 main → `v0.3.15` 受控发布；不直推 main。
+- 本批已完成：PR #40 合入、`v0.3.15` 标签与 Release、main CI、npm 发布；后续变更另起功能分支。
 
 后续独立批次候选（不要直接混入本批）：
 
