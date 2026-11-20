@@ -146,7 +146,7 @@ auth: {
   provider: PROVIDER,
   options: [
     {
-      key: "invite_mode",                                   // ^[a-z0-9_-]{1,40}$
+      key: "invite_preferred",                                   // ^[a-z0-9_-]{1,40}$
       label: "邀请模式",                                     // ≤60，必填
       description: "开着挂首选账号的邀请链接；关着挂最近注册那个号的",
       default: false,
@@ -159,12 +159,14 @@ auth: {
 
 - 宿主在**账号下方、Routing 上方**把它画成 Off/On（要 magpie **≥ 0.1.2985**；更旧的版本忽略
   `placement`，开关落在模型下方，**不报错** —— 所以别在插件里做版本判断）。
-- 插件里用 `ctx.magpie.option(PROVIDER, "invite_mode") === true` 读，而且**在使用点现读**：
+- 插件里用 `ctx.magpie.option(PROVIDER, "invite_preferred") === true` 读，而且**在使用点现读**：
   拨开关只重拉一次模型列表，**不重跑工厂**，构造时缓存的值永远是旧的。
 - `top: true` / `placement: true` / `"bottom"` 全部等于不指定，开关不会上去。
 - 它是 **provider 级策略，不是登录方式**：不要为它新增 `auth.methods[]`。
 
 字段上限、邀请源优先级、以及「`prompts` 为空 ⇒ 手填入口不可达」那个坑：[HOOKS 四之一](./HOOKS.md)。
+
+需要「最新账号 / 指定账号 / 手动邀请码」下拉时，直接使用 [`src/invite-policy.mjs`](./src/invite-policy.mjs)：它分别记住 `latest` / uid / `manual`，在 `ask()` 按账号取码，并给 `authorize()` 同一快照；接线示例见 HOOKS 四之一 5b。不要在 `index.mjs` 再复制一套状态机。
 
 判据：`node scripts/check.mjs` 的「导出函数返回了钩子」通过；`node --test` 全过。
 

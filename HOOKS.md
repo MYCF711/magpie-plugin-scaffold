@@ -624,6 +624,49 @@ assert.ok(out.url.includes("…"))                 // ⑤ 答案必须落到 URL
 - **存活** = 该 uid 仍在 `plugin-auth.json` 里；文件读不到时按「不校验」处理，**不要当空集**
   （那会把所有源一次判死）。
 
+### 5b. 现成邀请选择运行时：`src/invite-policy.mjs`
+
+当产品需要「最新账号 / 指定账号 / 手动邀请码」下拉时，不要再到 `index.mjs` 里各写一套状态机。`createInvitePolicy()` 把 `prompts → ask → prepare → authorize` 串起来，账号目录、首选 uid、取码和存储全部由派生插件注入：
+
+```js
+import { createInvitePolicy, INVITE_PREFERRED_OPTION } from "./src/invite-policy.mjs"
+import { createInviteSourceStore } from "./src/invite-source.mjs"
+import { createInviteStore } from "./src/invite.mjs"
+import { readPreferredUid } from "./src/preferred.mjs"
+
+const invitePolicy = createInvitePolicy({
+  ctx: _ctx,
+  provider: PROVIDER,
+  sourceStore: createInviteSourceStore(PROVIDER),
+  preferredStore: createInviteStore(`${PROVIDER}-invite-source`),
+  reservedStore: createInviteStore(PROVIDER),
+  readAccounts: () => readVendorAccounts(), // [{uid, label, accountId, firstSeenAt, auth}]
+  readPreferredUid: () => readPreferredUid(PROVIDER).uid,
+  readAccountInviteCode: async (account) => fetchVendorInviteCode(account.auth),
+})
+
+// auth.options 需要时加：{ ...INVITE_PREFERRED_OPTION, default: true }
+// 登录方法：
+get prompts() { return invitePolicy.prompts() }
+async ask(inputs = {}) { return invitePolicy.ask(inputs) }
+async authorize(inputs = {}) {
+  const invite = invitePolicy.prepare(inputs)()
+  // 用厂商自己的纯函数把 invite.code / invite.shareUrl 拼到注册 URL。
+  return makeVendorAuthorizeResult(invite)
+}
+```
+
+行为契约：
+
+- `inviteSource` 下拉支持 `latest` / 指定稳定 uid / `manual`，三者**分别持久化**。`latest` 绝不能写成当前 uid，`manual` 也不能丢；无效 uid 才修回 `latest`。
+- `INVITE_PREFERRED_OPTION.default` 是 `false`，保持旧的「自动最新」行为。派生插件确需默认首选时显式写 `default: true`。关闭开关后 `prompts()` 为空，并强制 `latest`，不复用上次的指定 uid。
+- `readAccountInviteCode()` **只在 `ask()` 中等待调用**；`authorize()` 使用 `prepare()` 的同一快照，零出站，不会选了 A 却拿 B 的码。
+- `sourceStore` 只写账号索引与按 uid 分文件的码；`reservedStore` 只有用户手动输入才写。自动派生不覆盖预留码。
+- `prepare()()` 返回 `{code, shareUrl, kind, uid, selection}`；`prepare()(targetIdentity)` 命中同一 uid 时返回 `kind:"skip"` 与空码，避免自邀。
+- 无账号时降级手动文本输入，不生成空 `options` 的 select。非法手动 token / Key 不落盘，并阻止本次注册继续使用旧预留码，直到用户改正。
+
+回归：`node --test tests/invite-policy.test.mjs`（12 项）。
+
 ### 6. 邀请只能在新账号注册那一刻建立
 
 - 邀请关系是**注册提交**那一刻由服务端建的。账号已经存在再补绑，服务端会按协议拒绝

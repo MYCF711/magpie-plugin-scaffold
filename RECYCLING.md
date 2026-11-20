@@ -58,6 +58,7 @@ WPS run 生命周期与 OPC API Key 换取都留在原插件，不进入通用�
 | `src/models.mjs` | Loomy / Alysis | 增加稳定 slug/code 映射与同 id 元数据合并；未知模型不继承第一条、不补回权限表 |
 | `src/openai-sse.mjs` | Qoder | 只补无名 tool_call 收尾策略，不搬厂商 SSE |
 | `src/store.mjs` / `src/invite.mjs` | WorkBuddy Plus | 独立临时名 + 0600/0700 + 原子替换 + 时区日键；邀请存储复用同一写原语 |
+| `src/invite-policy.mjs` | magpie-croli / magpie-monkeycode | 回收 `inviteSource` 下拉与 latest / uid / manual 分别记忆的通用状态机；`ask()` 取码、`authorize()` 零出站；厂商 URL、账号读取与取码函数全部注入，不进入通用层 |
 | `src/quota.mjs` | Intern InkStone | 无 zone 时间可按显式 offset 解析，消除宿主本地时区差异 |
 | `src/usage-cache.mjs` | WPS | 合并 stale-while-revalidate 与原有按 key 缓存/单飞，旧失败值不冒充可用额度 |
 | `index.mjs` | Magicrew | 复用现有 keyed lock 做签到 single-flight；不采用第二个调用直接 `done` 的 Set 版本 |
