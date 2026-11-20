@@ -197,6 +197,8 @@ export const XxxAuthPlugin = async (_ctx, _options) => {
         placement: "top", // ⚠ 默认置顶 —— 派生时别删这一行
       },
     ],
+    // 需要「最新 / 指定账号 / 手动码」邀请来源下拉时，用 src/invite-policy.mjs；
+    // 没有邀请机制的厂商不要盲目添加 invite_preferred 开关。
 
     // ═══ ② 登录 ═══════════════════════════════════════════════════
     methods: [

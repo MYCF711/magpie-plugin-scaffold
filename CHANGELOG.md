@@ -3,6 +3,17 @@
 > 每个版本一节，**一条一行**，说用户能感知的变化。
 > 格式与规矩见 [UPDATING.md](./UPDATING.md)。
 
+## 0.3.15 — 2026-11-20
+
+**新增通用邀请来源选择运行时：`src/invite-policy.mjs`**
+
+- 从 `magpie-croli` 与 `magpie-monkeycode` 的已验证交互回收 `createInvitePolicy()`：`inviteSource` 下拉支持最新账号、指定稳定 uid 与手动邀请码；账号目录、首选 uid、取码函数与存储均注入，不带入厂商常量
+- `latest` / 指定 uid / `manual` 分别持久化：latest 不会退化成当前 uid，manual 不会丢失；关闭首选开关后强制 latest，无效 uid 才修回 latest
+- `ask()` 按所选账号取码，`prepare()` 给 `authorize()` 同一快照、零出站；取码失败只回退同一 uid 的旧缓存或用户预留；`targetIdentity` 相同显式 skip 自邀
+- 手动预留码与账号选择分文件保存；非法 token / Key 不落盘并阻止本次继续使用旧预留码；无账号时降级文本输入，不生成空 select
+- 新增 `tests/invite-policy.test.mjs` 12 项；HOOKS 四之一新增 5b 接线示例，README/GUIDE/RECYCLING 补模块入口，AGENTS 坑表新增第 41 条
+- `package.json`：`version` 0.3.14 → **0.3.15**
+
 ## 0.3.14 — 2026-11-17
 
 **模板默认带上插件选项栏，并默认置顶（`auth.options` + `placement: "top"`）**
